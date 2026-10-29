@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Janela principal sem acesso genérico a shell, filesystem ou rede.",
+  "windows": ["main"],
+  "permissions": []
+}
