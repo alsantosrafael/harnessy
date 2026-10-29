@@ -15,6 +15,8 @@ bun run start
 
 ## Comandos disponíveis
 
+Para lint, formatação, ciclos rápido/nativo, CI e auditoria contextual, consulte o [harness de desenvolvimento](harness.md). `bun run check:quick` é o gate frontend diário; `bun run verify` inclui o build.
+
 | Comando | Resultado |
 | --- | --- |
 | `bun run start` | Desktop Tauri em desenvolvimento com Vite. |

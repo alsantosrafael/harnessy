@@ -1,0 +1,7 @@
+{
+  "scopes": { "user": false, "system": false },
+  "extraRoots": [],
+  "gate": "maturity",
+  "extends": [],
+  "rules": {}
+}

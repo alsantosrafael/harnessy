@@ -1,4 +1,4 @@
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { invoke, isTauri } from "@tauri-apps/api/core";
 
 export interface AppInfo {
   version: string;
@@ -8,5 +8,5 @@ export interface AppInfo {
 
 export async function getAppInfo(): Promise<AppInfo | null> {
   if (!isTauri()) return null;
-  return invoke<AppInfo>('app_info');
+  return invoke<AppInfo>("app_info");
 }

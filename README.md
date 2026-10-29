@@ -77,6 +77,7 @@ Este é um build local: não há instalador DMG, atualização automática ou re
 | Entender telas, atalhos e rascunhos | [Guia de uso](docs/user-guide.md) |
 | Resolver erro ao abrir, compilar ou salvar | [Solução de problemas](docs/troubleshooting.md) |
 | Trabalhar no código e executar verificações | [Desenvolvimento](docs/development.md) |
+| Usar e diagnosticar o harness de desenvolvimento | [Harness do repositório](docs/harness.md) |
 | Entender o que foi implementado e validado | [Fundação técnica](docs/foundation.md) |
 | Consultar arquitetura e critérios do produto | [Especificação](SPEC.md) |
 | Acompanhar versões | [Changelog](CHANGELOG.md) |

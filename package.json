@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "bun@1.4.3",
-  "engines": { "bun": ">=1.4.3" },
+  "engines": {
+    "bun": ">=1.4.3",
+    "node": ">=22"
+  },
   "description": "Workspace local para coordenar agentes de desenvolvimento",
   "type": "module",
   "scripts": {
@@ -15,7 +18,15 @@
     "check:rust": "cargo check --manifest-path src-tauri/Cargo.toml",
     "test": "vitest run",
     "test:watch": "vitest",
-    "tauri": "bunx --bun tauri"
+    "tauri": "bunx --bun tauri",
+    "lint": "biome lint .",
+    "format:check": "biome format .",
+    "format": "biome format --write .",
+    "check:quick": "bun run lint && bun run format:check && bun run check && bun run test",
+    "verify": "bun run check:quick && bun run build",
+    "verify:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --check && cargo clippy --manifest-path src-tauri/Cargo.toml --locked -- -D warnings",
+    "harness:score": "node node_modules/harness-score/dist/cli.js . --config .harness-score.json",
+    "harness:report": "node scripts/harness-report.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
@@ -24,11 +35,13 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.8",
     "@tauri-apps/cli": "^2.0.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.4.0",
+    "harness-score": "1.8.3",
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
     "vitest": "^3.2.4"

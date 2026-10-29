@@ -4,6 +4,8 @@ O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor
 
 ## [0.1.0] — Em desenvolvimento
 
+- Harness de desenvolvimento: orientações por subtree, Biome, gates frontend/nativo, CI com permissões mínimas e auditoria local harness-score fixada.
+
 - Fundação Tauri 2, Rust, React e TypeScript.
 - Design tokens, navegação de workspace, board vazio, chat com rascunho local e conexões indisponíveis explicitamente.
 - IPC somente de metadados; nenhuma ferramenta de shell ou credencial exposta à WebView.
