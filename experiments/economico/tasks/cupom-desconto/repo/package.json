@@ -1,0 +1,6 @@
+{
+  "name": "cupom-desconto",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "bun test" }
+}

@@ -5,16 +5,16 @@
 //! executa o comando de status de cada ferramenta e resume o resultado.
 //!
 //! - [`probe`] descreve cada CLI (binário, argumentos, dicas).
-//! - [`process`] localiza e executa binários com tempo limite.
+//! - [`crate::process`] localiza e executa binários com tempo limite.
 //! - [`interpret`] traduz a saída em um [`Verdict`] sem tocar em processos.
 
 mod interpret;
 mod probe;
-mod process;
 
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
+use crate::process;
 use interpret::Verdict;
 use probe::{Probe, PROBES};
 

@@ -1,0 +1,17 @@
+schema = 1
+id = "explicar"
+nome = "Explicar"
+descricao = "Explica onde e como fazer a mudança, sem editar nada."
+papel = "implementador"
+acesso = "leitura"
+pedido = """
+Explique onde e como fazer a mudança descrita abaixo. Não edite arquivos.
+
+# Tarefa: {{tarefa}}
+## Descrição
+{{descricao}}
+## Critérios de aceitação
+{{criterios}}
+
+Diga quais arquivos e trechos mudariam, em que ordem, e quais riscos existem. Seja curto e concreto.
+"""

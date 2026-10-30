@@ -19,18 +19,36 @@ pub struct Workspace {
     pub id: i64,
     pub name: String,
     pub folder: String,
+    /// `none` (só o worktree) é o único modo implementado; ver ADR 0001.
+    pub isolation: String,
 }
 
-pub fn list(db: &Connection) -> Result<Vec<Workspace>> {
-    let mut query = db.prepare("SELECT id, name, folder FROM workspaces ORDER BY id")?;
-    let rows = query.query_map([], |r| {
-        Ok(Workspace {
+impl Workspace {
+    fn from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
+        Ok(Self {
             id: r.get(0)?,
             name: r.get(1)?,
             folder: r.get(2)?,
+            isolation: r.get(3)?,
         })
-    })?;
+    }
+}
+
+const COLUMNS: &str = "id, name, folder, isolation";
+
+pub fn list(db: &Connection) -> Result<Vec<Workspace>> {
+    let mut query = db.prepare(&format!("SELECT {COLUMNS} FROM workspaces ORDER BY id"))?;
+    let rows = query.query_map([], Workspace::from_row)?;
     Ok(rows.collect::<rusqlite::Result<_>>()?)
+}
+
+pub fn get(db: &Connection, id: i64) -> Result<Workspace> {
+    db.query_row(
+        &format!("SELECT {COLUMNS} FROM workspaces WHERE id=?1"),
+        [id],
+        Workspace::from_row,
+    )
+    .map_err(|_| AppError::Validation("Workspace não encontrado."))
 }
 
 pub fn create(db: &Connection, name: &str, folder: &str) -> Result<Workspace> {
@@ -54,6 +72,7 @@ pub fn create(db: &Connection, name: &str, folder: &str) -> Result<Workspace> {
         id: db.last_insert_rowid(),
         name: name.to_owned(),
         folder,
+        isolation: "none".to_owned(),
     })
 }
 

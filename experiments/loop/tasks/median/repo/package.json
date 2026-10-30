@@ -1,0 +1,5 @@
+{
+  "name": "median",
+  "private": true,
+  "scripts": { "test": "bun test" }
+}

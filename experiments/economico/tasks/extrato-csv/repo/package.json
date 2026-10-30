@@ -1,0 +1,6 @@
+{
+  "name": "extrato-csv",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "bun test" }
+}

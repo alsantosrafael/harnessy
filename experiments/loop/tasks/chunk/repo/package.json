@@ -1,0 +1,5 @@
+{
+  "name": "chunk",
+  "private": true,
+  "scripts": { "test": "bun test" }
+}

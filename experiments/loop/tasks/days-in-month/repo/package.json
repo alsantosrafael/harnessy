@@ -1,0 +1,5 @@
+{
+  "name": "days-in-month",
+  "private": true,
+  "scripts": { "test": "bun test" }
+}

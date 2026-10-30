@@ -1,0 +1,31 @@
+schema = 1
+id = "revisar"
+nome = "Revisar resultado"
+descricao = "Revisão independente do diff de uma run verde, só quando há sinal de risco."
+papel = "implementador"
+acesso = "leitura"
+alvo = "run"
+saida = "revisao"
+quando = "risco"
+max_turns = 8
+pedido = """
+Revise a mudança abaixo contra a tarefa e os critérios. Você não vê a conversa de quem implementou: julgue só pelo diff.
+
+Aponte apenas defeitos concretos que você consegue localizar numa linha alterada do diff: critério não atendido, comportamento errado, caso de borda quebrado, teste que não verifica o que diz. Não aponte estilo, gosto ou melhorias opcionais como "bloqueia".
+
+Responda no formato pedido: veredito "approve" ou "request_changes" e até 10 achados com arquivo, linha (do arquivo novo), severidade ("bloqueia" ou "sugere") e texto curto.
+
+# Tarefa: {{tarefa}}
+## Descrição
+{{descricao}}
+## Critérios de aceitação
+{{criterios}}
+## Verificações do núcleo
+{{checks}}
+## Contraprova
+{{contraprova}}
+## Diff
+```diff
+{{diff}}
+```
+"""

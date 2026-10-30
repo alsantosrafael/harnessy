@@ -1,0 +1,21 @@
+schema = 1
+id = "dividir-em-passos"
+nome = "Dividir em passos"
+descricao = "Propõe até 5 tarefas menores, em ordem, cada uma com critérios próprios. Você confirma antes de criar."
+papel = "implementador"
+acesso = "leitura"
+saida = "passos"
+max_turns = 10
+pedido = """
+Divida a tarefa abaixo em até 5 passos pequenos, em ordem, que possam ser implementados e verificados um de cada vez. Cada passo deve deixar o projeto com as verificações passando.
+
+Para cada passo, dê um título curto e de 1 a 4 critérios de aceitação verificáveis. Leia o código só o necessário para acertar a ordem e os nomes. Não edite nada.
+
+# Tarefa: {{tarefa}}
+## Descrição
+{{descricao}}
+## Critérios de aceitação
+{{criterios}}
+## Arquivos prováveis
+{{arquivos_provaveis}}
+"""

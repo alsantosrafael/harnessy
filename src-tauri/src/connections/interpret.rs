@@ -1,6 +1,7 @@
 //! Interpretação da saída de cada CLI. Funções puras, testadas sem processos.
 
-use super::{process::Output, Provider, State};
+use super::{Provider, State};
+use crate::process::Output;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Verdict {

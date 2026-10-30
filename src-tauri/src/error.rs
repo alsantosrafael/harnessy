@@ -27,6 +27,12 @@ pub enum AppError {
 
     #[error("{0}")]
     Validation(&'static str),
+
+    #[error("Não foi possível executar a run: {0}")]
+    Run(String),
+
+    #[error("Ação inválida: {0}")]
+    Action(String),
 }
 
 impl Serialize for AppError {

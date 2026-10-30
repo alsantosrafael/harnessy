@@ -1,0 +1,13 @@
+schema = 1
+id = "implementar"
+nome = "Implementar"
+descricao = "Faz a mudança descrita na tarefa, com as verificações do projeto."
+papel = "implementador"
+acesso = "escrita"
+pedido = """
+# Tarefa: {{tarefa}}
+## Descrição
+{{descricao}}
+## Critérios de aceitação
+{{criterios}}
+"""

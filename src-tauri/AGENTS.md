@@ -5,5 +5,5 @@ Rust owns lifecycle, tray and privileged operations. The WebView only reaches it
 - Rules for any edit here: `.claude/rules/rust-architecture.md` (path-scoped, loaded automatically by Claude Code; Codex reads it from here).
 - Architecture map and rationale: `docs/architecture-rust.md`.
 - For IPC or window changes, inspect `src/lib.rs`, `capabilities/main.json` and `tauri.conf.json` together; grant only required permissions.
-- Product version comes from the root manifest; the crate version is intentionally internal.
+- The crate version in `Cargo.toml` is the back-end version, independent of the front-end version in the root manifest. Every change here evaluates a bump; see `.claude/rules/versionamento.md`.
 - Run `bun run verify:rust` and `cargo test` from the root. Lifecycle, tray or IPC changes also need the desktop smoke checks in `../docs/development.md`.

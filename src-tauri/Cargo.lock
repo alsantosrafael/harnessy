@@ -1192,13 +1192,16 @@ dependencies = [
 
 [[package]]
 name = "harnessy"
-version = "0.0.0"
+version = "0.11.0"
 dependencies = [
  "rusqlite",
  "serde",
+ "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "thiserror 2.0.21",
+ "toml 1.1.8+spec-1.1.0",
 ]
 
 [[package]]

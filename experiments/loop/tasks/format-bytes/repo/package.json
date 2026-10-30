@@ -1,0 +1,5 @@
+{
+  "name": "format-bytes",
+  "private": true,
+  "scripts": { "test": "bun test" }
+}
