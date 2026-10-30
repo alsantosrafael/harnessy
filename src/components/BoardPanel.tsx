@@ -283,6 +283,7 @@ export function BoardPanel({
         choice.model,
         action,
         continueFrom,
+        choice.reviewer,
       );
       setRuns((current) => upsertRun(current, run));
       setOpenRun(run.id);

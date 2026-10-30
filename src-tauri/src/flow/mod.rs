@@ -518,7 +518,11 @@ fn review_cycle(
     let started = Instant::now();
     let mut finish_event: Option<Finish> = None;
     let mut session_id: Option<String> = None;
-    let exit = runtime.start(&spec, &session, &mut |event| {
+    let review_runtime: &dyn Runtime = match &reviewer.runtime {
+        Some(own) => own.as_ref(),
+        None => runtime,
+    };
+    let exit = review_runtime.start(&spec, &session, &mut |event| {
         match &event {
             AgentEvent::Started { session_id: sid } => session_id = Some(sid.clone()),
             AgentEvent::Finished(done) => finish_event = Some(done.clone()),
@@ -906,6 +910,14 @@ mod tests {
     }
 
     fn reviewed_run(label: &str, review_json: &str) -> (TempDatabase, i64, ReviewedAgent) {
+        reviewed_run_with(label, review_json, None)
+    }
+
+    fn reviewed_run_with(
+        label: &str,
+        review_json: &str,
+        external: Option<Box<dyn Runtime + Send>>,
+    ) -> (TempDatabase, i64, ReviewedAgent) {
         let repo = TempRepo::new(label);
         let temp = TempDatabase::new(&format!("flow-{label}"));
         let store = temp.open();
@@ -948,6 +960,7 @@ mod tests {
             tarefa: "Criar arquivo".into(),
             descricao: String::new(),
             criterios: "ok.txt existe".into(),
+            runtime: external,
         });
         let agent = ReviewedAgent {
             review_json: review_json.into(),
@@ -973,6 +986,55 @@ mod tests {
             .unwrap()
             .collect::<rusqlite::Result<_>>()
             .unwrap()
+    }
+
+    /// Revisor com runtime próprio (o Codex): conta as chamadas e devolve a revisão.
+    struct SeparateReviewer(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
+
+    impl Runtime for SeparateReviewer {
+        fn start(
+            &self,
+            spec: &AgentSpec<'_>,
+            _session: &Session<'_>,
+            on_event: &mut dyn FnMut(AgentEvent),
+        ) -> Exit {
+            assert_eq!(spec.access, Access::Read);
+            self.0.lock().unwrap().push(spec.prompt.to_owned());
+            on_event(AgentEvent::Finished(Finish {
+                ok: true,
+                subtype: "success".into(),
+                summary: "ok".into(),
+                session_id: None,
+                usage: CycleUsage::default(),
+                denials: 0,
+                structured: Some(r#"{"veredito":"approve","achados":[]}"#.into()),
+            }));
+            Exit::Success("ok".into())
+        }
+    }
+
+    #[test]
+    fn a_reviewer_with_its_own_runtime_reviews_instead_of_the_implementer_runtime() {
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let (temp, run_id, agent) = reviewed_run_with(
+            "review-external",
+            r#"{"veredito":"request_changes","achados":[]}"#,
+            Some(Box::new(SeparateReviewer(seen.clone()))),
+        );
+        assert_eq!(
+            agent.calls.borrow().len(),
+            1,
+            "o implementador não é chamado para revisar"
+        );
+        let prompts = seen.lock().unwrap();
+        assert_eq!(prompts.len(), 1);
+        assert!(prompts[0].contains("```diff"));
+        let store = temp.open();
+        let db = store.connection().unwrap();
+        assert_eq!(
+            run::get(&db, run_id).unwrap().review.as_deref(),
+            Some("approve")
+        );
     }
 
     #[test]

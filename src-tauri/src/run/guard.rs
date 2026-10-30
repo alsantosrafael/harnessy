@@ -38,6 +38,18 @@ pub fn next_model(current: &str) -> Option<&'static str> {
     LADDER.get(at + 1).copied()
 }
 
+/// Revisores que a interface pode escolher: o próprio Claude Code (um degrau
+/// acima do implementador) ou o Codex.
+pub const REVIEWERS: [&str; 2] = ["claude", "codex"];
+
+/// Valida o revisor escolhido na interface.
+pub fn reviewer(id: &str) -> Result<&'static str> {
+    REVIEWERS
+        .into_iter()
+        .find(|known| *known == id)
+        .ok_or(AppError::Validation("Revisor desconhecido."))
+}
+
 /// Valida o esforço declarado por uma Ação.
 pub fn effort(id: &str) -> Result<&'static str> {
     EFFORTS
@@ -203,6 +215,33 @@ fn base_args(settings: &Path, model: &str, max_turns: u32) -> Vec<String> {
     .collect()
 }
 
+/// Argumentos fixos do `codex exec`: só leitura, sem sessão gravada; o prompt
+/// segue por stdin (`-`). O `--sandbox` da linha de comando vale mais que o
+/// `config.toml` do usuário.
+pub fn codex_args(schema: Option<&Path>) -> Vec<String> {
+    let mut args: Vec<String> = [
+        "exec",
+        "--json",
+        "--sandbox",
+        "read-only",
+        "--skip-git-repo-check",
+        "--ephemeral",
+        "--color",
+        "never",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    if let Some(schema) = schema {
+        args.extend([
+            "--output-schema".into(),
+            schema.to_string_lossy().into_owned(),
+        ]);
+    }
+    args.push("-".into());
+    args
+}
+
 /// Ambiente completo do agente; o do app não é herdado. Não usa
 /// `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`: ele força o modo de permissão para
 /// `default` e é redundante, já que nenhum segredo entra na lista.
@@ -234,6 +273,27 @@ pub fn env(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn codex_runs_read_only_and_reads_the_prompt_from_stdin() {
+        let args = codex_args(Some(Path::new("/x/schema.json")));
+        let at = args.iter().position(|a| a == "--sandbox").unwrap();
+        assert_eq!(args[at + 1], "read-only");
+        assert_eq!(args.last().map(String::as_str), Some("-"));
+        assert!(args
+            .windows(2)
+            .any(|w| w == ["--output-schema", "/x/schema.json"]));
+        assert!(!codex_args(None).iter().any(|a| a == "--output-schema"));
+        assert!(!args
+            .iter()
+            .any(|a| a.contains("danger") || a.contains("write")));
+    }
+
+    #[test]
+    fn only_known_reviewers_are_accepted() {
+        assert_eq!(reviewer("codex").unwrap(), "codex");
+        assert!(reviewer("gpt").is_err());
+    }
 
     #[test]
     fn settings_deny_push_and_credentials() {

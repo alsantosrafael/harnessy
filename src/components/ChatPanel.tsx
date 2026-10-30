@@ -74,7 +74,15 @@ export function ChatPanel({
     session.edit("");
     session.flush();
     try {
-      await startRun(workspaceId, taskId, choice.runtime, choice.model);
+      await startRun(
+        workspaceId,
+        taskId,
+        choice.runtime,
+        choice.model,
+        undefined,
+        null,
+        choice.reviewer,
+      );
       onCreated(true);
     } catch (cause) {
       setError(`A tarefa foi criada em A fazer, mas a run não começou: ${message(cause)}`);

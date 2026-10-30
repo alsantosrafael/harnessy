@@ -55,6 +55,7 @@ const run = (id: number, state: string): Run => ({
   review: null,
   reviewDiscarded: null,
   baseRunId: null,
+  reviewer: null,
 });
 const event = (seq: number): RunEvent => ({ runId: 1, seq, kind: "log", text: String(seq) });
 

@@ -153,6 +153,9 @@ const MIGRATIONS: &[&str] = &[
         PRIMARY KEY (workspace_id, arquivo)
     );
 ",
+    "
+    ALTER TABLE runs ADD COLUMN reviewer TEXT CHECK (reviewer IS NULL OR reviewer IN ('claude', 'codex'));
+",
 ];
 
 /// Segundos desde a época Unix; `0` se o relógio estiver antes dela.

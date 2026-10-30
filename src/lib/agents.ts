@@ -15,7 +15,7 @@ export interface AgentOption {
 }
 
 /**
- * Agentes e modelos que o Implementador pode usar. Os ids de modelo são aliases do
+ * Agentes e modelos que o Implementador pode usar (o Codex revisa, não implementa). Os ids de modelo são aliases do
  * `claude --model` e precisam estar também em `MODELS`, em `src-tauri/src/run/guard.rs`,
  * que é quem valida a escolha.
  */
@@ -36,17 +36,30 @@ export const agents: readonly AgentOption[] = [
     label: "Codex",
     defaultModel: "",
     models: [],
-    unavailable: "sem adaptador de execução ainda",
+    unavailable: "só revisa, por enquanto",
   },
+];
+
+/** Quem revisa o resultado de uma run de escrita. */
+export type Reviewer = "claude" | "codex";
+
+export const reviewers: readonly { id: Reviewer; label: string }[] = [
+  { id: "claude", label: "Claude Code, um modelo acima" },
+  { id: "codex", label: "Codex" },
 ];
 
 export interface AgentChoice {
   runtime: Runtime;
   model: string;
+  reviewer: Reviewer;
 }
 
-/** Padrão do Implementador: Claude Code com Sonnet. */
-export const defaultChoice = (): AgentChoice => ({ runtime: "claude", model: "sonnet" });
+/** Padrão: Claude Code com Sonnet implementa e o próprio Claude Code revisa. */
+export const defaultChoice = (): AgentChoice => ({
+  runtime: "claude",
+  model: "sonnet",
+  reviewer: "claude",
+});
 
 export const agentOf = (runtime: Runtime) => agents.find((agent) => agent.runtime === runtime);
 
@@ -56,10 +69,17 @@ export const modelLabel = (choice: AgentChoice) =>
 /** Aceita qualquer valor lido do armazenamento e devolve uma escolha executável. */
 export function normalizeChoice(raw: unknown): AgentChoice {
   const value = (raw ?? {}) as Partial<AgentChoice>;
+  const reviewer = reviewers.some((item) => item.id === value.reviewer)
+    ? (value.reviewer as Reviewer)
+    : "claude";
   const agent = agents.find((item) => item.runtime === value.runtime);
-  if (!agent || agent.unavailable) return defaultChoice();
+  if (!agent || agent.unavailable) return { ...defaultChoice(), reviewer };
   const known = agent.models.some((model) => model.id === value.model);
-  return { runtime: agent.runtime, model: known ? String(value.model) : agent.defaultModel };
+  return {
+    runtime: agent.runtime,
+    model: known ? String(value.model) : agent.defaultModel,
+    reviewer,
+  };
 }
 
 const STORAGE_KEY = "harnessy.agent-choice";

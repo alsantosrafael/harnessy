@@ -127,6 +127,8 @@ export interface Run {
   nextModel: string | null;
   /** Veredito do revisor (`approve`, `request_changes`, `invalid`); `null` = não revisou. */
   review: string | null;
+  /** Revisor escolhido (`claude` ou `codex`); `null` em runs antigas, que valem `claude`. */
+  reviewer: string | null;
   /** Achados do revisor descartados por não apontarem para o diff. */
   reviewDiscarded: number | null;
   /** Run cuja branch serviu de base (passo encadeado). */
@@ -178,7 +180,17 @@ export const startRun = (
   model: string,
   action = IMPLEMENT_ACTION,
   continueFrom: number | null = null,
-) => localCall<Run>("start_run", { workspaceId, taskId, runtime, model, action, continueFrom });
+  reviewer = "claude",
+) =>
+  localCall<Run>("start_run", {
+    workspaceId,
+    taskId,
+    runtime,
+    model,
+    action,
+    continueFrom,
+    reviewer,
+  });
 /** Passo proposto por "Dividir em passos", editável antes de virar tarefa. */
 export interface StepProposal {
   title: string;

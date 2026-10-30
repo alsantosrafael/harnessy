@@ -17,7 +17,11 @@ use serde_json::json;
 use super::{failure::Failure, proof::Verdict};
 use crate::{
     action::{Action, Contexto, Quando},
-    run::{guard, prompt, runtime::Access, worktree},
+    run::{
+        guard, prompt,
+        runtime::{Access, Runtime},
+        worktree,
+    },
 };
 
 /// Linhas de contexto aceitas ao redor de um trecho alterado.
@@ -38,6 +42,8 @@ pub struct Reviewer {
     pub tarefa: String,
     pub descricao: String,
     pub criterios: String,
+    /// Runtime próprio do revisor (o Codex); `None` usa o do implementador.
+    pub runtime: Option<Box<dyn Runtime + Send>>,
 }
 
 impl Reviewer {

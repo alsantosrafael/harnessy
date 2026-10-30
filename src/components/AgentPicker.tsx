@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { type AgentChoice, agentOf, agents } from "../lib/agents";
+import { type AgentChoice, type Reviewer, agentOf, agents, reviewers } from "../lib/agents";
 import type { Runtime } from "../lib/roles";
 import "../styles/agent-picker.css";
 
@@ -8,7 +8,7 @@ interface Props {
   onChange: (choice: AgentChoice) => void;
 }
 
-/** Escolhe o agente e o modelo do Implementador. Agente sem adaptador aparece desabilitado, com o motivo. */
+/** Escolhe o agente, o modelo e o revisor. Agente sem adaptador aparece desabilitado, com o motivo. */
 export function AgentPicker({ choice, onChange }: Props) {
   const id = useId();
   const agent = agentOf(choice.runtime);
@@ -22,7 +22,7 @@ export function AgentPicker({ choice, onChange }: Props) {
           onChange={(event) => {
             const next = agentOf(event.target.value as Runtime);
             if (next && !next.unavailable) {
-              onChange({ runtime: next.runtime, model: next.defaultModel });
+              onChange({ ...choice, runtime: next.runtime, model: next.defaultModel });
             }
           }}
         >
@@ -43,6 +43,20 @@ export function AgentPicker({ choice, onChange }: Props) {
           {agent?.models.map((model) => (
             <option key={model.id} value={model.id}>
               {model.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label htmlFor={`${id}-reviewer`}>
+        Revisor
+        <select
+          id={`${id}-reviewer`}
+          value={choice.reviewer}
+          onChange={(event) => onChange({ ...choice, reviewer: event.target.value as Reviewer })}
+        >
+          {reviewers.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
             </option>
           ))}
         </select>

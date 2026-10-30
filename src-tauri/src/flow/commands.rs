@@ -16,7 +16,13 @@ use crate::{
     error::{AppError, Result},
     process,
     run::{
-        self, claude::ClaudeCode, guard, redact, supervisor::Registry, CycleRecord, NewRun, Run,
+        self,
+        claude::ClaudeCode,
+        codex::{self, Codex},
+        guard, redact,
+        runtime::Runtime,
+        supervisor::Registry,
+        CycleRecord, NewRun, Run,
     },
     task::{self, commands::emit_change, Task},
     workspace,
@@ -52,23 +58,47 @@ fn contexto<'a>(task: &'a Task, arquivos: &'a str) -> Contexto<'a> {
 
 /// Revisor da run de escrita: a Ação `revisar` do catálogo (a do usuário vence),
 /// salvo quando ela está inválida, não é sobre Run ou está em `quando = "manual"`.
+/// Com `codex`, a revisão roda no Codex; sem ele, no Claude Code, um degrau acima.
 fn reviewer_for(
     data_dir: &Path,
     repo: Option<&Repositorio<'_>>,
     task: &Task,
     model: &str,
+    codex: Option<Codex>,
 ) -> Option<Reviewer> {
     let acao = actions::find(data_dir, repo, action::REVIEW).ok()?;
     if acao.alvo != Alvo::Run || acao.saida != Saida::Revisao || acao.quando == Quando::Manual {
         return None;
     }
+    let (model, runtime) = match codex {
+        Some(codex) => (
+            codex::LABEL.to_owned(),
+            Some(Box::new(codex) as Box<dyn Runtime + Send>),
+        ),
+        None => (Reviewer::model_for(&acao, model), None),
+    };
     Some(Reviewer {
-        model: Reviewer::model_for(&acao, model),
+        model,
+        runtime,
         action: acao,
         tarefa: task.title.clone(),
         descricao: task.description.clone(),
         criterios: task.criteria.clone(),
     })
+}
+
+/// Codex do revisor escolhido; `None` quando o revisor é o Claude Code.
+fn codex_for(reviewer: &str, dirs: &[PathBuf], data_dir: &Path) -> Result<Option<Codex>> {
+    if reviewer != "codex" {
+        return Ok(None);
+    }
+    let binary = process::find_binary("codex", dirs).ok_or(AppError::Validation(
+        "Codex não encontrado neste computador.",
+    ))?;
+    let env = guard::env(dirs, &data_dir.join("cargo-target"), |name| {
+        std::env::var(name).ok()
+    });
+    Ok(Some(Codex::new(binary, data_dir.to_path_buf(), env)))
 }
 
 /// Prompt de uma Ação sobre uma Tarefa: arquivos prováveis da pasta do workspace
@@ -184,6 +214,7 @@ pub fn start_run(
     model: String,
     action: String,
     continue_from: Option<i64>,
+    reviewer: String,
 ) -> Result<Run> {
     if runtime != RUNTIME {
         return Err(AppError::Validation(
@@ -191,6 +222,7 @@ pub fn start_run(
         ));
     }
     let model = run::guard::model(&model)?;
+    let reviewer = guard::reviewer(&reviewer)?;
     let (ws, task, avoid) = {
         let db = store.connection()?;
         (
@@ -246,6 +278,12 @@ pub fn start_run(
         .path()
         .app_data_dir()
         .map_err(|_| AppError::Run("pasta de dados indisponível.".into()))?;
+    // Só run de escrita é revisada; o Codex ausente recusa antes de criar a run.
+    let codex = if read_only {
+        None
+    } else {
+        codex_for(reviewer, &dirs, &data_dir)?
+    };
     let cargo_target = data_dir.join("cargo-target");
     let runtime = ClaudeCode::new(
         claude_bin,
@@ -268,6 +306,9 @@ pub fn start_run(
             base_run_id: base.as_ref().map(|(id, _)| *id),
         },
     )?;
+    if !read_only {
+        run::set_reviewer(&*store.connection()?, created.id, reviewer)?;
+    }
     registry.register(created.id);
     // Leitura não move o card: a resposta é opinião do agente, não evidência.
     if !read_only {
@@ -300,7 +341,7 @@ pub fn start_run(
         review: if read_only {
             None
         } else {
-            reviewer_for(&data_dir_review, Some(&repo), &task, model)
+            reviewer_for(&data_dir_review, Some(&repo), &task, model, codex)
         },
         base_ref: base.map(|(_, branch)| branch),
         output_schema: (acao.saida == Saida::Passos).then_some(read::STEPS_SCHEMA),
@@ -360,6 +401,11 @@ pub fn continue_run(
         "Claude Code não encontrado neste computador.",
     ))?;
     let data_dir = app_data(&app)?;
+    let codex = codex_for(
+        guard::reviewer(previous.reviewer.as_deref().unwrap_or("claude"))?,
+        &dirs,
+        &data_dir,
+    )?;
     let runtime = ClaudeCode::new(
         claude_bin,
         data_dir.clone(),
@@ -389,7 +435,7 @@ pub fn continue_run(
         require_proof: acao.exigir_prova,
         effort: acao.esforco.clone(),
         max_turns: actions::max_turns(&acao),
-        review: reviewer_for(&app_data(&app)?, Some(&repo), &task, model),
+        review: reviewer_for(&app_data(&app)?, Some(&repo), &task, model, codex),
         base_ref: None,
         output_schema: None,
     };

@@ -2,6 +2,16 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.11.0] — 2026-10-30
+
+- Novo seletor **Revisor** (Claude Code, um modelo acima, ou Codex) ao lado de Agente e Modelo, na nova tarefa e no painel da tarefa. A escolha fica salva neste dispositivo.
+- O Codex continua indisponível como agente que implementa; agora a lista diz "só revisa, por enquanto".
+
+## Back [0.12.0] — 2026-10-30
+
+- O Codex pode revisar uma run de escrita: novo adaptador `run/codex.rs` (`codex exec --json --sandbox read-only --ephemeral`, prompt por stdin, saída estruturada por `--output-schema`), usado só pelo revisor. O filtro de achados fora do diff e o ciclo de correção são os mesmos do revisor Claude.
+- `start_run` recebe `reviewer` (`claude` ou `codex`). **BREAKING:** o argumento é obrigatório no IPC; o front 0.11.0 já o envia. `Run` ganha `reviewer`; migração 9 adiciona `runs.reviewer`. `continue_run` mantém o revisor da run.
+
 ## Front [0.10.0] — 2026-10-30
 
 - Interface mais enxuta: removidos o texto de apresentação, o banner de início, o painel de contexto, o rodapé de status e a seção de conversas. A sidebar ficou com **Nova tarefa**, **Tarefas** e **Conexões**.

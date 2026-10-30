@@ -2,11 +2,12 @@
 //!
 //! Este módulo guarda o modelo e as regras de persistência. Os subprocessos do
 //! agente ficam em [`supervisor`]; o contrato com o runtime é [`runtime`], e o
-//! adaptador do Claude Code ([`claude`]) é o único que conhece a CLI. O que é
+//! adaptadores do Claude Code ([`claude`]) e do Codex ([`codex`]) são os únicos que conhecem as CLIs. O que é
 //! entregue ao agente (prompt, settings e ambiente) é montado em Rust
 //! (regras 25–28).
 
 pub mod claude;
+pub mod codex;
 pub mod commands;
 pub mod guard;
 pub mod prompt;
@@ -53,7 +54,7 @@ const MAX_DENIAL_BYTES: usize = 80;
 const COLUMNS: &str = "id, workspace_id, task_id, title, action, role, runtime, state, \
                        base_sha, branch, worktree_path, started_at, finished_at, summary, blocked, \
                        model, cycles, turns, input_tokens, output_tokens, cache_read_tokens, \
-                       cache_write_tokens, cost_usd, agent_ms, checks_ms, proof, effort, review, review_discarded, base_run_id, \
+                       cache_write_tokens, cost_usd, agent_ms, checks_ms, proof, effort, review, review_discarded, base_run_id, reviewer, \
                        (SELECT c.model FROM run_cycles c WHERE c.run_id = runs.id \
                         ORDER BY c.cycle DESC LIMIT 1)";
 
@@ -105,6 +106,8 @@ pub struct Run {
     pub review_discarded: Option<i64>,
     /// Run cuja branch serviu de base (passo encadeado); `None` = ramo base do workspace.
     pub base_run_id: Option<i64>,
+    /// Revisor escolhido (`claude` ou `codex`); `None` em runs anteriores a ele, que valem `claude`.
+    pub reviewer: Option<String>,
     /// Modelo do último ciclo gravado.
     pub last_model: Option<String>,
     /// Próximo modelo da lista acima do último ciclo; `None` no topo.
@@ -144,11 +147,12 @@ impl Run {
             review: r.get(27)?,
             review_discarded: r.get(28)?,
             base_run_id: r.get(29)?,
+            reviewer: r.get(30)?,
             last_model: None,
             next_model: None,
         })
         .and_then(|mut run| {
-            run.last_model = r.get::<_, Option<String>>(30)?.or(run.model.clone());
+            run.last_model = r.get::<_, Option<String>>(31)?.or(run.model.clone());
             run.next_model = run
                 .last_model
                 .as_deref()
@@ -428,6 +432,15 @@ pub fn set_review(db: &Connection, id: i64, verdict: &str, discarded: usize) -> 
     db.execute(
         "UPDATE runs SET review=?2, review_discarded=?3 WHERE id=?1",
         params![id, verdict, discarded as i64],
+    )?;
+    Ok(())
+}
+
+/// Grava o revisor escolhido para a run (já validado por [`guard::reviewer`]).
+pub fn set_reviewer(db: &Connection, id: i64, reviewer: &str) -> Result<()> {
+    db.execute(
+        "UPDATE runs SET reviewer=?2 WHERE id=?1",
+        params![id, reviewer],
     )?;
     Ok(())
 }

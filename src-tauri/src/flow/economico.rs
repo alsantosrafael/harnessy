@@ -316,6 +316,7 @@ fn economico() {
                             tarefa: task.title.clone(),
                             descricao: task.body.clone(),
                             criterios: task.criteria.clone(),
+                            runtime: None,
                         }),
                         base_ref: None,
                         output_schema: None,

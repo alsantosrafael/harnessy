@@ -75,7 +75,7 @@ impl Runtime for ClaudeCode {
 }
 
 /// Desfecho do ciclo a partir de como o processo terminou e do resultado reportado.
-fn exit_of(end: &End, finish: Option<&Finish>) -> Exit {
+pub(super) fn exit_of(end: &End, finish: Option<&Finish>) -> Exit {
     if end.cancelled {
         return Exit::Cancelled;
     }

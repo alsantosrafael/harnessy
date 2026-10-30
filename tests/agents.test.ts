@@ -4,7 +4,7 @@ import { agentOf, agents, defaultChoice, modelLabel, normalizeChoice } from "../
 import { splitDraft } from "../src/lib/chatTask.ts";
 
 test("the default is Claude Code with Sonnet, and every executable agent lists its default model", () => {
-  assert.deepEqual(defaultChoice(), { runtime: "claude", model: "sonnet" });
+  assert.deepEqual(defaultChoice(), { runtime: "claude", model: "sonnet", reviewer: "claude" });
   for (const agent of agents.filter((item) => !item.unavailable)) {
     assert.ok(agent.models.some((model) => model.id === agent.defaultModel));
   }
@@ -14,6 +14,7 @@ test("a stored choice is kept only if it is executable and the model is known", 
   assert.deepEqual(normalizeChoice({ runtime: "claude", model: "opus" }), {
     runtime: "claude",
     model: "opus",
+    reviewer: "claude",
   });
   assert.deepEqual(normalizeChoice({ runtime: "claude", model: "gpt-5" }), defaultChoice());
   assert.deepEqual(normalizeChoice({ runtime: "codex", model: "x" }), defaultChoice());
@@ -22,10 +23,22 @@ test("a stored choice is kept only if it is executable and the model is known", 
   assert.deepEqual(normalizeChoice("lixo"), defaultChoice());
 });
 
-test("Codex is listed but not selectable until it has an execution adapter", () => {
+test("the reviewer is kept when valid, even if the implementer choice is discarded", () => {
+  assert.equal(
+    normalizeChoice({ runtime: "claude", model: "opus", reviewer: "codex" }).reviewer,
+    "codex",
+  );
+  assert.deepEqual(normalizeChoice({ runtime: "codex", reviewer: "codex" }), {
+    ...defaultChoice(),
+    reviewer: "codex",
+  });
+  assert.equal(normalizeChoice({ reviewer: "gpt" }).reviewer, "claude");
+});
+
+test("Codex is listed as implementer but not selectable: it only reviews", () => {
   assert.ok(agentOf("codex")?.unavailable);
   assert.equal(agentOf("claude")?.unavailable, undefined);
-  assert.equal(modelLabel({ runtime: "claude", model: "fable" }), "Fable");
+  assert.equal(modelLabel({ runtime: "claude", model: "fable", reviewer: "claude" }), "Fable");
 });
 
 test("the first line becomes the title and the rest the description", () => {
