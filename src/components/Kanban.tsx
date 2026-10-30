@@ -27,7 +27,8 @@ interface Props {
   /** Abre a tarefa com o cursor no título. */
   onEdit: (id: number) => void;
   onDelete: (id: number) => void;
-  onCreate: (draft: NewTaskDraft) => Promise<void>;
+  /** Resolve `true` só quando a tarefa foi gravada; `false` mantém o rascunho na tela. */
+  onCreate: (draft: NewTaskDraft) => Promise<boolean>;
 }
 
 /** Tarefas do workspace em quatro raias. Mover: botão do card, teclado ou arrastar. */
@@ -101,7 +102,7 @@ export function Kanban({
 }
 
 /** Nova tarefa: o título basta; descrição e critérios são opcionais e podem vir depois. */
-function Composer({ onCreate }: { onCreate: (draft: NewTaskDraft) => Promise<void> }) {
+function Composer({ onCreate }: { onCreate: (draft: NewTaskDraft) => Promise<boolean> }) {
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [detailed, setDetailed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -110,12 +111,13 @@ function Composer({ onCreate }: { onCreate: (draft: NewTaskDraft) => Promise<voi
   async function submit() {
     if (!ready || busy) return;
     setBusy(true);
-    await onCreate({
+    const created = await onCreate({
       title: draft.title.trim(),
       description: draft.description.trim(),
       criteria: draft.criteria.trim(),
     });
-    setDraft(EMPTY_DRAFT);
+    // Só limpa após gravar: uma falha mantém o texto para o usuário tentar de novo.
+    if (created) setDraft(EMPTY_DRAFT);
     setBusy(false);
   }
 

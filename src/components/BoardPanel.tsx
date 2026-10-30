@@ -257,8 +257,8 @@ export function BoardPanel({
   }, [hidden]);
 
   const create = useCallback(
-    async (draft: NewTaskDraft) => {
-      if (workspaceId === null) return;
+    async (draft: NewTaskDraft): Promise<boolean> => {
+      if (workspaceId === null) return false;
       try {
         const task = await saveTask({
           workspaceId,
@@ -269,8 +269,10 @@ export function BoardPanel({
         setTasks((current) => [task, ...current]);
         flash(task.id);
         setLive(`Tarefa "${task.title}" criada em A fazer.`);
+        return true;
       } catch (cause) {
         setError(message(cause));
+        return false;
       }
     },
     [workspaceId, flash],
