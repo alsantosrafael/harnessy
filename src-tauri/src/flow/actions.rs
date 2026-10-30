@@ -107,7 +107,9 @@ mod tests {
         assert!(prompt.contains("# Tarefa: Ajustar texto"));
         assert!(prompt.contains("Trocar o rótulo."));
         assert!(prompt.contains("O rótulo novo aparece."));
-        assert!(prompt.contains("O Harnessy roda as verificações do projeto ao final"));
+        assert!(prompt.contains(
+            "O Harnessy já instalou as dependências e roda as verificações do projeto ao final"
+        ));
         assert!(!prompt.contains("Rode as verificações do projeto descritas no AGENTS.md"));
     }
 

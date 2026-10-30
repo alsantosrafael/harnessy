@@ -14,7 +14,8 @@ pub fn compose(access: Access, pedido: &str, avoid: &[String]) -> String {
                 "Siga o AGENTS.md e as convenções do repositório; faça só o que o pedido pede.",
                 "Não faça push nem abra PR: o Harnessy publica. Commits locais são permitidos; o que sobrar sem commit o Harnessy commita.",
                 "Não edite arquivos protegidos: `.git`, `.claude`, `.harnessy`, `.env*`, `bun.lock` e `Cargo.lock`.",
-                "O Harnessy roda as verificações do projeto ao final; você pode rodar os comandos de verificação antes se quiser conferir.",
+                "O Harnessy já instalou as dependências e roda as verificações do projeto ao final. Para conferir antes, rode um comando por vez, como `bun run test`, `bun run lint` ou `bun run check`; não rode instalação, `bunx` nem `cd`/`;`/`||` encadeando comandos.",
+                "Cada parte de um comando precisa ser permitida: se uma for negada, o comando inteiro falha, mas isso não desliga o Bash. Rode de novo só o comando simples. Edite arquivos com as ferramentas de edição, não com redirecionamento do shell (`>`, `<<EOF`).",
                 "Termine com um resumo curto do que mudou.",
             ],
         ),
@@ -57,8 +58,10 @@ mod tests {
         assert!(prompt.contains("Não faça push nem abra PR"));
         assert!(prompt.contains("Não edite arquivos protegidos"));
         assert!(prompt.contains(
-            "O Harnessy roda as verificações do projeto ao final; você pode rodar os comandos de verificação antes se quiser conferir."
+            "O Harnessy já instalou as dependências e roda as verificações do projeto ao final."
         ));
+        assert!(prompt.contains("`bun run test`"));
+        assert!(prompt.contains("isso não desliga o Bash"));
         assert!(!prompt.contains("Rode as verificações do projeto descritas no AGENTS.md"));
         assert!(prompt.ends_with("# Tarefa: Ajustar texto\n"));
     }

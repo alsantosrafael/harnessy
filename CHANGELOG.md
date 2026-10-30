@@ -2,6 +2,10 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Back [0.13.1] — 2026-10-30
+
+- Corrigido: o agente concluía que "o Bash está negado" e deixava de rodar testes e lint. Ele encadeava `ls … || bun install …; bun run test`, e como cada parte do comando precisa ser permitida (e `bun install`/`bunx` não são, de propósito: baixam e executam código de rede), tudo era negado. O prompt de escrita agora diz que as dependências já estão instaladas, manda rodar um comando simples por vez (`bun run test`, `bun run lint`, `bun run check`), proíbe instalação, `bunx` e encadeamento, explica que uma negação não desliga o Bash e pede editar arquivos pelas ferramentas de edição, não por redirecionamento. As permissões não mudaram.
+
 ## Front [0.12.0] — 2026-10-30
 
 - **Chat** voltou como tela própria: runs à esquerda (em andamento no topo, anteriores recolhidas) e, à direita, a conversa ao vivo do agente — mensagens dele, ações agrupadas, logs técnicos recolhidos e o resultado da revisão — com o campo de nova tarefa embaixo (⌘↵ inicia). O Chat mostra quantas runs estão em andamento.
