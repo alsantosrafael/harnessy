@@ -15,6 +15,7 @@ import type { Runtime } from "../lib/roles";
 import {
   canTryNextModel,
   isActive,
+  ledgerItems,
   proofLabel,
   type ProofTone,
   stateLabel,
@@ -255,6 +256,14 @@ export function RunFeed({ run, events, onError, onStepsCreated }: Props) {
           <p className="muted">
             {agent} · {modelName(run.runtime as Runtime, run.model ?? "")} · {stateLabel(run.state)}
             {run.branch ? ` · ${run.branch}` : ""}
+          </p>
+          <p className="muted run-ledger">
+            {ledgerItems(run).map((item, at) => (
+              <span key={item.label}>
+                {at > 0 && " · "}
+                {item.label} {item.value}
+              </span>
+            ))}
           </p>
         </div>
         {active && (

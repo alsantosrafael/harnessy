@@ -2,6 +2,20 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.14.0] — 2026-10-30
+
+- No **Chat**, com uma run aberta o campo vira **Pedir ajuste**: o texto continua na mesma tarefa, partindo da branch da run concluída, em vez de criar uma tarefa nova. **Nova tarefa** (ao lado do botão) volta ao modo de criação. Com a run em andamento, o campo explica que é preciso esperar.
+- O padrão de revisão passou a **Sempre**. Quem já tinha "Só com risco" salvo mantém a escolha.
+
+## Back [0.14.0] — 2026-10-30
+
+- `start_run` recebe `instruction` opcional (ajuste pedido numa run encadeada, até 4.000 caracteres), anexado depois do pedido da Ação. Compatível: sem o argumento, nada muda.
+- Quando a revisão não roda porque a mudança foi comprovada e o diff é pequeno (`quando = "risco"`), a conversa registra "Revisão dispensada" e como pedir revisão sempre. Falha ao ler o diff também é registrada, em vez de a revisão sumir em silêncio.
+
+## Front [0.13.0] — 2026-10-30
+
+- O detalhe da Run mostra uma linha com tempo do agente, tempo das verificações, tokens de entrada e saída, custo e ciclos. Campo sem valor aparece como "não informado"; zero só quando o valor real é zero. Durações em segundos com uma casa decimal; tokens com separador de milhar.
+
 ## Back [0.13.1] — 2026-10-30
 
 - Corrigido: o agente concluía que "o Bash está negado" e deixava de rodar testes e lint. Ele encadeava `ls … || bun install …; bun run test`, e como cada parte do comando precisa ser permitida (e `bun install`/`bunx` não são, de propósito: baixam e executam código de rede), tudo era negado. O prompt de escrita agora diz que as dependências já estão instaladas, manda rodar um comando simples por vez (`bun run test`, `bun run lint`, `bun run check`), proíbe instalação, `bunx` e encadeamento, explica que uma negação não desliga o Bash e pede editar arquivos pelas ferramentas de edição, não por redirecionamento. As permissões não mudaram.

@@ -61,13 +61,13 @@ export interface AgentChoice {
   reviewWhen: ReviewWhen;
 }
 
-/** Padrão: Claude Code com Sonnet implementa; o próprio Claude Code revisa quando há risco. */
+/** Padrão: Claude Code com Sonnet implementa; o próprio Claude Code revisa toda run. */
 export const defaultChoice = (): AgentChoice => ({
   runtime: "claude",
   model: "sonnet",
   reviewer: "claude",
   reviewerModel: "",
-  reviewWhen: "auto",
+  reviewWhen: "always",
 });
 
 export const agentOf = (runtime: Runtime) => agents.find((agent) => agent.runtime === runtime);
@@ -104,7 +104,7 @@ export function normalizeChoice(raw: unknown): AgentChoice {
     reviewerModel: normalizeModel(reviewer, value.reviewerModel, true),
     reviewWhen: reviewWhens.some((item) => item.id === value.reviewWhen)
       ? (value.reviewWhen as ReviewWhen)
-      : "auto",
+      : defaultChoice().reviewWhen,
   };
 }
 

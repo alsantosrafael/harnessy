@@ -10,13 +10,13 @@ import {
 } from "../src/lib/agents.ts";
 import { splitDraft } from "../src/lib/chatTask.ts";
 
-test("the default is Claude Code with Sonnet, reviewed by Claude Code when there is risk", () => {
+test("the default is Claude Code with Sonnet, reviewed by Claude Code on every run", () => {
   assert.deepEqual(defaultChoice(), {
     runtime: "claude",
     model: "sonnet",
     reviewer: "claude",
     reviewerModel: "",
-    reviewWhen: "auto",
+    reviewWhen: "always",
   });
   for (const agent of agents) {
     assert.ok(agent.models.some((model) => model.id === agent.defaultModel));
@@ -54,19 +54,20 @@ test("Codex can implement and review, with the default or a typed model id", () 
   assert.equal(normalizeChoice({ runtime: "codex", model: "" }).model, "codex");
 });
 
-test("the Claude reviewer may stay automatic; unknown policies fall back to auto", () => {
+test("the Claude reviewer may stay automatic; unknown policies fall back to always", () => {
   assert.equal(normalizeChoice({ reviewer: "claude", reviewerModel: "" }).reviewerModel, "");
   assert.equal(
     normalizeChoice({ reviewer: "claude", reviewerModel: "opus" }).reviewerModel,
     "opus",
   );
-  assert.equal(normalizeChoice({ reviewWhen: "talvez" }).reviewWhen, "auto");
+  assert.equal(normalizeChoice({ reviewWhen: "talvez" }).reviewWhen, "always");
+  assert.equal(normalizeChoice({ reviewWhen: "auto" }).reviewWhen, "auto");
 });
 
 test("the summary says who implements, who reviews and when", () => {
   assert.equal(
     choiceSummary(defaultChoice()),
-    "Claude Code · Sonnet · revisa: Claude Code, um modelo acima (com risco)",
+    "Claude Code · Sonnet · revisa: Claude Code, um modelo acima (sempre)",
   );
   assert.equal(
     choiceSummary({

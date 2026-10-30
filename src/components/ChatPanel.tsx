@@ -1,9 +1,10 @@
-import { Send } from "lucide-react";
+import { Plus, Send } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import type { AgentChoice } from "../lib/agents";
 import { splitDraft } from "../lib/chatTask";
 import { saveTask, type LocalTask, type Workspace } from "../lib/desktop";
 import { DRAFT_LIMIT, type DraftSession } from "../lib/drafts";
+import { isActive } from "../lib/runs";
 import type { RunsState } from "../lib/useRuns";
 import { AgentPicker } from "./AgentPicker";
 import { RunFeed } from "./RunFeed";
@@ -54,17 +55,38 @@ export function ChatPanel({
   const { runs, openRun, events } = runsState;
   const shown = runs.find((run) => run.id === openRun) ?? null;
 
+  // Com uma run aberta, o campo pede ajuste nela (mesma tarefa); sem run, cria tarefa nova.
+  const iterating = shown !== null;
+  const running = shown !== null && isActive(shown);
+
   // Dito em texto, não só no botão desabilitado: o que falta para iniciar.
   const blockedBy = !agentReady
     ? "Agente ou git não foram encontrados. Veja em Conexões."
     : workspaceId === null
       ? "Crie um workspace em Tarefas para guardar a tarefa."
-      : !draft.trim()
-        ? ""
+      : running
+        ? "A run está em andamento. Quando terminar, peça o ajuste aqui."
         : "";
 
+  async function iterate(run: NonNullable<typeof shown>) {
+    setBusy(true);
+    setError("");
+    // Só uma run concluída tem branch para continuar; nas outras o ajuste parte do código atual.
+    const base = run.state === "completed" && run.branch ? run.id : null;
+    const next = await runsState.start(run.taskId, choice, run.action, base, draft.trim());
+    if (next) {
+      session.edit("");
+      session.flush();
+    } else {
+      setError("O ajuste não foi iniciado. O texto continua no campo.");
+    }
+    onCreated(next !== null);
+    setBusy(false);
+  }
+
   async function start() {
-    if (!agentReady || busy || workspaceId === null || !draft.trim()) return;
+    if (!agentReady || busy || workspaceId === null || !draft.trim() || running) return;
+    if (shown) return iterate(shown);
     setBusy(true);
     setError("");
     const { title, description } = splitDraft(draft);
@@ -145,7 +167,11 @@ export function ChatPanel({
                   void start();
                 }
               }}
-              placeholder="Nova tarefa: o que o agente deve fazer? Não inclua senhas, tokens ou arquivos .env."
+              placeholder={
+                iterating
+                  ? "Peça um ajuste nesta run. O agente continua da branch dela, na mesma tarefa."
+                  : "Nova tarefa: o que o agente deve fazer? Não inclua senhas, tokens ou arquivos .env."
+              }
               aria-describedby={blockedBy ? "start-hint draft-status" : "draft-status"}
               rows={3}
             />
@@ -168,12 +194,23 @@ export function ChatPanel({
                 </label>
                 <AgentPicker choice={choice} onChange={onChoice} />
               </div>
+              {iterating && (
+                <button
+                  type="button"
+                  className="button"
+                  disabled={busy}
+                  onClick={() => runsState.open(null)}
+                >
+                  <Plus size={14} aria-hidden="true" />
+                  Nova tarefa
+                </button>
+              )}
               <button
                 className="button primary"
                 disabled={Boolean(blockedBy) || busy || !draft.trim()}
                 aria-describedby={blockedBy ? "start-hint" : undefined}
               >
-                {busy ? "Iniciando…" : "Iniciar"}
+                {busy ? "Iniciando…" : iterating ? "Pedir ajuste" : "Iniciar"}
                 <Send size={14} aria-hidden="true" />
               </button>
             </div>

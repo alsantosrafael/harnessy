@@ -15,7 +15,7 @@ use crate::{
     error::{AppError, Result},
     process,
     run::{
-        self, claude::ClaudeCode, codex::Codex, guard, redact, runtime::Runtime,
+        self, claude::ClaudeCode, codex::Codex, guard, prompt, redact, runtime::Runtime,
         supervisor::Registry, CycleRecord, NewRun, Run,
     },
     task::{self, commands::emit_change, Task},
@@ -255,6 +255,7 @@ pub fn start_run(
     reviewer: String,
     reviewer_model: String,
     review_when: String,
+    instruction: Option<String>,
 ) -> Result<Run> {
     let runtime_id = guard::runtime(&runtime)?;
     let model = guard::agent_model(runtime_id, &model)?;
@@ -358,7 +359,10 @@ pub fn start_run(
     let job = Job {
         run_id: created.id,
         title,
-        prompt: prompt_for(&acao, &task, &ws.folder, &avoid),
+        prompt: prompt::with_followup(
+            prompt_for(&acao, &task, &ws.folder, &avoid),
+            instruction.as_deref().unwrap_or(""),
+        )?,
         repo: ws.folder.into(),
         data_dir,
         model: model.clone(),

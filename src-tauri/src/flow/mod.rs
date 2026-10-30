@@ -487,8 +487,23 @@ fn review_cycle(
     runtime: &dyn Runtime,
 ) -> Option<review::Outcome> {
     let id = job.run_id;
-    let diffs = review::diffs(git, dirs, &plan.dir, &plan.base).ok()?;
+    let diffs = match review::diffs(git, dirs, &plan.dir, &plan.base) {
+        Ok(diffs) => diffs,
+        Err(_) => {
+            sink.event(
+                id,
+                "status",
+                "Revisão não rodou: não foi possível ler o diff.",
+            );
+            return None;
+        }
+    };
     if !review::is_due(reviewer.action.quando, proof.verdict, diffs.size) {
+        sink.event(
+            id,
+            "status",
+            "Revisão dispensada: a mudança foi comprovada e o diff é pequeno. Escolha revisar \"Sempre\" para revisar toda run.",
+        );
         return None;
     }
     sink.event(

@@ -3,6 +3,10 @@
 //! Uma Ação não consegue remover estas regras, porque o início não vem dela.
 
 use super::runtime::Access;
+use crate::error::{AppError, Result};
+
+/// Tamanho máximo do ajuste pedido numa run encadeada.
+const MAX_FOLLOWUP_CHARS: usize = 4_000;
 
 /// Início do prompt, antes do pedido da Ação. Escrita e leitura têm regras próprias.
 /// `avoid` são comandos que o Harnessy já negou neste workspace (fato, não opinião).
@@ -47,6 +51,21 @@ pub fn compose(access: Access, pedido: &str, avoid: &[String]) -> String {
     prompt
 }
 
+/// Ajuste pedido pelo usuário numa run encadeada: vai depois do pedido da Ação,
+/// que continua valendo. Texto vazio deixa o prompt como está.
+pub fn with_followup(prompt: String, instruction: &str) -> Result<String> {
+    let instruction = instruction.trim();
+    if instruction.is_empty() {
+        return Ok(prompt);
+    }
+    if instruction.chars().count() > MAX_FOLLOWUP_CHARS {
+        return Err(AppError::Validation("O ajuste pedido é longo demais."));
+    }
+    Ok(format!(
+        "{prompt}\n\n## Ajuste pedido agora\nO trabalho anterior desta tarefa já está neste worktree. Faça só o ajuste abaixo, sem refazer o que já está certo.\n\n{instruction}\n"
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -82,5 +101,16 @@ mod tests {
         let rule = "- Não tente: `curl`, `git push` (negados pelo Harnessy neste projeto).";
         assert!(prompt.contains(rule));
         assert!(prompt.find(rule).unwrap() < prompt.find("Pedido.").unwrap());
+    }
+
+    #[test]
+    fn followup_goes_after_the_request_and_empty_text_changes_nothing() {
+        let base = compose(Access::Write, "Pedido.", &[]);
+        assert_eq!(with_followup(base.clone(), "  ").unwrap(), base);
+        assert!(with_followup(base.clone(), &"x".repeat(4_001)).is_err());
+        let prompt = with_followup(base.clone(), "Use vírgula no custo.").unwrap();
+        assert!(prompt.starts_with(&base));
+        assert!(prompt.ends_with("Use vírgula no custo.\n"));
+        assert!(prompt.contains("## Ajuste pedido agora"));
     }
 }

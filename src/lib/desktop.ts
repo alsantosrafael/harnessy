@@ -184,6 +184,7 @@ export const startRun = (
   choice: AgentChoice,
   action = IMPLEMENT_ACTION,
   continueFrom: number | null = null,
+  instruction: string | null = null,
 ) =>
   localCall<Run>("start_run", {
     workspaceId,
@@ -195,6 +196,7 @@ export const startRun = (
     reviewer: choice.reviewer,
     reviewerModel: choice.reviewerModel,
     reviewWhen: choice.reviewWhen,
+    instruction,
   });
 /** Passo proposto por "Dividir em passos", editável antes de virar tarefa. */
 export interface StepProposal {

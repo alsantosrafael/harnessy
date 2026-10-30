@@ -103,3 +103,46 @@ export function chainBase(task: LocalTask, runs: readonly Run[]): Run | null {
     ) ?? null
   );
 }
+
+const NOT_REPORTED = "não informado";
+const integer = new Intl.NumberFormat("pt-BR");
+const seconds = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+const dollars = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+});
+
+/** Contagem do ledger com separador de milhar; `null` é "não informado", nunca zero. */
+export const ledgerCount = (value: number | null) =>
+  value === null ? NOT_REPORTED : integer.format(value);
+
+/** Duração em milissegundos, mostrada em segundos com uma casa decimal. */
+export const ledgerSeconds = (ms: number | null) =>
+  ms === null ? NOT_REPORTED : `${seconds.format(ms / 1000)} s`;
+
+/** Menor custo exibível com quatro casas; abaixo disso, um custo real nunca vira "US$ 0,00". */
+const SMALLEST_COST = 0.0001;
+
+/** Custo em dólares; `null` é "não informado". Positivo e menor que a precisão mostra "< US$ 0,0001". */
+export const ledgerCost = (usd: number | null) => {
+  if (usd === null) return NOT_REPORTED;
+  if (usd > 0 && usd < SMALLEST_COST / 2) return `< ${dollars.format(SMALLEST_COST)}`;
+  return dollars.format(usd);
+};
+
+/** Linha do ledger da run: tempos, tokens, custo e ciclos, na ordem em que aparecem na tela. */
+export function ledgerItems(run: Run): { label: string; value: string }[] {
+  return [
+    { label: "Tempo do agente", value: ledgerSeconds(run.agentMs) },
+    { label: "Verificações", value: ledgerSeconds(run.checksMs) },
+    { label: "Tokens de entrada", value: ledgerCount(run.inputTokens) },
+    { label: "Tokens de saída", value: ledgerCount(run.outputTokens) },
+    { label: "Custo", value: ledgerCost(run.costUsd) },
+    { label: "Ciclos", value: ledgerCount(run.cycles) },
+  ];
+}

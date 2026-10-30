@@ -5,6 +5,8 @@ import {
   canStartRun,
   canTryNextModel,
   chainBase,
+  ledgerCost,
+  ledgerItems,
   mergeEvents,
   proofLabel,
   reviewLabel,
@@ -144,4 +146,32 @@ test("the run list shows elapsed time in short Portuguese units", () => {
   assert.equal(timeAgo(now - 3 * 3600, now), "há 3 h");
   assert.equal(timeAgo(now - 2 * 86400, now), "há 2 d");
   assert.equal(timeAgo(now + 10, now), "agora");
+});
+
+test("the run ledger shows null as not reported and real zero as zero", () => {
+  const values = (item: Partial<Run>) =>
+    Object.fromEntries(
+      ledgerItems({ ...run(1, "completed"), ...item }).map((line) => [line.label, line.value]),
+    );
+  const filled = values({
+    agentMs: 12_345,
+    checksMs: 0,
+    inputTokens: 1_234_567,
+    outputTokens: null,
+    costUsd: 0.1234,
+    cycles: 0,
+  });
+  assert.equal(filled["Tempo do agente"], "12,3 s");
+  assert.equal(filled.Verificações, "0,0 s");
+  assert.equal(filled["Tokens de entrada"], "1.234.567");
+  assert.equal(filled["Tokens de saída"], "não informado");
+  assert.match(filled.Custo, /^US\$\s0,1234$/);
+  assert.equal(filled.Ciclos, "0");
+
+  // Custo real positivo nunca vira zero, mesmo abaixo da precisão exibida.
+  assert.match(ledgerCost(0.00001), /^< US\$\s0,0001$/);
+  assert.match(ledgerCost(0), /^US\$\s0,00$/);
+
+  const empty = values({});
+  assert.deepEqual(Object.values(empty), Array(6).fill("não informado"));
 });

@@ -27,6 +27,7 @@ export interface RunsState {
     choice: AgentChoice,
     action?: string,
     continueFrom?: number | null,
+    instruction?: string | null,
   ) => Promise<Run | null>;
 }
 
@@ -110,11 +111,11 @@ export function useRuns(
   }, [openRun, workspaceId, openRunActive]);
 
   const start = useCallback<RunsState["start"]>(
-    async (taskId, choice, action, continueFrom = null) => {
+    async (taskId, choice, action, continueFrom = null, instruction = null) => {
       if (workspaceId === null) return null;
       setStarting(true);
       try {
-        const run = await startRun(workspaceId, taskId, choice, action, continueFrom);
+        const run = await startRun(workspaceId, taskId, choice, action, continueFrom, instruction);
         setRuns((current) => upsertRun(current, run));
         setOpenRun(run.id);
         return run;
