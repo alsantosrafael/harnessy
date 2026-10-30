@@ -20,3 +20,4 @@ O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor
 - Workspaces e tarefas locais persistidos em SQLite, com controle de revisão para edições concorrentes.
 - Conexões reais com GitHub, Codex e Claude Code via estado das CLIs oficiais (`gh`, `codex`, `claude`): detecção de instalação, sessão e conta, sem leitura ou armazenamento de credenciais; autenticação continua pelo terminal.
 - Runtime fixo por papel: Claude Code refina e implementa, Codex revisa e testa (SPEC 1.2, `src/lib/roles.ts`).
+- Núcleo Rust reorganizado por domínio com erro único e IPC fino; regras em `.claude/rules/rust-architecture.md` e mapa em `docs/architecture-rust.md`. Sem mudança de comportamento.

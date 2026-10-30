@@ -50,8 +50,12 @@ src/
   styles/app.css           # Estilos da fundação
   styles/refinements.css   # Refinamentos de UX e adaptação
 src-tauri/
-  src/lib.rs               # Lifecycle, bandeja e comando app_info
+  src/lib.rs               # Builder e registro de comandos (ver docs/architecture-rust.md)
   src/main.rs              # Entrada do executável
+  src/error.rs             # AppError único, serializado como string
+  src/db.rs                # Conexão SQLite e migrações
+  src/app/                 # app_info, setup, bandeja e janela
+  src/workspace/, src/task/, src/connections/  # Domínios: regras em mod.rs, IPC em commands.rs
   capabilities/main.json   # Permissões da janela
   tauri.conf.json          # Janela, CSP, build e bundle
   icons/                   # Ícones gerados
@@ -64,6 +68,7 @@ docs/                      # Uso, desenvolvimento e pesquisa
 
 ## Regras da fundação
 
+- Núcleo Rust: estrutura por domínio, erro único e IPC fino conforme [architecture-rust.md](architecture-rust.md); regras obrigatórias em `.claude/rules/rust-architecture.md`.
 - Rust controla operações privilegiadas; React não recebe shell ou acesso genérico a arquivos.
 - Comandos IPC: `app_info` (metadados), `list_workspaces`/`create_workspace`/`list_tasks`/`save_task` (SQLite local) e `check_connections` (estado das CLIs `gh`, `codex` e `claude`). A verificação de conexões executa apenas comandos de status fixos, com entrada fechada e tempo limite; nunca lê, copia ou devolve tokens à WebView.
 - Não apresentar integração como funcional sem implementação real. Estados vazios e desabilitados são intencionais.

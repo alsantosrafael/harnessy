@@ -21,12 +21,25 @@ Cada papel de agente tem runtime fixo: **Refinador e Implementador usam Claude C
 - Execução real dos papéis (adaptadores Claude Code e Codex). A atribuição é configuração, não comportamento, até lá.
 - Troca de runtime pela interface fica para o futuro, conforme SPEC.
 
+## 2026-10-29 — Reorganização do núcleo Rust
+
+### Entregue
+
+- Crate dividido por domínio (`app`, `workspace`, `task`, `connections`) e infraestrutura (`db`, `error`); `lib.rs` só monta o `Builder`. Comandos IPC viraram adaptadores de uma linha em `*/commands.rs`; regras e SQL vivem em `mod.rs` sobre `&Connection`.
+- `AppError` com `thiserror`, serializado como string: contrato com o frontend inalterado, sem vazamento de erros de biblioteca.
+- Migrações incrementais em `db::MIGRATIONS`; `TempDatabase` para testes.
+- Regras em `.claude/rules/rust-architecture.md` (escopo `src-tauri/**`) e documentação em `docs/architecture-rust.md`. `src-tauri/AGENTS.md` ficou mínimo e aponta para ambos.
+
+### Verificado
+
+- `bun run verify:rust` limpo; `cargo test` com 7 testes (parsers, migrações, workspaces, tarefas).
+
 ## 2026-10-29 — Trabalho local e conexões reais
 
 ### Entregue
 
-- **Workspaces e tarefas locais (SQLite):** módulo `src-tauri/src/local_work.rs` com `rusqlite` (bundled), schema `user_version=1`, controle de revisão otimista nas edições e aba **Tarefas locais** em `LocalWorkPanel.tsx`. Banco em `app_data_dir/local-work.sqlite3`.
-- **Conexões GitHub, Codex e Claude Code:** módulo `src-tauri/src/connections.rs` com o comando `check_connections`. Procura as CLIs `gh`, `codex` e `claude` no PATH e em diretórios usuais, executa só o comando de status de cada uma (entrada fechada, tempo limite de 20 s, saída limitada a 16 KB) e devolve estado, conta e caminho. A tela **Conexões** exibe os estados Conectado, Sessão expirada, Indisponível e Não verificado, com o comando de login ou instalação quando necessário. Credenciais nunca chegam à WebView.
+- **Workspaces e tarefas locais (SQLite):** módulo `src-tauri/src/local_work.rs` (hoje `db.rs`, `workspace/` e `task/`) com `rusqlite` (bundled), schema `user_version=1`, controle de revisão otimista nas edições e aba **Tarefas locais** em `LocalWorkPanel.tsx`. Banco em `app_data_dir/local-work.sqlite3`.
+- **Conexões GitHub, Codex e Claude Code:** módulo `src-tauri/src/connections.rs` (hoje `connections/`) com o comando `check_connections`. Procura as CLIs `gh`, `codex` e `claude` no PATH e em diretórios usuais, executa só o comando de status de cada uma (entrada fechada, tempo limite de 20 s, saída limitada a 16 KB) e devolve estado, conta e caminho. A tela **Conexões** exibe os estados Conectado, Sessão expirada, Indisponível e Não verificado, com o comando de login ou instalação quando necessário. Credenciais nunca chegam à WebView.
 - **Codex CLI** instalado globalmente com `bun install -g @openai/codex` (0.166.0) em `~/.bun/bin`.
 - Documentação atualizada: README, guia do usuário, troubleshooting e development.
 
