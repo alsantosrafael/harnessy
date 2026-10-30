@@ -2,6 +2,10 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Back [0.11.1] — 2026-10-30
+
+- Corrigido: uma run do agente era bloqueada quando o comando composto usava `grep`, `sort`, `uniq`, `tr`, `stat`, `file`, `which`, `true` ou `false`, porque a lista de permissões não os tinha e cada parte do comando precisa ser permitida. Esses utilitários de leitura agora são permitidos; `sed`, `awk` e `xargs` continuam fora da lista, porque escrevem ou executam.
+
 ## Back [0.11.0] — 2026-10-30
 
 - Ações de escrita aceitam `exigir_prova = true`: quando a contraprova termina em "nenhum teste prova a mudança" ou "nenhum teste alterado", a run ganha um ciclo de correção pedindo um teste que falhe sem a mudança (`trigger = proof`), uma vez por run e dentro do limite de correções. `exigir_prova` com leitura ou com `contraprova = false` é recusado.

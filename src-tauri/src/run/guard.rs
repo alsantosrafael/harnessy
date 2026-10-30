@@ -88,6 +88,20 @@ const ALLOW: &[&str] = &[
     "Bash(git show *)",
     "Bash(git ls-files *)",
     "Bash(git rev-parse *)",
+    // Filtros e testes de leitura: sem eles, um `ls | grep x` ou `…; true` é negado
+    // inteiro e a run perde a verificação. `sed`, `awk` e `xargs` ficam de fora porque
+    // escrevem ou executam.
+    "Bash(grep *)",
+    "Bash(sort)",
+    "Bash(sort *)",
+    "Bash(uniq)",
+    "Bash(uniq *)",
+    "Bash(tr *)",
+    "Bash(stat *)",
+    "Bash(file *)",
+    "Bash(which *)",
+    "Bash(true)",
+    "Bash(false)",
 ];
 
 const DENY: &[&str] = &[
@@ -251,6 +265,27 @@ mod tests {
         let deny = value["permissions"]["deny"].as_array().unwrap();
         for rule in ["Bash(git push *)", "Edit(.git/**)", "Read(~/.ssh/**)"] {
             assert!(deny.iter().any(|r| r == rule), "falta {rule}");
+        }
+    }
+
+    #[test]
+    fn read_only_filters_are_allowed_and_writers_stay_out() {
+        let value: serde_json::Value = serde_json::from_str(&settings_json(Access::Write)).unwrap();
+        let allow = value["permissions"]["allow"].as_array().unwrap();
+        for rule in [
+            "Bash(grep *)",
+            "Bash(sort)",
+            "Bash(uniq *)",
+            "Bash(true)",
+            "Bash(false)",
+        ] {
+            assert!(allow.iter().any(|r| r == rule), "falta {rule}");
+        }
+        for rule in ["Bash(sed *)", "Bash(awk *)", "Bash(xargs *)"] {
+            assert!(
+                !allow.iter().any(|r| r == rule),
+                "não deveria permitir {rule}"
+            );
         }
     }
 
