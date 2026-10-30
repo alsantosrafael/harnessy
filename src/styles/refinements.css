@@ -2,16 +2,12 @@
 .section-label, .eyebrow, .local-label { font-size: 10px; }
 .workspace-label > div > span, .version, .draft-label, .shortcut { font-size: var(--text-xs); }
 .lead, .nav-item, .setup-banner strong { font-size: var(--text-base); }
-.button, .setup-banner p, .board-title h2, .board-empty p,
+.button, .setup-banner p,
 .context-panel > p:not(.section-label), .chat-intro p, .connection-footnote,
 .composer label, .composer-actions > span { font-size: var(--text-sm); }
-.badge, .runtime-status, .empty-caption, .statusbar,
-.flow-strip p, .context-section > span, .context-section > p,
+.badge, .runtime-status, .statusbar, .context-section > span, .context-section > p,
 .agent-line, .context-tip, .context-caption,
-.composer label span, .draft-status, .secrets-note, .composer-hint { font-size: var(--text-xs) !important; }
-.flow-strip strong, .prompt-suggestions button { font-size: var(--text-sm); }
-.board-columns > div { font-size: var(--text-xs); }
-.board-columns svg { display: none; }
+.composer label span, .draft-status, .secrets-note, .composer-hint { font-size: var(--text-xs) !important; } .prompt-suggestions button { font-size: var(--text-sm); }
 .context-panel { width: 224px; }
 .context-panel .section-label { font-size: 10px; }
 .privacy-note { line-height: 1.6; }
@@ -35,7 +31,6 @@
 .draft-recovery { margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .draft-recovery p { color: var(--text-muted); font-size: var(--text-sm); line-height: 1.7; margin-bottom: 12px; }
 .draft-recovery .button { white-space: normal; text-align: left; }
-.board-title { flex-wrap: wrap; }
 .badge { max-width: 100%; white-space: normal; line-height: 1.5; }
 .setup-banner > div { min-width: 0; }
 .setup-banner p { line-height: 1.6; }
@@ -47,9 +42,6 @@ main { scroll-padding: 20px; }
 
 @media (max-width: 1200px) {
   .context-panel { width: 190px; }
-  .flow-strip { flex-wrap: wrap; row-gap: 16px; }
-  .flow-strip > svg { display: none; }
-  .board-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 14px; }
 }
 
 /* Also useful for browser previews and enlarged desktop text. */
@@ -80,9 +72,6 @@ main { scroll-padding: 20px; }
   .context-panel { width: 100%; border-left: 0; border-top: 1px solid var(--border); padding: 20px 0 0; }
   h1 { font-size: 30px; }
   .setup-banner > .button { margin-left: 0; }
-  .board-empty h2 { text-wrap: balance; }
-  .flow-strip { flex-direction: column; align-items: flex-start; }
-  .flow-strip p { max-width: none; }
   .statusbar { padding-inline: 12px; }
   .skip-link { left: 76px; }
 }

@@ -16,26 +16,33 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { getAppInfo, type AppInfo } from "./lib/desktop";
+import { type AgentChoice, loadChoice, saveChoice } from "./lib/agents";
+import { getAppInfo, listWorkspaces, type AppInfo, type Workspace } from "./lib/desktop";
 import { createDraftSession } from "./lib/drafts";
 import { BoardPanel } from "./components/BoardPanel";
 import { ChatPanel } from "./components/ChatPanel";
 import { ConnectionsPage } from "./components/ConnectionsPage";
 import { ContextPanel } from "./components/ContextPanel";
-import { LocalWorkPanel } from "./components/LocalWorkPanel";
 
 type Page = "workspace" | "connections";
-type Tab = "tasks" | "board" | "chat";
-const tabNames = ["tasks", "board", "chat"] as const;
+type Tab = "board" | "chat";
+const tabNames = ["board", "chat"] as const;
 
 export function App() {
   const [page, setPage] = useState<Page>("workspace");
-  const [tab, setTab] = useState<Tab>("tasks");
+  const [tab, setTab] = useState<Tab>("board");
   const [details, setDetails] = useState(true);
   // The session belongs to the application, not to a screen that can unmount.
   const [draftSession] = useState(createDraftSession);
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [runtimeError, setRuntimeError] = useState(false);
+  // Workspaces, agente e modelo valem para o chat e para as tarefas.
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [workspacesReady, setWorkspacesReady] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [boardTick, setBoardTick] = useState(0);
+  const [choice, setChoice] = useState<AgentChoice>(loadChoice);
   const [help, setHelp] = useState(false);
   const helpButton = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -49,6 +56,21 @@ export function App() {
       flush();
     };
   }, [draftSession]);
+
+  useEffect(() => {
+    listWorkspaces()
+      .then((rows) => {
+        setWorkspaces(rows);
+        setWorkspaceId((current) => current ?? rows[0]?.id ?? null);
+      })
+      .catch((cause) => setLoadError(cause instanceof Error ? cause.message : String(cause)))
+      .finally(() => setWorkspacesReady(true));
+  }, []);
+
+  function chooseAgent(next: AgentChoice) {
+    setChoice(next);
+    saveChoice(next);
+  }
 
   useEffect(() => {
     let alive = true;
@@ -207,8 +229,8 @@ export function App() {
               <div>
                 <strong>Seu projeto começa aqui.</strong>
                 <p>
-                  Organize workspaces e tarefas locais e confira as sessões do GitHub, Codex e
-                  Claude Code em Conexões. Execução de agentes vem depois.
+                  Escreva a tarefa, mande o Claude Code implementar e acompanhe o card andar de A
+                  fazer a Concluído. As sessões do GitHub, Codex e Claude Code ficam em Conexões.
                 </p>
               </div>
               <button className="button subtle" onClick={connect}>
@@ -249,7 +271,7 @@ export function App() {
                     ) : (
                       <MessageSquare size={16} aria-hidden="true" />
                     )}
-                    {value === "tasks" ? "Tarefas locais" : value === "board" ? "Board" : "Chat"}
+                    {value === "board" ? "Tarefas" : "Chat"}
                   </button>
                 ))}
               </div>
@@ -269,16 +291,37 @@ export function App() {
             </div>
             <div className="work-area">
               <div className="work-content">
-                <div
-                  id="tasks-panel"
-                  role="tabpanel"
-                  aria-labelledby="tasks-tab"
-                  hidden={tab !== "tasks"}
-                >
-                  <LocalWorkPanel hidden={tab !== "tasks"} />
-                </div>
-                <BoardPanel hidden={tab !== "board"} onConnect={connect} />
-                <ChatPanel hidden={tab !== "chat"} session={draftSession} />
+                <BoardPanel
+                  hidden={tab !== "board"}
+                  agentReady={info?.agentExecutionAvailable ?? false}
+                  onConnect={connect}
+                  workspaces={workspaces}
+                  workspacesReady={workspacesReady}
+                  workspaceId={workspaceId}
+                  loadError={loadError}
+                  onWorkspaceChange={setWorkspaceId}
+                  onWorkspaceCreated={(created) => {
+                    setWorkspaces((rows) => [...rows, created]);
+                    setWorkspaceId((current) => current ?? created.id);
+                  }}
+                  refreshKey={boardTick}
+                  choice={choice}
+                  onChoice={chooseAgent}
+                />
+                <ChatPanel
+                  hidden={tab !== "chat"}
+                  session={draftSession}
+                  workspaces={workspaces}
+                  workspaceId={workspaceId}
+                  onWorkspaceChange={setWorkspaceId}
+                  choice={choice}
+                  onChoice={chooseAgent}
+                  agentReady={info?.agentExecutionAvailable ?? false}
+                  onCreated={(started) => {
+                    setBoardTick((tick) => tick + 1);
+                    if (started) switchTab("board");
+                  }}
+                />
               </div>
               {details && <ContextPanel />}
             </div>
@@ -290,7 +333,7 @@ export function App() {
             <span className={`status-dot ${runtimeError ? "status-error" : ""}`} />
             {runtimeError
               ? "Erro de comunicação com o núcleo"
-              : "Trabalho local · conexões verificadas pelas CLIs · agentes ainda não executam"}
+              : "Trabalho local · conexões verificadas pelas CLIs · agentes executam só por ação sua"}
           </span>
           <span>
             <Command size={11} aria-hidden="true" />1 Workspace

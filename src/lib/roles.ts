@@ -13,9 +13,10 @@ export interface RoleDefinition {
 }
 
 /**
- * Atribuição fixa de runtime por papel, decidida em 2026-10-29:
- * Claude Code implementa; Codex revisa e testa. A separação de runtimes
- * reforça a independência da revisão. Não há troca pela interface nesta versão.
+ * Runtime padrão por papel, decidido em 2026-10-29: Claude Code implementa; Codex
+ * revisa e testa. A separação de runtimes reforça a independência da revisão.
+ * O Implementador pode trocar de agente e de modelo (`lib/agents.ts`); os demais
+ * papéis seguem o padrão até existir adaptador de execução para o Codex.
  */
 export const roles: readonly RoleDefinition[] = [
   {

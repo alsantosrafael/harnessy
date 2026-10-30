@@ -18,7 +18,7 @@ const providers: {
   {
     provider: "github",
     title: "GitHub",
-    description: "Seus repositórios, boards e pull requests, no mesmo fluxo.",
+    description: "Seus repositórios e pull requests, no mesmo fluxo.",
     icon: <Github aria-hidden="true" />,
   },
   {

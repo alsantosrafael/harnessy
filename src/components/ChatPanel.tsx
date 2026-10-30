@@ -1,6 +1,12 @@
-import { useRef, useSyncExternalStore } from "react";
-import { ArrowDown, Send, Sparkles, Terminal } from "lucide-react";
+import { useRef, useState, useSyncExternalStore } from "react";
+import { ArrowDown, Send, Sparkles } from "lucide-react";
+import type { AgentChoice } from "../lib/agents";
+import { splitDraft } from "../lib/chatTask";
+import { saveTask, startRun, type Workspace } from "../lib/desktop";
 import { DRAFT_LIMIT, type DraftSession } from "../lib/drafts";
+import { AgentPicker } from "./AgentPicker";
+
+const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 const suggestions = [
   "Implementar uma tarefa",
@@ -8,12 +14,82 @@ const suggestions = [
   "Planejar um novo projeto",
 ];
 
-export function ChatPanel({ hidden, session }: { hidden: boolean; session: DraftSession }) {
+interface Props {
+  hidden: boolean;
+  session: DraftSession;
+  workspaces: Workspace[];
+  workspaceId: number | null;
+  onWorkspaceChange: (id: number) => void;
+  choice: AgentChoice;
+  onChoice: (choice: AgentChoice) => void;
+  /** Claude Code e git encontrados neste computador. */
+  agentReady: boolean;
+  /** Tarefa criada; `started` indica que a run também começou. */
+  onCreated: (started: boolean) => void;
+}
+
+export function ChatPanel({
+  hidden,
+  session,
+  workspaces,
+  workspaceId,
+  onWorkspaceChange,
+  choice,
+  onChoice,
+  agentReady,
+  onCreated,
+}: Props) {
   const { text: draft, status: saveState } = useSyncExternalStore(
     session.subscribe,
     session.getSnapshot,
   );
   const input = useRef<HTMLTextAreaElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  // Dito em texto, não só no botão desabilitado: o que falta para iniciar.
+  const blockedBy = !agentReady
+    ? "Claude Code ou git não foram encontrados. Veja em Conexões."
+    : workspaceId === null
+      ? "Crie um workspace em Tarefas para guardar a tarefa."
+      : !draft.trim()
+        ? "Escreva a tarefa para poder iniciar."
+        : "";
+
+  async function start() {
+    if (blockedBy || busy || workspaceId === null) return;
+    setBusy(true);
+    setError("");
+    const { title, description } = splitDraft(draft);
+    let taskId: number;
+    try {
+      const task = await saveTask({
+        workspaceId,
+        id: null,
+        revision: null,
+        title,
+        description,
+        criteria: "",
+      });
+      taskId = task.id;
+    } catch (cause) {
+      setError(message(cause));
+      setBusy(false);
+      return;
+    }
+    // A tarefa já está salva: o rascunho cumpriu o papel dele.
+    session.edit("");
+    session.flush();
+    try {
+      await startRun(workspaceId, taskId, choice.runtime, choice.model);
+      onCreated(true);
+    } catch (cause) {
+      setError(`A tarefa foi criada em A fazer, mas a run não começou: ${message(cause)}`);
+      onCreated(false);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function insertSuggestion(value: string) {
     // Suggestions never destroy existing work; focus the composer after insertion.
@@ -40,8 +116,8 @@ export function ChatPanel({ hidden, session }: { hidden: boolean; session: Draft
         </span>
         <h2>O que vamos construir?</h2>
         <p>
-          Comece com uma ideia. O refinador ajuda a transformá-la em uma tarefa clara antes da
-          implementação.
+          Descreva o que quer fazer. Ao iniciar, o Harnessy cria a tarefa e manda o agente que você
+          escolher implementar.
         </p>
       </div>
       {/* biome-ignore lint/a11y/useSemanticElements: suggestions are a group, not form fields. */}
@@ -57,7 +133,13 @@ export function ChatPanel({ hidden, session }: { hidden: boolean; session: Draft
           </button>
         ))}
       </div>
-      <form className="composer" onSubmit={(event) => event.preventDefault()}>
+      <form
+        className="composer"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void start();
+        }}
+      >
         <label htmlFor="prompt">
           Próxima tarefa <span>Rascunho local</span>
         </label>
@@ -68,16 +150,34 @@ export function ChatPanel({ hidden, session }: { hidden: boolean; session: Draft
           value={draft}
           onChange={(event) => session.edit(event.target.value)}
           placeholder="Descreva o que você quer fazer…"
-          aria-describedby="send-unavailable draft-status"
+          aria-describedby="start-hint draft-status"
           rows={4}
         />
         <div className="composer-actions">
-          <span>
-            <Terminal size={13} aria-hidden="true" />
-            Codex não conectado
-          </span>
-          <button className="button primary" disabled aria-describedby="send-unavailable">
-            Iniciar
+          <div className="composer-controls">
+            <label className="chat-workspace">
+              Workspace
+              <select
+                value={workspaceId ?? ""}
+                disabled={workspaces.length === 0 || busy}
+                onChange={(event) => onWorkspaceChange(Number(event.target.value))}
+              >
+                {workspaces.length === 0 && <option value="">Nenhum workspace</option>}
+                {workspaces.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <AgentPicker choice={choice} onChange={onChoice} />
+          </div>
+          <button
+            className="button primary"
+            disabled={Boolean(blockedBy) || busy}
+            aria-describedby="start-hint"
+          >
+            {busy ? "Iniciando…" : "Iniciar"}
             <Send size={14} aria-hidden="true" />
           </button>
         </div>
@@ -106,9 +206,14 @@ export function ChatPanel({ hidden, session }: { hidden: boolean; session: Draft
           </button>
         </div>
       )}
-      <p id="send-unavailable" className="composer-hint">
-        O envio será habilitado com a integração Codex.
+      <p id="start-hint" className="composer-hint">
+        {blockedBy || "Cria a tarefa em A fazer e inicia a run com o agente e o modelo escolhidos."}
       </p>
+      {error && (
+        <p className="local-error composer-error" role="alert">
+          {error}
+        </p>
+      )}
       <p className="secrets-note">Não inclua senhas, tokens ou conteúdo de arquivos .env.</p>
     </section>
   );

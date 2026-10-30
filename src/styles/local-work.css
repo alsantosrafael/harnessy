@@ -18,3 +18,6 @@
 .local-empty { padding: var(--space-6); border: 1px dashed var(--border); border-radius: var(--radius-md); }
 .local-error { padding: var(--space-4); color: var(--critical); border: 1px solid var(--critical); border-radius: var(--radius-sm); }
 @media (max-width: 1100px) { .local-columns { grid-template-columns: 1fr; } }
+.more-actions ul { display: grid; gap: var(--space-3); padding: 0; margin: var(--space-3) 0 0; list-style: none; }
+.more-actions li { display: grid; gap: var(--space-1); justify-items: start; }
+.more-actions-note { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
