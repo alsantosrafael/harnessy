@@ -36,7 +36,7 @@ O botão à direita das abas mostra ou oculta o painel. Ele apresenta a estrutur
 
 ### Conexões
 
-A tela verifica as sessões das CLIs oficiais instaladas no computador: `gh` (GitHub), `codex` (Codex) e `claude` (Claude Code). Cada cartão mostra um estado: **Conectado**, **Sessão expirada**, **Indisponível** (CLI não encontrada) ou **Não verificado** (a verificação falhou ou excedeu o tempo limite).
+Cada cartão indica os papéis que a CLI atende: Claude Code refina e implementa; Codex revisa e testa. A tela verifica as sessões das CLIs oficiais instaladas no computador: `gh` (GitHub), `codex` (Codex) e `claude` (Claude Code). Cada cartão mostra um estado: **Conectado**, **Sessão expirada**, **Indisponível** (CLI não encontrada) ou **Não verificado** (a verificação falhou ou excedeu o tempo limite).
 
 O Harnessy não solicita tokens nem abre login: para conectar, execute no terminal o comando exibido no cartão (`gh auth login --web`, `codex login` ou `claude auth login`) e clique em **Verificar novamente**. As credenciais permanecem no keychain ou nos arquivos de cada CLI; a interface recebe apenas o estado, a conta identificada e o caminho da CLI.
 

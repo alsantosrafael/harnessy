@@ -1,4 +1,5 @@
 import { Check, FolderGit2, GitBranch } from "lucide-react";
+import { roles, runtimeLabel } from "../lib/roles";
 
 export function ContextPanel() {
   return (
@@ -24,16 +25,19 @@ export function ContextPanel() {
       </div>
       <div className="context-section">
         <span>AGENTES</span>
-        {["Implementador", "Revisor", "Tester"].map((role) => (
-          <div className="agent-line" key={role}>
+        {roles.map((item) => (
+          <div className="agent-line" key={item.role} title={item.delivers}>
             <span className="agent-avatar" aria-hidden="true">
-              {role[0]}
+              {item.label[0]}
             </span>
-            {role}
+            {item.label}
+            <span className="agent-runtime">{runtimeLabel[item.runtime]}</span>
             <span className="idle-dot" aria-hidden="true" />
           </div>
         ))}
-        <p className="context-caption">Papéis planejados · nenhuma sessão ativa</p>
+        <p className="context-caption">
+          Claude Code implementa, Codex revisa e testa · nenhuma sessão ativa
+        </p>
       </div>
       <div className="context-tip">
         <Check size={14} aria-hidden="true" />

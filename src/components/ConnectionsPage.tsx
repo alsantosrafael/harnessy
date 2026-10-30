@@ -7,6 +7,7 @@ import {
   type ConnectionStatus,
   type Provider,
 } from "../lib/desktop";
+import { rolesFor } from "../lib/roles";
 
 const providers: {
   provider: Provider;
@@ -23,13 +24,13 @@ const providers: {
   {
     provider: "codex",
     title: "Codex",
-    description: "Implementação, revisão e testes em sessões independentes.",
+    description: "Revisa e testa o que foi implementado, em sessão independente.",
     icon: <Terminal aria-hidden="true" />,
   },
   {
     provider: "claude",
     title: "Claude Code",
-    description: "Runtime alternativo para papéis de agente, com a sessão da sua conta.",
+    description: "Refina e implementa as tarefas, com a sessão da sua conta.",
     icon: <Sparkles aria-hidden="true" />,
   },
 ];
@@ -123,12 +124,14 @@ export function ConnectionsPage() {
 }
 
 function Connection({
+  provider,
   icon,
   title,
   description,
   status,
   phase,
 }: {
+  provider: Provider;
   icon: ReactNode;
   title: string;
   description: string;
@@ -137,6 +140,12 @@ function Connection({
 }) {
   const state: ConnectionState | "checking" | "web" =
     phase === "web" ? "web" : (status?.state ?? "checking");
+  const roleNames =
+    provider === "github"
+      ? null
+      : rolesFor(provider)
+          .map((item) => item.label)
+          .join(", ");
   const command =
     status && status.state === "unavailable"
       ? status.installHint
@@ -154,6 +163,7 @@ function Connection({
       </div>
       <h2>{title}</h2>
       <p>{description}</p>
+      {roleNames && <p className="connection-roles">Papéis: {roleNames}</p>}
       <dl className="connection-facts">
         <dt>Estado</dt>
         <dd>

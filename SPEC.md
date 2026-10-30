@@ -1,6 +1,6 @@
 # Harnessy — especificação consolidada
 
-Versão do documento: 1.1 · Atualizado em 2026-10-29  
+Versão do documento: 1.2 · Atualizado em 2026-10-29  
 Versão inicial do produto: **0.1.0**  
 Status: decisões de produto aprovadas; implementação incremental  
 Plataforma inicial: macOS, uso individual, local-first  
@@ -12,7 +12,7 @@ Construir um aplicativo desktop leve para comandar agentes de desenvolvimento, o
 
 O usuário pode pedir: “pegue o card X”, “crie uma tarefa no board Y”, “implemente e abra PR”, “revise este PR” ou “valide esta aplicação”. A interface reúne board, conversas, progresso, alterações e evidências.
 
-Inicialmente todos os papéis usam **Codex**, em sessões independentes e aproveitando autenticação suportada do usuário. O Harnessy coordena o agente existente; não implementa um loop próprio de inferência no MVP. Claude Code e providers via API são extensões futuras, com contratos próprios.
+Cada papel usa um runtime fixo, em sessões independentes e aproveitando a autenticação já feita pelo usuário nas CLIs oficiais: **Claude Code implementa** (Refinador e Implementador) e **Codex revisa e testa** (Revisor e Tester). A separação de runtimes reforça a independência da revisão: quem revisa não compartilha modelo, contexto nem conversa com quem implementou. O Harnessy coordena os agentes existentes; não implementa um loop próprio de inferência no MVP. Providers via API e roteamento entre runtimes são extensões futuras, com contratos próprios.
 
 O aplicativo deve poder ser distribuído para outras pessoas futuramente, cada uma com seus dados e credenciais locais. Windows e Linux são alvos futuros; não se presume portabilidade de sandbox, autenticação e instalador sem validação por sistema.
 
@@ -37,7 +37,7 @@ Os artigos não prescrevem esta arquitetura de produto. Políticas de merge, lim
 ### Primeira versão funcional
 
 - Aplicativo desktop macOS com janela própria, board, chat e painel contextual.
-- Conexão visual GitHub e Codex; seleção de repositórios e GitHub Projects.
+- Conexão GitHub, Codex e Claude Code pelo estado das CLIs; seleção de repositórios e GitHub Projects.
 - Workspaces com um ou vários repositórios; múltiplas conversas por workspace.
 - Consultar, criar, editar e mover cards; GitHub como fonte oficial.
 - Fluxos independentes de refinamento, implementação, revisão e teste, além do fluxo composto.
@@ -51,7 +51,7 @@ Os artigos não prescrevem esta arquitetura de produto. Políticas de merge, lim
 
 ### Futuro
 
-- Claude Code, agentes próprios via APIs, roteamento entre providers.
+- Agentes próprios via APIs, roteamento entre providers e troca de runtime por papel pela interface.
 - Builds Windows/Linux, distribuição assinada e atualização verificável.
 - Preview remoto exclusivo por tarefa como opção, não infraestrutura automática obrigatória do MVP.
 - Scanner estático de prontidão do repositório, após validar ferramenta e cobertura.
@@ -203,16 +203,16 @@ Dependências com efeitos são recebidas explicitamente. Relógio, processos e i
 
 Definições próprias inspiradas nas skills locais, adaptadas ao orquestrador. Não copiar instruções de commit, revisão ou delegação que conflitem com as políticas centrais.
 
-| Papel | Inspiração | Entrega |
-| --- | --- | --- |
-| Refinador | grill-me / grilling | Objetivo, escopo, critérios e dúvidas resolvidas. |
-| Implementador | implement, tdd, diagnosing-bugs | Alterações, checks, resumo e pendências. |
-| Revisor | code-review | Aderência à tarefa, padrões, correção e achados fundamentados. |
-| Tester | diagnosing-bugs e Playwright | Cenários funcionais, esperado/observado, evidências e bugs. |
+| Papel | Runtime | Inspiração | Entrega |
+| --- | --- | --- | --- |
+| Refinador | Claude Code | grill-me / grilling | Objetivo, escopo, critérios e dúvidas resolvidas. |
+| Implementador | Claude Code | implement, tdd, diagnosing-bugs | Alterações, checks, resumo e pendências. |
+| Revisor | Codex | code-review | Aderência à tarefa, padrões, correção e achados fundamentados. |
+| Tester | Codex | diagnosing-bugs e Playwright | Cenários funcionais, esperado/observado, evidências e bugs. |
 
 Refinador consulta primeiro card, documentação e código; pergunta uma questão por vez somente sobre decisões não resolvidas. Critérios propostos precisam de confirmação antes de iniciar implementação ambígua.
 
-Todos usam Codex inicialmente, com sessão independente. Não repassar conversa privada do implementador ao revisor; compartilhar tarefa, critérios, código, diff, checks e evidências. Tester recebe contexto funcional, ambiente e versão, preservando sua independência para explorar além do caminho feliz.
+Claude Code implementa e Codex revisa e testa, cada um com sessão independente; a atribuição é fixa nesta versão e vive em `src/lib/roles.ts`. Não repassar conversa privada do implementador ao revisor; compartilhar tarefa, critérios, código, diff, checks e evidências. Tester recebe contexto funcional, ambiente e versão, preservando sua independência para explorar além do caminho feliz.
 
 ### Contratos estruturados
 

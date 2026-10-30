@@ -4,6 +4,23 @@
 
 Registro cronológico do que foi implementado, com o estado verificado em cada etapa. O `CHANGELOG.md` resume por versão; este arquivo explica o contexto e o que ficou pendente.
 
+## 2026-10-29 — Runtime por papel: Claude Code implementa, Codex revisa
+
+### Decisão
+
+Cada papel de agente tem runtime fixo: **Refinador e Implementador usam Claude Code; Revisor e Tester usam Codex.** Substitui a decisão anterior da SPEC ("todos os papéis usam Codex"). Motivo: separar runtimes reforça a independência da revisão, que já não recebe a conversa privada do implementador.
+
+### Entregue
+
+- SPEC 1.2: objetivo, escopo e tabela de papéis atualizados com a coluna Runtime.
+- `src/lib/roles.ts`: fonte única do mapeamento papel→runtime, com teste em `tests/roles.test.ts` garantindo que implementação e revisão nunca compartilham runtime.
+- Painel de contexto lista os quatro papéis com o runtime de cada um; a tela de Conexões mostra quais papéis cada CLI atende.
+
+### Pendente
+
+- Execução real dos papéis (adaptadores Claude Code e Codex). A atribuição é configuração, não comportamento, até lá.
+- Troca de runtime pela interface fica para o futuro, conforme SPEC.
+
 ## 2026-10-29 — Trabalho local e conexões reais
 
 ### Entregue
