@@ -15,9 +15,9 @@ Esta versão permite explorar a experiência e preparar ideias. Ela ainda não e
 
 “Meu espaço” ainda é uma identificação visual. Criar e trocar workspaces e manter várias conversas são funcionalidades futuras. O botão `+` não cria uma nova conversa nem apaga a atual.
 
-### Board
+### Tarefas
 
-Mostra as colunas planejadas e um estado vazio. Os zeros não são dados consultados do GitHub. **Configurar GitHub** leva à tela de conexões; não abre login nesta versão.
+Um quadro com quatro raias: **A fazer**, **Em andamento**, **Revisão** e **Concluído**. Digite um título no campo da primeira raia e tecle `Enter` para criar (`n` leva o foco ao campo). Para mover um card, use a seta que aparece nele, `]` e `[` com o card focado, `1`–`4` para ir direto a uma raia ou arraste. Um aviso permite **Desfazer** por alguns segundos. Abra o card para editar descrição e critérios, ver o prompt do agente, o **Histórico** de movimentos (você ou o Harnessy, com o resumo do agente como nota) e iniciar **Implementar com Claude Code**. Uma run que falha, termina sem mudar nada ou tem ações negadas deixa o card **Bloqueada**, com o motivo; use **Marcar como resolvido** quando tratar.
 
 ### Chat
 
@@ -26,13 +26,15 @@ Mostra as colunas planejadas e um estado vazio. Os zeros não são dados consult
 3. Se quiser, clique em uma sugestão: ela acrescenta texto ao rascunho existente e devolve o foco ao campo.
 4. Aguarde **Rascunho salvo neste dispositivo** antes de encerrar.
 
-O botão **Iniciar** permanece desabilitado até a integração Codex. `Enter` insere uma nova linha; não há atalho de envio habilitado.
+No rodapé do campo, escolha o **Workspace**, o **Agente** e o **Modelo**. O padrão é Claude Code com Sonnet; a escolha é lembrada neste computador e vale também para o botão de implementar nas Tarefas. Modelos do Claude Code: Fable, Opus, Sonnet e Haiku. O Codex aparece na lista, desabilitado, até ter adaptador de execução.
+
+**Iniciar** cria a tarefa em A fazer (a primeira linha do rascunho vira o título e o resto, a descrição), limpa o rascunho e começa a run com o agente e o modelo escolhidos; a tela vai para Tarefas, onde o card anda sozinho. O botão fica desabilitado, com o motivo escrito abaixo, se faltar workspace, texto ou o Claude Code/git. Nada exige o Codex conectado. `Enter` insere uma nova linha.
 
 Um rascunho pode ter até **20.000 caracteres**. As sugestões também respeitam esse limite; se estiver próximo dele, edite o texto antes de inserir mais conteúdo.
 
 ### Painel de contexto
 
-O botão à direita das abas mostra ou oculta o painel. Ele apresenta a estrutura planejada para repositórios e agentes; nenhum agente listado está ativo. Ocultar o painel amplia a área do board/chat sem apagar o rascunho.
+O botão à direita das abas mostra ou oculta o painel. Ele apresenta a estrutura planejada para repositórios e agentes; nenhum agente listado está ativo. Ocultar o painel amplia a área de tarefas/chat sem apagar o rascunho.
 
 ### Conexões
 
@@ -47,7 +49,9 @@ O Harnessy não solicita tokens nem abre login: para conectar, execute no termin
 | Ir para Visão geral | `⌘1` |
 | Ir para Conexões | `⌘2` |
 | Percorrer controles | `Tab` / `Shift+Tab` |
-| Alternar Board/Chat com foco nas abas | `←` / `→` |
+| Alternar Tarefas/Chat com foco nas abas | `←` / `→` |
+| Nova tarefa | `n` |
+| Mover o card focado | `]` avança, `[` volta, `1`–`4` vai à raia |
 | Primeira/última aba com foco nas abas | `Home` / `End` |
 | Ativar botão com foco | `Enter` ou `Espaço` |
 | Fechar o diálogo Sobre | `Esc` |
@@ -60,7 +64,7 @@ O primeiro link acessível por teclado permite pular a barra lateral e ir ao con
 
 - Existe **um rascunho**, salvo no armazenamento local da WebView, com schema versionado.
 - O salvamento ocorre após uma pequena pausa na digitação. A interface distingue **salvando**, **salvo** e **erro**.
-- Trocar Board/Chat ou navegar para Conexões preserva o texto; recarregar usa a última gravação bem-sucedida.
+- Trocar Tarefas/Chat ou navegar para Conexões preserva o texto; recarregar usa a última gravação bem-sucedida.
 - O aplicativo tenta gravar também ao sair da página, mas encerramento forçado ou falha do sistema pode perder as últimas alterações. Aguarde a confirmação de salvamento para reduzir esse risco.
 - Prévia no navegador e aplicativo desktop têm armazenamentos distintos. Perfis/navegadores e instalações de desenvolvimento podem usar contextos diferentes; não conte com transferência automática entre eles.
 - Não há sincronização, exportação ou backup automático. Para preservar algo importante, copie para um arquivo seu.

@@ -129,10 +129,10 @@ Abra pelo Finder ou pelo comando da etapa 1. O bundle atual é local, sem assina
 ## 6. Confirmar que está pronto
 
 - A janela abre e mostra a versão em **Sobre esta fundação**.
-- Board e Chat alternam normalmente.
+- Tarefas e Chat alternam normalmente.
 - **Preparar tarefa** leva o cursor ao campo de texto.
 - O rascunho mostra o status de salvamento.
-- **Conexões** informa que GitHub e Codex ainda não estão habilitados.
+- **Conexões** mostra o estado real das sessões do GitHub, Codex e Claude Code.
 - O menu **H** permite reabrir a janela depois de fechá-la.
 
 Continue no [guia de uso](user-guide.md). Se algo divergir, consulte [solução de problemas](troubleshooting.md).

@@ -4,7 +4,7 @@
 
 Aplicativo desktop feito com **Tauri 2, Rust, React e TypeScript**, usando **Bun, Vite e Vitest** no frontend. Primeira plataforma: **macOS**, validado inicialmente em Apple Silicon.
 
-> **0.1.0 · Fundação em desenvolvimento.** Você já pode abrir o aplicativo, navegar por Board e Chat e preparar um rascunho. GitHub e Codex ainda não estão conectados; esta versão não executa agentes.
+> **0.2.0 · Em desenvolvimento.** Crie tarefas locais, mova os cards entre A fazer, Em andamento, Revisão e Concluído (com histórico) e mande o Claude Code implementar em um worktree próprio. O card anda sozinho e as runs presas aparecem como bloqueadas. Push e PR ainda são manuais.
 
 ## Comece aqui
 
@@ -33,13 +33,13 @@ O comando abre a janela desktop e inicia automaticamente o frontend de desenvolv
 
 ## Primeiro passeio
 
-1. Em **Visão geral → Board**, conheça a estrutura do workspace. O board fica vazio até existir integração com o GitHub.
+1. Em **Visão geral → Tarefas**, crie um workspace e digite o título de uma tarefa na raia **A fazer** (`Enter`). Mova o card pela seta, com `]`/`[` ou arrastando.
 2. Clique em **Preparar tarefa** para abrir o Chat com o campo em foco.
 3. Escreva sua ideia. O rascunho é salvo neste dispositivo; sugestões acrescentam texto sem apagar o conteúdo existente.
 4. Abra **Conexões** para verificar as sessões das CLIs `gh`, `codex` e `claude`. Para autenticar, execute o comando indicado no terminal e verifique novamente.
 5. Feche a janela para ocultá-la. Use o menu **H**, na barra superior do macOS, para **Abrir Harnessy** ou **Encerrar Harnessy**.
 
-O botão **Iniciar** ainda não envia o rascunho. Não coloque credenciais no chat: o armazenamento de rascunhos não é um cofre.
+No chat, **Iniciar** cria a tarefa e começa a run com o agente e o modelo que você escolher (padrão: Claude Code com Sonnet). Não coloque credenciais no chat: o armazenamento de rascunhos não é um cofre.
 
 [Guia completo de uso e atalhos →](docs/user-guide.md)
 
@@ -49,11 +49,13 @@ O botão **Iniciar** ainda não envia o rascunho. Não coloque credenciais no ch
 | --- | --- |
 | Aplicativo desktop, navegação e painel de contexto | Disponível |
 | Chat com rascunho local e sugestões | Disponível |
-| Board | Estrutura visual, sem cards reais |
+| Tarefas (quadro local com estados e histórico) | Disponível |
 | GitHub, Codex e Claude Code | Estado real das sessões das CLIs `gh`, `codex` e `claude`; autenticação pelo terminal |
-| Agentes, worktrees e execução de tarefas | Planejados |
+| Claude Code implementa em worktree próprio | Disponível: verificações rodadas pelo núcleo, falha estruturada, retomada de sessão, contraprova e ciclo com o próximo modelo |
+| Revisão independente | Revisor Claude (um modelo acima) quando há sinal de risco; revisão pelo Codex planejada |
+| Ações (Explicar, Dividir em passos, Nova Ação, Ações do repositório) | Disponível |
 | Workspaces e tarefas locais em SQLite | Disponível (aba Tarefas locais) |
-| Configuração `.harnessy/` versionada | Planejada |
+| Configuração `.harnessy/` versionada | Ações em `.harnessy/actions/` com confirmação por hash; perfil de verificações planejado |
 | Deploy, Playwright e fluxo de revisão/correção | Planejados |
 
 As configurações e workflows descritos na SPEC são requisitos futuros, não arquivos que você precise criar para abrir esta versão. Nenhum token ou Docker é necessário para explorar a fundação; as CLIs são opcionais e, quando presentes, sua sessão é apenas verificada.

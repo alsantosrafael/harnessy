@@ -90,9 +90,17 @@ Substitua manualmente sua cópia em Applications. Não existe updater nesta vers
 
 Aliases de shell não afetam a verificação: o app executa o binário diretamente, sem passar pelo shell.
 
+## O app fecha ao abrir depois de atualizar do 0.1
+
+O esquema do banco local mudou no 0.2 sem migração (o produto ainda não guarda dados a preservar), então um banco criado pelo 0.1 não abre. Feche o app, apague `~/Library/Application Support/app.harnessy.desktop/local-work.sqlite3` e abra de novo. Isso apaga workspaces, tarefas e runs locais.
+
+## A run falha nos testes com erro de Node (`node:fs/promises`, `constants`)
+
+O app abriu com um Node antigo no `PATH`. Desde o 0.4.1 o Harnessy lê o `PATH` do seu shell de login, então o Node do nvm vale. Confira que `node -v` no seu terminal mostra a versão esperada e reabra o app. Se o seu `~/.zshrc` demora mais de 8 s (por exemplo, plugins pesados), o app usa o `PATH` comum; nesse caso, ponha o Node desejado em `~/.local/bin` ou `/opt/homebrew/bin`.
+
 ## O botão Iniciar está desabilitado
 
-A execução de agentes ainda não foi implementada. Você pode usar navegação, tarefas locais, rascunhos e verificação de conexões, mas não executar agentes. Consulte o [estado atual](../README.md#o-que-está-disponível).
+O texto logo abaixo do campo diz o que falta: criar um workspace (em **Tarefas**), escrever a tarefa, ou instalar o Claude Code e o git (**Conexões** mostra o estado). O Codex não é necessário. Se o Codex aparece desabilitado na lista de agentes, é porque ele ainda não tem adaptador de execução.
 
 ## O cabeçalho mostra “Prévia da interface”
 
@@ -111,7 +119,7 @@ Não existe recuperação de histórico ou backup automático nesta etapa. Apaga
 
 ## A tela está apertada ou cortada
 
-A janela desktop tem mínimo de **1000 × 680**. Maximize a janela ou oculte o painel de contexto pelo botão à direita de Board/Chat. A área central tem rolagem; em telas menores, conteúdo abaixo da dobra deve ser alcançado por ela.
+A janela desktop tem mínimo de **1000 × 680**. Maximize a janela ou oculte o painel de contexto pelo botão à direita de Tarefas/Chat. A área central tem rolagem; em telas menores, conteúdo abaixo da dobra deve ser alcançado por ela.
 
 Se alguma ação ficar inacessível, registre tamanho da janela, escala da tela, tamanho de texto/zoom e uma captura de tela.
 

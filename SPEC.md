@@ -8,11 +8,11 @@ Stack alvo: **Tauri 2 + Rust + React/TypeScript + SQLite**; frontend com **Bun +
 
 ## 1. Objetivo
 
-Construir um aplicativo desktop leve para comandar agentes de desenvolvimento, organizar tarefas no GitHub Projects e acompanhar entregas com revisão e validação funcional independentes.
+Construir um aplicativo desktop leve para comandar agentes de desenvolvimento, organizar tarefas localmente e acompanhar entregas com revisão e validação funcional independentes.
 
-O usuário pode pedir: “pegue o card X”, “crie uma tarefa no board Y”, “implemente e abra PR”, “revise este PR” ou “valide esta aplicação”. A interface reúne board, conversas, progresso, alterações e evidências.
+O usuário pode pedir: “pegue o card X”, “crie uma tarefa”, “implemente e abra PR”, “revise este PR” ou “valide esta aplicação”. A interface reúne board, conversas, progresso, alterações e evidências.
 
-Cada papel usa um runtime fixo, em sessões independentes e aproveitando a autenticação já feita pelo usuário nas CLIs oficiais: **Claude Code implementa** (Refinador e Implementador) e **Codex revisa e testa** (Revisor e Tester). A separação de runtimes reforça a independência da revisão: quem revisa não compartilha modelo, contexto nem conversa com quem implementou. O Harnessy coordena os agentes existentes; não implementa um loop próprio de inferência no MVP. Providers via API e roteamento entre runtimes são extensões futuras, com contratos próprios.
+Cada papel tem um runtime padrão, em sessões independentes e aproveitando a autenticação já feita pelo usuário nas CLIs oficiais: **Claude Code implementa** (Refinador e Implementador) e **Codex revisa e testa** (Revisor e Tester). A separação de runtimes reforça a independência da revisão: quem revisa não compartilha modelo, contexto nem conversa com quem implementou. O Harnessy coordena os agentes existentes; não implementa um loop próprio de inferência no MVP. Providers via API e roteamento entre runtimes são extensões futuras, com contratos próprios.
 
 O aplicativo deve poder ser distribuído para outras pessoas futuramente, cada uma com seus dados e credenciais locais. Windows e Linux são alvos futuros; não se presume portabilidade de sandbox, autenticação e instalador sem validação por sistema.
 
@@ -37,9 +37,9 @@ Os artigos não prescrevem esta arquitetura de produto. Políticas de merge, lim
 ### Primeira versão funcional
 
 - Aplicativo desktop macOS com janela própria, board, chat e painel contextual.
-- Conexão GitHub, Codex e Claude Code pelo estado das CLIs; seleção de repositórios e GitHub Projects.
+- Conexão GitHub, Codex e Claude Code pelo estado das CLIs; seleção de repositórios.
 - Workspaces com um ou vários repositórios; múltiplas conversas por workspace.
-- Consultar, criar, editar e mover cards; GitHub como fonte oficial.
+- Criar, editar e mover cards entre os estados A fazer, Em andamento, Revisão e Concluído, com histórico; as tarefas ficam só no SQLite local e o Harnessy as move pelo resultado da run e marca bloqueios sem custo de tokens (ADR 0003).
 - Fluxos independentes de refinamento, implementação, revisão e teste, além do fluxo composto.
 - Worktrees por tarefa e por subagente escritor paralelo; delegação com limites.
 - Branch, commit, push, PR, revisão/comentário e merge explícito pelo usuário.
@@ -70,7 +70,7 @@ Os artigos não prescrevem esta arquitetura de produto. Políticas de merge, lim
 | --- | --- |
 | Workspace | Projeto local com repositórios, conexão a Projects e políticas/configurações. |
 | Repositório | Identidade GitHub, clone gerenciado, branch base e instruções aplicáveis. |
-| Card | Item do GitHub Projects, vinculado a issue quando houver; não equivale sempre a issue. |
+| Card | Tarefa local exibida no quadro, com Estado e Histórico. |
 | Conversa | Histórico de intenção e decisões; pode conter várias execuções e vínculos. |
 | Tarefa | Objetivo e critérios de aceite confirmados, vinculados a cards/PRs. |
 | Execução | Tentativa orquestrada com configuração congelada, limites e evidências. |
@@ -88,12 +88,12 @@ Vínculos entre vários repositórios e PRs pertencem à mesma tarefa. Não exis
 ### Estrutura
 
 - Barra lateral: workspaces, conversas e conexões.
-- Centro do workspace: abas **Board** e **Chat**.
+- Centro do workspace: abas **Tarefas** e **Chat**.
 - Painel contextual recolhível: card, PR, execução, diff e evidências, sem perder o contexto central.
 - Várias conversas por projeto; cards, PRs e repositórios podem ser anexados à conversa.
 - Cada execução mostra papel responsável, versão em análise, etapa, fila, bloqueios e ações disponíveis.
 
-Board suporta criação/edição e mudança de status com confirmação de sincronização. Falha de escrita preserva o rascunho, informa o erro e permite retry reconciliado. Alterações externas são reconciliadas sem sobrescrita silenciosa de edições concorrentes.
+O quadro suporta criação/edição e mudança de estado com resposta imediata e desfazer. Falha de escrita devolve o card à raia anterior, preserva o texto editado e informa o erro. Edições concorrentes não sobrescrevem em silêncio (controle de revisão); mover não invalida uma edição aberta.
 
 Chat aceita prompts e instruções durante a execução. Distingue instrução enviada, entregue e incorporada quando observável; não simula suporte ausente no adaptador. Tarefas começam por prompt ou botão **Iniciar tarefa**, nunca apenas ao mover um card.
 
@@ -294,7 +294,6 @@ Botão **Conectar ao Codex** detecta instalação/autenticação suportada, most
 - Sem force push implícito ou merge automático.
 - Revisão formal quando a identidade permite; mesma identidade do autor pode exigir comentário, identificado explicitamente.
 - Inline somente em caminho/linha válidos; demais achados no corpo geral.
-- Estados do Projects são mapeados por workspace, não nomes universais impostos ao board.
 - Merge na UI exige ação humana, versão ainda validada, checks/regras GitHub e método permitido pelo repositório. Merge externo é reconciliado.
 
 ## 12. Ambiente de testes, CI e deploy
@@ -468,7 +467,7 @@ Integração do scanner é opcional e posterior: fixar versão/modelo de scoring
 ## 19. Etapas de entrega
 
 1. **Consolidação e migração:** SPEC única; substituir protótipo Electron por Tauri/Rust/React; versão 0.1.0 centralizada e comandos reproduzíveis.
-2. **Fatia de UX/performance:** navegação, board/chat/contexto, estados reais, teclado e fixtures de carga; validar build desktop.
+2. **Fatia de UX/performance:** navegação, tarefas/chat/contexto, estados reais, teclado e fixtures de carga; validar build desktop.
 3. **Núcleo:** SQLite, configuração versionada, contratos, fila, supervisor, eventos e recuperação.
 4. **Prova Codex/segurança:** app-server, schemas, autenticação, eventos, isolamento, aprovações, cancelamento e retomada. Gate antes de agentes em projetos reais.
 5. **GitHub:** OAuth/Keychain, Projects/cards, PR/review/merge humano, reconciliação e idempotência.
@@ -478,13 +477,15 @@ Integração do scanner é opcional e posterior: fixar versão/modelo de scoring
 
 Estado atual do repositório: fundação **Tauri 2/Rust/React/TypeScript**, com navegação, tokens, rascunho local e IPC restrito a metadados. Build macOS gerado; sem integrações GitHub/Codex, SQLite ou sandbox de agentes. Metas de desempenho e fixtures de carga ainda precisam ser medidas. Esta especificação distingue requisitos futuros de recursos implementados.
 
+Próximas fatias do harness (perfil do workspace, loop de verificação, contexto, publicação, revisor, avaliações e onboarding) estão detalhadas em [Harness plug-and-play](docs/specs/harness-plug-and-play.md).
+
 ## 20. Critérios de aceite
 
 O MVP funcional está pronto quando demonstra em projeto piloto:
 
 1. Abrir aplicativo macOS com UX/performance medidas nas metas acordadas.
 2. Conectar GitHub/Codex pela interface, sem gravar credenciais no repo/renderer/conversa.
-3. Consultar/editar board real e reconciliar alterações externas.
+3. Quadro local com estados, histórico e movimento pelos agentes.
 4. Refinar tarefa ambígua, confirmar critérios e iniciar execução explicitamente.
 5. Executar Codex real em isolamento comprovado, com papéis independentes e contexto adequado.
 6. Produzir alterações isoladas e checks sobre os SHAs publicados; suportar worktrees e delegação dentro dos limites.
