@@ -16,9 +16,20 @@
 .lane-cards { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .lane-empty { margin: 0; padding: var(--space-3) var(--space-2); color: var(--text-muted); font-size: var(--text-sm); line-height: 1.5; }
 
-.composer-inline input { width: 100%; padding: var(--space-3); border: 1px solid var(--input-border); border-radius: var(--radius-sm); background: var(--input-bg); color: var(--text); font: inherit; }
-.composer-inline input::placeholder { color: var(--text-secondary); }
-.composer-inline input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+/* Criação: o título é o gesto principal; descrição e critérios abrem sob demanda, sem sair da raia. */
+.composer-inline { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-raised); }
+.composer-label { font-size: var(--text-sm); font-weight: 600; color: var(--text); }
+.composer-inline input, .composer-inline textarea, .composer-details textarea { width: 100%; padding: var(--space-2) var(--space-3); border: 1px solid var(--input-border); border-radius: var(--radius-sm); background: var(--input-bg); color: var(--text); font: inherit; }
+.composer-inline textarea, .composer-details textarea { resize: vertical; }
+.composer-inline input::placeholder, .composer-inline textarea::placeholder { color: var(--text-secondary); }
+.composer-inline input:focus-visible, .composer-inline textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.composer-toggle { justify-self: start; padding: 2px var(--space-1); border: 0; background: none; color: var(--text-secondary); font: inherit; font-size: var(--text-sm); text-decoration: underline; text-underline-offset: 3px; }
+.composer-toggle:hover { color: var(--text); }
+.composer-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.composer-details { display: grid; gap: var(--space-2); }
+.composer-details label { display: grid; gap: var(--space-1); font-size: var(--text-sm); font-weight: 600; color: var(--text); }
+.composer-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.composer-hint { font-size: var(--text-xs); line-height: 1.4; color: var(--text-muted); }
 
 /* Cards: o botão abre; o de avançar fica ao lado (botão dentro de botão não existe em HTML). */
 .kanban-card { position: relative; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-raised); transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease; }

@@ -18,7 +18,7 @@ import { canStartRun, chainBase, isActive } from "../lib/runs";
 import type { RunsState } from "../lib/useRuns";
 import { quickStates, type QuickId } from "../lib/quick";
 import { type Confirmation, ConfirmDialog } from "./ConfirmDialog";
-import { Kanban, KanbanSkeleton } from "./Kanban";
+import { Kanban, KanbanSkeleton, type NewTaskDraft } from "./Kanban";
 import { QuickActions } from "./QuickActions";
 import { TaskDetail } from "./TaskDetail";
 import { WorkspaceForm } from "./WorkspaceForm";
@@ -257,16 +257,14 @@ export function BoardPanel({
   }, [hidden]);
 
   const create = useCallback(
-    async (title: string) => {
+    async (draft: NewTaskDraft) => {
       if (workspaceId === null) return;
       try {
         const task = await saveTask({
           workspaceId,
           id: null,
           revision: null,
-          title,
-          description: "",
-          criteria: "",
+          ...draft,
         });
         setTasks((current) => [task, ...current]);
         flash(task.id);

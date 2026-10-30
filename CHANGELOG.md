@@ -2,6 +2,10 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.19.0] — 2026-10-31
+
+- A criação de tarefa na raia **A fazer** ganhou um formulário mais claro: o campo **Título** (com o botão **Criar**) e, embaixo, **+ Descrição e critérios** abre descrição e critérios de aceite opcionais no mesmo lugar. Uma linha diz que só o título basta e que o resto pode vir depois. Ctrl/⌘+Enter cria a partir da descrição ou dos critérios.
+
 ## Front [0.18.0] — 2026-10-31
 
 Barra lateral organizada por workspace:

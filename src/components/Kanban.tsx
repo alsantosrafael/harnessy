@@ -4,6 +4,15 @@ import { type Block, LANES, neighbor, shortcutTarget, statusName } from "../lib/
 import type { LocalTask, TaskStatus } from "../lib/desktop";
 import "../styles/kanban.css";
 
+/** Dados de uma tarefa nova; só o título é obrigatório. */
+export interface NewTaskDraft {
+  title: string;
+  description: string;
+  criteria: string;
+}
+
+const EMPTY_DRAFT: NewTaskDraft = { title: "", description: "", criteria: "" };
+
 interface Props {
   groups: Record<TaskStatus, LocalTask[]>;
   selectedId: number | null;
@@ -18,7 +27,7 @@ interface Props {
   /** Abre a tarefa com o cursor no título. */
   onEdit: (id: number) => void;
   onDelete: (id: number) => void;
-  onCreate: (title: string) => Promise<void>;
+  onCreate: (draft: NewTaskDraft) => Promise<void>;
 }
 
 /** Tarefas do workspace em quatro raias. Mover: botão do card, teclado ou arrastar. */
@@ -91,34 +100,98 @@ export function Kanban({
   );
 }
 
-function Composer({ onCreate }: { onCreate: (title: string) => Promise<void> }) {
-  const [title, setTitle] = useState("");
+/** Nova tarefa: o título basta; descrição e critérios são opcionais e podem vir depois. */
+function Composer({ onCreate }: { onCreate: (draft: NewTaskDraft) => Promise<void> }) {
+  const [draft, setDraft] = useState(EMPTY_DRAFT);
+  const [detailed, setDetailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const ready = draft.title.trim() !== "";
+
+  async function submit() {
+    if (!ready || busy) return;
+    setBusy(true);
+    await onCreate({
+      title: draft.title.trim(),
+      description: draft.description.trim(),
+      criteria: draft.criteria.trim(),
+    });
+    setDraft(EMPTY_DRAFT);
+    setBusy(false);
+  }
+
   return (
     <form
       className="composer-inline"
-      onSubmit={async (event) => {
+      onSubmit={(event) => {
         event.preventDefault();
-        const value = title.trim();
-        if (!value || busy) return;
-        setBusy(true);
-        await onCreate(value);
-        setTitle("");
-        setBusy(false);
+        void submit();
       }}
     >
-      <label className="sr-only" htmlFor="new-task-title">
-        Título da nova tarefa
+      <label className="composer-label" htmlFor="new-task-title">
+        Título
       </label>
       <input
         id="new-task-title"
-        value={title}
+        value={draft.title}
         maxLength={300}
         placeholder="Nova tarefa… (n)"
         autoComplete="off"
         disabled={busy}
-        onChange={(event) => setTitle(event.target.value)}
+        onChange={(event) => setDraft({ ...draft, title: event.target.value })}
       />
+      <button
+        type="button"
+        className="composer-toggle"
+        aria-expanded={detailed}
+        aria-controls="new-task-details"
+        onClick={() => setDetailed(!detailed)}
+      >
+        {detailed ? "Ocultar descrição e critérios" : "+ Descrição e critérios"}
+      </button>
+      {detailed && (
+        <div id="new-task-details" className="composer-details">
+          <label>
+            Descrição
+            <textarea
+              rows={3}
+              maxLength={100000}
+              value={draft.description}
+              disabled={busy}
+              onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                  event.preventDefault();
+                  void submit();
+                }
+              }}
+            />
+          </label>
+          <label>
+            Critérios de aceite
+            <textarea
+              rows={3}
+              maxLength={100000}
+              value={draft.criteria}
+              disabled={busy}
+              onChange={(event) => setDraft({ ...draft, criteria: event.target.value })}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                  event.preventDefault();
+                  void submit();
+                }
+              }}
+            />
+          </label>
+        </div>
+      )}
+      <div className="composer-footer">
+        <span className="composer-hint">
+          Só o título basta. O resto pode vir depois, no painel da tarefa.
+        </span>
+        <button className="button primary" disabled={!ready || busy}>
+          {busy ? "Criando…" : "Criar"}
+        </button>
+      </div>
     </form>
   );
 }
