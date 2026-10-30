@@ -10,9 +10,9 @@ Mapa e justificativas em `docs/architecture-rust.md`. Estas regras valem para qu
 ## Estrutura
 
 1. `lib.rs` só registra módulos e monta o `tauri::Builder`. Nenhuma lógica, struct ou comando é definido nele.
-2. Um módulo por domínio (`workspace`, `task`, `connections`, `app`) e um por infraestrutura compartilhada (`db`, `error`). Novo conceito de produto = novo diretório `src/<dominio>/`, nunca uma função solta em módulo existente.
+2. Um módulo por domínio (`workspace`, `task`, `run`, `connections`) e um por infraestrutura compartilhada (`db`, `error`, `process`). Novo conceito de produto = novo diretório `src/<dominio>/`, nunca uma função solta em módulo existente.
 3. Dentro de um domínio: `mod.rs` contém modelos e regras; `commands.rs` contém apenas adaptadores `#[tauri::command]`. Submódulos adicionais (`probe.rs`, `process.rs`, `interpret.rs`) separam dados estáticos, efeitos colaterais e lógica pura.
-4. Módulos de domínio não se importam entre si. Compartilhamento passa por `db` ou `error`; se dois domínios precisarem do mesmo tipo, ele vira módulo próprio.
+4. Módulos de domínio não se importam entre si. Compartilhamento passa por `db`, `error` ou `process`; se dois domínios precisarem do mesmo tipo, ele vira módulo próprio. Só a camada de composição (`app`, `flow`) pode usar vários domínios, para orquestrar fluxos que os cruzam.
 
 ## Comandos IPC
 
@@ -30,15 +30,22 @@ Mapa e justificativas em `docs/architecture-rust.md`. Estas regras valem para qu
 
 ## Persistência
 
-13. Esquema só muda adicionando uma entrada ao final de `MIGRATIONS` em `db.rs`. Nunca editar uma migração já publicada; `user_version` é a única fonte da versão do esquema.
+13. Esquema só muda adicionando uma entrada ao final de `MIGRATIONS` em `db.rs`. Nunca editar uma migração já publicada; `user_version` é a única fonte da versão do esquema. Exceção temporária: enquanto o produto estiver em 0.x sem dados de usuário a preservar (decisão de 2026-10-30, Back 0.2.0), o esquema pode ser editado no lugar e o banco local de desenvolvimento apagado. A exceção termina na primeira versão distribuída.
 14. Limites de tamanho e constantes de validação ficam no topo do módulo de domínio como `const`, não como literais nas funções.
 15. Nomes de colunas em `SELECT` são explícitos (sem `*`), mapeados por uma função `from_row` no tipo.
 
 ## Segurança e processos externos
 
-16. Executar binários externos só em `connections::process`, com `stdin` fechado, tempo limite, saída limitada e argumentos fixos vindos de `probe.rs`. Nenhum argumento vem da WebView.
+16. Executar binários externos só em dois lugares: `connections::process` (sondas curtas, com `stdin` fechado, tempo limite, saída limitada e argumentos fixos vindos de `probe.rs`) e o módulo `run` (processos de longa duração, regras 25–28). Nenhum argumento vem da WebView.
 17. Credenciais, tokens e saída bruta de CLIs nunca entram em um tipo `Serialize`. A interface recebe estado, frase curta e, no máximo, nome de conta e caminho do binário.
 18. Novo acesso privilegiado (filesystem, rede, shell) exige comando dedicado, permissão mínima em `capabilities/main.json` e nota em `docs/development.md`.
+
+## Execução de agentes (`run`)
+
+25. Argumentos, prompt e arquivo de settings de uma Run são montados em Rust a partir de modelos fixos e dos dados da Tarefa. A WebView só escolhe a Ação e a Tarefa por id.
+26. O ambiente do processo do agente é uma lista fixa em Rust. Nunca herdar o ambiente do app; nunca incluir `GH_TOKEN`, chaves de API ou variáveis do shell do usuário. Uma Ação não declara variáveis de ambiente nem segredos.
+27. O Harnessy não guarda credenciais em SQLite, arquivos ou eventos. Texto de Run passa por filtro de padrões de token antes de ser salvo e tem tamanho limitado.
+28. Push, `gh pr create` e qualquer escrita em fonte externa são feitos pelo Rust, nunca pelo agente, depois de verificar o diff. Toda Run tem limite de tempo, turnos e saída, e cancelar encerra o grupo de processos inteiro.
 
 ## Testes e verificação
 
