@@ -1,5 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import type { AgentChoice } from "./agents";
 
 export interface AppInfo {
   version: string;
@@ -129,6 +130,10 @@ export interface Run {
   review: string | null;
   /** Revisor escolhido (`claude` ou `codex`); `null` em runs antigas, que valem `claude`. */
   reviewer: string | null;
+  /** Modelo do revisor; vazio ou `null` = automático (um degrau acima). */
+  reviewerModel: string | null;
+  /** Quando revisar (`auto`, `always`, `never`); `null` vale `auto`. */
+  reviewWhen: string | null;
   /** Achados do revisor descartados por não apontarem para o diff. */
   reviewDiscarded: number | null;
   /** Run cuja branch serviu de base (passo encadeado). */
@@ -176,20 +181,20 @@ export const previewPrompt = (workspaceId: number, taskId: number, action = IMPL
 export const startRun = (
   workspaceId: number,
   taskId: number,
-  runtime: string,
-  model: string,
+  choice: AgentChoice,
   action = IMPLEMENT_ACTION,
   continueFrom: number | null = null,
-  reviewer = "claude",
 ) =>
   localCall<Run>("start_run", {
     workspaceId,
     taskId,
-    runtime,
-    model,
+    runtime: choice.runtime,
+    model: choice.model,
     action,
     continueFrom,
-    reviewer,
+    reviewer: choice.reviewer,
+    reviewerModel: choice.reviewerModel,
+    reviewWhen: choice.reviewWhen,
   });
 /** Passo proposto por "Dividir em passos", editável antes de virar tarefa. */
 export interface StepProposal {

@@ -1,9 +1,11 @@
-//! Adaptador do Codex CLI (`codex exec --json`): só leitura, porque o Codex
-//! revisa e não implementa (SPEC §6.4). Traduz o JSONL da CLI para eventos
-//! neutros de [`runtime`](super::runtime); nenhum outro módulo conhece o formato.
+//! Adaptador do Codex CLI (`codex exec --json`). Traduz o JSONL da CLI para
+//! eventos neutros de [`runtime`](super::runtime); nenhum outro módulo conhece
+//! o formato. Leitura roda com `--sandbox read-only`; escrita, com
+//! `workspace-write` (só o worktree, sem rede), que é a contenção do Codex.
 //!
-//! O modelo vem da configuração do próprio Codex do usuário (`spec.model` e
-//! `spec.effort` não são repassados): os ids de modelo dele não são os do Claude.
+//! `spec.model` igual a [`guard::CODEX_DEFAULT`] usa o modelo da configuração do próprio Codex;
+//! `spec.effort` não é repassado (os níveis dele não são os do Claude). O Codex
+//! não retoma sessão aqui: a correção leva o contexto completo.
 
 use std::path::{Path, PathBuf};
 
@@ -12,12 +14,9 @@ use serde_json::Value;
 use super::{
     claude::exit_of,
     guard,
-    runtime::{Access, AgentEvent, AgentSpec, CycleUsage, Exit, Finish, Runtime, Session},
+    runtime::{AgentEvent, AgentSpec, CycleUsage, Exit, Finish, Runtime, Session},
     supervisor::{self, Line},
 };
-
-/// Nome do revisor no ledger e no log (o Codex escolhe o modelo).
-pub const LABEL: &str = "codex";
 
 pub struct Codex {
     binary: PathBuf,
@@ -43,9 +42,6 @@ impl Runtime for Codex {
         session: &Session<'_>,
         on_event: &mut dyn FnMut(AgentEvent),
     ) -> Exit {
-        if spec.access != Access::Read {
-            return Exit::Failed("O Codex só executa Ações de leitura, como a revisão.".into());
-        }
         let schema = match spec
             .json_schema
             .map(|json| write_schema(&self.data_dir, session.run_id, json))
@@ -56,7 +52,7 @@ impl Runtime for Codex {
         };
         let plan = supervisor::Plan {
             binary: self.binary.clone(),
-            args: guard::codex_args(schema.as_deref()),
+            args: guard::codex_args(spec.access, spec.model, schema.as_deref()),
             env: self.env.clone(),
             cwd: spec.dir.to_path_buf(),
             prompt: spec.prompt.to_owned(),

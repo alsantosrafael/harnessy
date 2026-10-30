@@ -114,6 +114,8 @@ const run = (id: number, taskId: number, state: string, blocked = ""): Run => ({
   reviewDiscarded: null,
   baseRunId: null,
   reviewer: null,
+  reviewerModel: null,
+  reviewWhen: null,
 });
 
 test("only the latest finished run of an open task can block it", () => {

@@ -2,9 +2,25 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.12.0] — 2026-10-30
+
+- **Chat** voltou como tela própria: runs à esquerda (em andamento no topo, anteriores recolhidas) e, à direita, a conversa ao vivo do agente — mensagens dele, ações agrupadas, logs técnicos recolhidos e o resultado da revisão — com o campo de nova tarefa embaixo (⌘↵ inicia). O Chat mostra quantas runs estão em andamento.
+- A revisão aparece como cartão na conversa: quem revisou, o veredito e os achados com arquivo e linha, bloqueantes e sugestões.
+- A configuração da run ficou num bloco recolhível que resume "quem implementa · quem revisa (quando)". Implementador e revisor escolhem agente (Claude Code ou Codex) e modelo; o Codex aceita o padrão da CLI ou um id digitado. **Quando revisar**: só com risco, sempre ou nunca.
+- Iniciar uma implementação pelo painel da tarefa abre a conversa da run; o painel ganhou "Ver a conversa da última run". As runs saíram de baixo do quadro.
+- Novos comandos `bun run app`, `app:build` e `app:install` para abrir, recompilar ou instalar o aplicativo.
+- **BREAKING (IPC):** `startRun` envia `reviewerModel` e `reviewWhen`.
+
+## Back [0.13.0] — 2026-10-30
+
+- O Codex também pode **implementar** (`--sandbox workspace-write`, só o worktree, sem rede) e revisar; a escolha de agente e modelo vale para cada papel.
+- `start_run` recebe `reviewer`, `reviewerModel` e `reviewWhen` (`auto`, `always`, `never`); `Run` ganha `reviewerModel` e `reviewWhen`; migração 10 (`runs.reviewer_model`, `runs.review_when`). **BREAKING:** os três argumentos são obrigatórios no IPC; o front 0.12.0 já os envia. `continue_run` mantém a escolha da run.
+- "Sempre" revisa mesmo quando a Ação `revisar` diz `quando = "risco"`; "nunca" desliga a revisão sem editar a Ação. O evento `review` informa quem revisou.
+- Modelo do Codex digitado é validado por caracteres de id (nunca vira opção da linha de comando).
+
 ## Front [0.11.0] — 2026-10-30
 
-- Novo seletor **Revisor** (Claude Code, um modelo acima, ou Codex) ao lado de Agente e Modelo, na nova tarefa e no painel da tarefa. A escolha fica salva neste dispositivo.
+- Novo seletor de revisor (Claude Code, um modelo acima, ou Codex) ao lado de Agente e Modelo, na nova tarefa e no painel da tarefa. A escolha fica salva neste dispositivo.
 - O Codex continua indisponível como agente que implementa; agora a lista diz "só revisa, por enquanto".
 
 ## Back [0.12.0] — 2026-10-30

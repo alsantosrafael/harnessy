@@ -13,10 +13,10 @@ Aplicativo desktop feito com **Tauri 2, Rust, React e TypeScript**, usando **Bun
 Na pasta raiz do projeto, execute:
 
 ```bash
-open src-tauri/target/release/bundle/macos/Harnessy.app
+bun run app
 ```
 
-Ou abra `Harnessy.app` pelo Finder nesse mesmo caminho. O aplicativo compilado não precisa de um terminal ou servidor Vite em execução.
+Ele abre `src-tauri/target/release/bundle/macos/Harnessy.app` (e gera o build antes, se ainda não existir). Para recompilar com o código atual, use `bun run app:build`; para copiar para `~/Applications` e abrir de lá, `bun run app:install`. Também dá para abrir `Harnessy.app` pelo Finder nesse caminho. O aplicativo compilado não precisa de um terminal ou servidor Vite em execução.
 
 ### Quer executar pelo código-fonte?
 
@@ -52,7 +52,7 @@ No chat, **Iniciar** cria a tarefa e começa a run com o agente e o modelo que v
 | Tarefas (quadro local com estados e histórico) | Disponível |
 | GitHub, Codex e Claude Code | Estado real das sessões das CLIs `gh`, `codex` e `claude`; autenticação pelo terminal |
 | Claude Code implementa em worktree próprio | Disponível: verificações rodadas pelo núcleo, falha estruturada, retomada de sessão, contraprova e ciclo com o próximo modelo |
-| Revisão independente | Revisor Claude (um modelo acima) quando há sinal de risco; revisão pelo Codex planejada |
+| Revisão independente | Revisor escolhido na interface (Claude Code ou Codex, com modelo e "quando revisar"); por padrão, Claude um modelo acima quando há sinal de risco |
 | Ações (Explicar, Dividir em passos, Nova Ação, Ações do repositório) | Disponível |
 | Workspaces e tarefas locais em SQLite | Disponível (aba Tarefas locais) |
 | Configuração `.harnessy/` versionada | Ações em `.harnessy/actions/` com confirmação por hash; perfil de verificações planejado |

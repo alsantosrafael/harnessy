@@ -156,6 +156,10 @@ const MIGRATIONS: &[&str] = &[
     "
     ALTER TABLE runs ADD COLUMN reviewer TEXT CHECK (reviewer IS NULL OR reviewer IN ('claude', 'codex'));
 ",
+    "
+    ALTER TABLE runs ADD COLUMN reviewer_model TEXT;
+    ALTER TABLE runs ADD COLUMN review_when TEXT CHECK (review_when IS NULL OR review_when IN ('auto', 'always', 'never'));
+",
 ];
 
 /// Segundos desde a época Unix; `0` se o relógio estiver antes dela.

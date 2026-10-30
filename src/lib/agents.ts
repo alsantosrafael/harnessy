@@ -8,16 +8,18 @@ export interface ModelOption {
 export interface AgentOption {
   runtime: Runtime;
   label: string;
+  /** Modelos conhecidos; com `customModel`, a interface aceita também um id livre. */
   models: readonly ModelOption[];
   defaultModel: string;
-  /** Presente quando o agente ainda não executa; é o motivo mostrado ao usuário. */
-  unavailable?: string;
+  /** O agente aceita um id de modelo digitado (os ids dele variam por conta). */
+  customModel?: boolean;
 }
 
 /**
- * Agentes e modelos que o Implementador pode usar (o Codex revisa, não implementa). Os ids de modelo são aliases do
- * `claude --model` e precisam estar também em `MODELS`, em `src-tauri/src/run/guard.rs`,
- * que é quem valida a escolha.
+ * Agentes e modelos de quem implementa e de quem revisa. Os ids do Claude Code são
+ * aliases do `claude --model` e precisam estar também em `MODELS`, em
+ * `src-tauri/src/run/guard.rs`, que é quem valida a escolha. O Codex usa o modelo
+ * da configuração dele (`codex`) ou um id digitado, validado em `guard::codex_model`.
  */
 export const agents: readonly AgentOption[] = [
   {
@@ -34,52 +36,91 @@ export const agents: readonly AgentOption[] = [
   {
     runtime: "codex",
     label: "Codex",
-    defaultModel: "",
-    models: [],
-    unavailable: "só revisa, por enquanto",
+    defaultModel: "codex",
+    models: [{ id: "codex", label: "Padrão do Codex" }],
+    customModel: true,
   },
 ];
 
-/** Quem revisa o resultado de uma run de escrita. */
-export type Reviewer = "claude" | "codex";
+/** Quando o revisor roda: segundo a Ação (só com risco), sempre ou nunca. */
+export type ReviewWhen = "auto" | "always" | "never";
 
-export const reviewers: readonly { id: Reviewer; label: string }[] = [
-  { id: "claude", label: "Claude Code, um modelo acima" },
-  { id: "codex", label: "Codex" },
+export const reviewWhens: readonly { id: ReviewWhen; label: string }[] = [
+  { id: "auto", label: "Só com risco" },
+  { id: "always", label: "Sempre" },
+  { id: "never", label: "Nunca" },
 ];
 
 export interface AgentChoice {
+  /** Quem implementa e o modelo dele. */
   runtime: Runtime;
   model: string;
-  reviewer: Reviewer;
+  /** Quem revisa; `reviewerModel` vazio = automático (Claude Code, um modelo acima). */
+  reviewer: Runtime;
+  reviewerModel: string;
+  reviewWhen: ReviewWhen;
 }
 
-/** Padrão: Claude Code com Sonnet implementa e o próprio Claude Code revisa. */
+/** Padrão: Claude Code com Sonnet implementa; o próprio Claude Code revisa quando há risco. */
 export const defaultChoice = (): AgentChoice => ({
   runtime: "claude",
   model: "sonnet",
   reviewer: "claude",
+  reviewerModel: "",
+  reviewWhen: "auto",
 });
 
 export const agentOf = (runtime: Runtime) => agents.find((agent) => agent.runtime === runtime);
 
-export const modelLabel = (choice: AgentChoice) =>
-  agentOf(choice.runtime)?.models.find((model) => model.id === choice.model)?.label ?? choice.model;
+const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
+
+/** Rótulo de um modelo; id desconhecido (digitado) aparece como veio. */
+export function modelName(runtime: Runtime, model: string) {
+  if (!model) return runtime === "claude" ? "um modelo acima" : "padrão";
+  return agentOf(runtime)?.models.find((item) => item.id === model)?.label ?? model;
+}
+
+/** Modelo aceito para o agente, ou o padrão dele. `blank` permite vazio (revisor automático). */
+function normalizeModel(runtime: Runtime, raw: unknown, blank: boolean): string {
+  const agent = agentOf(runtime);
+  const id = typeof raw === "string" ? raw.trim() : "";
+  if (!agent) return "";
+  if (!id) return blank && runtime === "claude" ? "" : agent.defaultModel;
+  if (agent.models.some((model) => model.id === id)) return id;
+  return agent.customModel && MODEL_ID.test(id) ? id : agent.defaultModel;
+}
+
+const isRuntime = (value: unknown): value is Runtime => agents.some((a) => a.runtime === value);
 
 /** Aceita qualquer valor lido do armazenamento e devolve uma escolha executável. */
 export function normalizeChoice(raw: unknown): AgentChoice {
-  const value = (raw ?? {}) as Partial<AgentChoice>;
-  const reviewer = reviewers.some((item) => item.id === value.reviewer)
-    ? (value.reviewer as Reviewer)
-    : "claude";
-  const agent = agents.find((item) => item.runtime === value.runtime);
-  if (!agent || agent.unavailable) return { ...defaultChoice(), reviewer };
-  const known = agent.models.some((model) => model.id === value.model);
+  const value = (raw ?? {}) as Partial<Record<keyof AgentChoice, unknown>>;
+  const runtime = isRuntime(value.runtime) ? value.runtime : "claude";
+  const reviewer = isRuntime(value.reviewer) ? value.reviewer : "claude";
   return {
-    runtime: agent.runtime,
-    model: known ? String(value.model) : agent.defaultModel,
+    runtime,
+    model: normalizeModel(runtime, value.model, false),
     reviewer,
+    reviewerModel: normalizeModel(reviewer, value.reviewerModel, true),
+    reviewWhen: reviewWhens.some((item) => item.id === value.reviewWhen)
+      ? (value.reviewWhen as ReviewWhen)
+      : "auto",
   };
+}
+
+/** Agente e modelo em texto; o padrão do Codex e o revisor automático não repetem o modelo. */
+function who(runtime: Runtime, model: string) {
+  const label = agentOf(runtime)?.label ?? runtime;
+  if (runtime === "codex") return model && model !== "codex" ? `${label} · ${model}` : label;
+  return model ? `${label} · ${modelName(runtime, model)}` : `${label}, um modelo acima`;
+}
+
+/** Resumo de uma linha: quem implementa e quem revisa, e quando. */
+export function choiceSummary(choice: AgentChoice) {
+  const impl = who(choice.runtime, choice.model);
+  if (choice.reviewWhen === "never") return `${impl} · sem revisão`;
+  const when = choice.reviewWhen === "always" ? "sempre" : "com risco";
+  return `${impl} · revisa: ${who(choice.reviewer, choice.reviewerModel)} (${when})`;
 }
 
 const STORAGE_KEY = "harnessy.agent-choice";

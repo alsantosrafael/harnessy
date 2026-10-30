@@ -54,7 +54,7 @@ const MAX_DENIAL_BYTES: usize = 80;
 const COLUMNS: &str = "id, workspace_id, task_id, title, action, role, runtime, state, \
                        base_sha, branch, worktree_path, started_at, finished_at, summary, blocked, \
                        model, cycles, turns, input_tokens, output_tokens, cache_read_tokens, \
-                       cache_write_tokens, cost_usd, agent_ms, checks_ms, proof, effort, review, review_discarded, base_run_id, reviewer, \
+                       cache_write_tokens, cost_usd, agent_ms, checks_ms, proof, effort, review, review_discarded, base_run_id, reviewer, reviewer_model, review_when, \
                        (SELECT c.model FROM run_cycles c WHERE c.run_id = runs.id \
                         ORDER BY c.cycle DESC LIMIT 1)";
 
@@ -108,6 +108,10 @@ pub struct Run {
     pub base_run_id: Option<i64>,
     /// Revisor escolhido (`claude` ou `codex`); `None` em runs anteriores a ele, que valem `claude`.
     pub reviewer: Option<String>,
+    /// Modelo do revisor; vazio = automático (um degrau acima do implementador).
+    pub reviewer_model: Option<String>,
+    /// Política de revisão (`auto`, `always`, `never`); `None` vale `auto`.
+    pub review_when: Option<String>,
     /// Modelo do último ciclo gravado.
     pub last_model: Option<String>,
     /// Próximo modelo da lista acima do último ciclo; `None` no topo.
@@ -148,11 +152,13 @@ impl Run {
             review_discarded: r.get(28)?,
             base_run_id: r.get(29)?,
             reviewer: r.get(30)?,
+            reviewer_model: r.get(31)?,
+            review_when: r.get(32)?,
             last_model: None,
             next_model: None,
         })
         .and_then(|mut run| {
-            run.last_model = r.get::<_, Option<String>>(31)?.or(run.model.clone());
+            run.last_model = r.get::<_, Option<String>>(33)?.or(run.model.clone());
             run.next_model = run
                 .last_model
                 .as_deref()
@@ -436,11 +442,17 @@ pub fn set_review(db: &Connection, id: i64, verdict: &str, discarded: usize) -> 
     Ok(())
 }
 
-/// Grava o revisor escolhido para a run (já validado por [`guard::reviewer`]).
-pub fn set_reviewer(db: &Connection, id: i64, reviewer: &str) -> Result<()> {
+/// Grava a escolha de revisão da run (valores já validados em [`guard`]).
+pub fn set_review_choice(
+    db: &Connection,
+    id: i64,
+    reviewer: &str,
+    model: &str,
+    when: &str,
+) -> Result<()> {
     db.execute(
-        "UPDATE runs SET reviewer=?2 WHERE id=?1",
-        params![id, reviewer],
+        "UPDATE runs SET reviewer=?2, reviewer_model=?3, review_when=?4 WHERE id=?1",
+        params![id, reviewer, model, when],
     )?;
     Ok(())
 }

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CircleHelp, Columns3, Plug, SquarePen, X } from "lucide-react";
+import { CircleHelp, Columns3, MessageSquare, Plug, SquarePen, X } from "lucide-react";
 import { type AgentChoice, loadChoice, saveChoice } from "./lib/agents";
 import { getAppInfo, listWorkspaces, type AppInfo, type Workspace } from "./lib/desktop";
 import { createDraftSession } from "./lib/drafts";
+import { isActive } from "./lib/runs";
+import { useRuns } from "./lib/useRuns";
 import { BoardPanel } from "./components/BoardPanel";
 import { ChatPanel } from "./components/ChatPanel";
 import { ConnectionsPage } from "./components/ConnectionsPage";
@@ -22,6 +24,8 @@ export function App() {
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
   const [loadError, setLoadError] = useState("");
   const [boardTick, setBoardTick] = useState(0);
+  const [runError, setRunError] = useState("");
+  const runs = useRuns(workspaceId, boardTick, setRunError);
   const [choice, setChoice] = useState<AgentChoice>(loadChoice);
   const [help, setHelp] = useState(false);
   const helpButton = useRef<HTMLButtonElement>(null);
@@ -89,9 +93,10 @@ export function App() {
   }, [help]);
 
   const connect = () => setView("connections");
+  const working = runs.runs.filter(isActive).length;
   const runtimeLabel = runtimeError ? "Núcleo indisponível" : info ? "Local" : "Prévia";
   const workspace = workspaces.find((item) => item.id === workspaceId);
-  const viewTitle = { board: "Tarefas", chat: "Nova tarefa", connections: "Conexões" }[view];
+  const viewTitle = { board: "Tarefas", chat: "Chat", connections: "Conexões" }[view];
 
   return (
     <div className="app-shell">
@@ -108,7 +113,6 @@ export function App() {
         <button className="button primary new-task" onClick={() => show("chat")}>
           <SquarePen size={14} aria-hidden="true" />
           Nova tarefa
-          <span className="shortcut">⌘2</span>
         </button>
         <nav>
           <button
@@ -118,6 +122,20 @@ export function App() {
           >
             <Columns3 size={16} aria-hidden="true" />
             Tarefas<span className="shortcut">⌘1</span>
+          </button>
+          <button
+            className={`nav-item ${view === "chat" ? "selected" : ""}`}
+            aria-current={view === "chat" ? "page" : undefined}
+            onClick={() => show("chat")}
+          >
+            <MessageSquare size={16} aria-hidden="true" />
+            Chat
+            {working > 0 && (
+              <span className="nav-badge" title={`${working} run(s) em andamento`}>
+                {working}
+              </span>
+            )}
+            <span className="shortcut">⌘2</span>
           </button>
           <button
             className={`nav-item ${view === "connections" ? "selected" : ""}`}
@@ -152,6 +170,14 @@ export function App() {
           </span>
         </header>
 
+        {runError && (
+          <p className="local-error app-error" role="alert">
+            {runError}{" "}
+            <button type="button" className="link-button" onClick={() => setRunError("")}>
+              Dispensar
+            </button>
+          </p>
+        )}
         <main id="main" tabIndex={-1}>
           {view === "connections" && <ConnectionsPage />}
           <div className="page workspace-page" hidden={view === "connections"}>
@@ -171,6 +197,8 @@ export function App() {
               refreshKey={boardTick}
               choice={choice}
               onChoice={chooseAgent}
+              runs={runs}
+              onOpenRun={() => show("chat")}
             />
             <ChatPanel
               hidden={view !== "chat"}
@@ -181,10 +209,10 @@ export function App() {
               choice={choice}
               onChoice={chooseAgent}
               agentReady={info?.agentExecutionAvailable ?? false}
-              onCreated={(started) => {
-                setBoardTick((tick) => tick + 1);
-                if (started) show("board");
-              }}
+              runs={runs}
+              onCreated={() => setBoardTick((tick) => tick + 1)}
+              onStepsCreated={() => setBoardTick((tick) => tick + 1)}
+              onError={setRunError}
             />
           </div>
         </main>

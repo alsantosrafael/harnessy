@@ -33,6 +33,7 @@ use crate::{
 };
 
 pub const ROLE: &str = "implementador";
+#[cfg(test)]
 pub const RUNTIME: &str = "claude";
 const MAX_SUMMARY_BYTES: usize = 2000;
 
@@ -565,7 +566,7 @@ fn review_cycle(
     );
     sink.review(id, outcome.verdict, outcome.discarded);
     sink.event(id, "status", &outcome.message());
-    sink.event(id, "review", &outcome.event_json());
+    sink.event(id, "review", &outcome.event_json(&reviewer.model));
     Some(outcome)
 }
 

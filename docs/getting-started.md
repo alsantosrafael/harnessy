@@ -23,7 +23,7 @@ src-tauri/target/release/bundle/macos/Harnessy.app
 Dê dois cliques no aplicativo. Se preferir o terminal, execute a partir da raiz do projeto:
 
 ```bash
-open src-tauri/target/release/bundle/macos/Harnessy.app
+bun run app
 ```
 
 Você pode copiar o `.app` pelo Finder para uma pasta de aplicativos. A cópia funciona sem o repositório e sem Vite; ela só é atualizada quando você substitui o build manualmente.

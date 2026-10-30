@@ -1,6 +1,6 @@
 {
   "name": "harnessy",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "private": true,
   "packageManager": "bun@1.4.3",
   "engines": {
@@ -14,6 +14,9 @@
     "dev": "bunx --bun vite --host 127.0.0.1",
     "build": "bunx --bun tsc --noEmit && bunx --bun vite build",
     "desktop:build": "bunx --bun tauri build",
+    "app": "bun scripts/app.mjs open",
+    "app:build": "bun scripts/app.mjs build",
+    "app:install": "bun scripts/app.mjs install",
     "check": "bunx --bun tsc --noEmit && bun scripts/check-version.mjs",
     "check:rust": "cargo check --manifest-path src-tauri/Cargo.toml",
     "test": "vitest run",

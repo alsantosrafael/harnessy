@@ -38,16 +38,58 @@ pub fn next_model(current: &str) -> Option<&'static str> {
     LADDER.get(at + 1).copied()
 }
 
-/// Revisores que a interface pode escolher: o próprio Claude Code (um degrau
-/// acima do implementador) ou o Codex.
-pub const REVIEWERS: [&str; 2] = ["claude", "codex"];
+/// Agentes que executam: `claude` e `codex` (cada um com adaptador em `run/`).
+pub const RUNTIMES: [&str; 2] = ["claude", "codex"];
+/// Modelo do Codex que significa "o que a CLI do usuário já usa" (nenhum `-m`).
+pub const CODEX_DEFAULT: &str = "codex";
+const CODEX_MODEL_MAX: usize = 64;
+/// Política de revisão escolhida na interface: a da Ação, sempre ou nunca.
+pub const REVIEW_WHEN: [&str; 3] = ["auto", "always", "never"];
 
-/// Valida o revisor escolhido na interface.
-pub fn reviewer(id: &str) -> Result<&'static str> {
-    REVIEWERS
+/// Valida o agente escolhido na interface.
+pub fn runtime(id: &str) -> Result<&'static str> {
+    RUNTIMES
         .into_iter()
         .find(|known| *known == id)
-        .ok_or(AppError::Validation("Revisor desconhecido."))
+        .ok_or(AppError::Validation("Agente desconhecido."))
+}
+
+/// Valida a política de revisão.
+pub fn review_when(id: &str) -> Result<&'static str> {
+    REVIEW_WHEN
+        .into_iter()
+        .find(|known| *known == id)
+        .ok_or(AppError::Validation("Política de revisão desconhecida."))
+}
+
+/// Modelo do Codex: vazio ou `codex` é o padrão da CLI; o resto é um id livre,
+/// mas só com caracteres de id de modelo, para nunca virar opção da linha de comando.
+pub fn codex_model(id: &str) -> Result<String> {
+    let id = id.trim();
+    if id.is_empty() || id == CODEX_DEFAULT {
+        return Ok(CODEX_DEFAULT.into());
+    }
+    let valid = id.len() <= CODEX_MODEL_MAX
+        && id.starts_with(|c: char| c.is_ascii_alphanumeric())
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ':'));
+    if valid {
+        Ok(id.to_owned())
+    } else {
+        Err(AppError::Validation(
+            "Modelo do Codex inválido: use só letras, números, ponto, hífen, _ ou dois-pontos.",
+        ))
+    }
+}
+
+/// Valida o modelo de um agente (regra 25: a WebView escolhe, o núcleo confere).
+pub fn agent_model(runtime: &str, id: &str) -> Result<String> {
+    match runtime {
+        "claude" => model(id).map(str::to_owned),
+        "codex" => codex_model(id),
+        _ => Err(AppError::Validation("Agente desconhecido.")),
+    }
 }
 
 /// Valida o esforço declarado por uma Ação.
@@ -215,15 +257,19 @@ fn base_args(settings: &Path, model: &str, max_turns: u32) -> Vec<String> {
     .collect()
 }
 
-/// Argumentos fixos do `codex exec`: só leitura, sem sessão gravada; o prompt
-/// segue por stdin (`-`). O `--sandbox` da linha de comando vale mais que o
-/// `config.toml` do usuário.
-pub fn codex_args(schema: Option<&Path>) -> Vec<String> {
+/// Argumentos fixos do `codex exec`; o prompt segue por stdin (`-`). O
+/// `--sandbox` da linha de comando vale mais que o `config.toml` do usuário:
+/// leitura não escreve nada; escrita só escreve dentro do worktree, sem rede.
+pub fn codex_args(access: Access, model: &str, schema: Option<&Path>) -> Vec<String> {
+    let sandbox = match access {
+        Access::Read => "read-only",
+        Access::Write => "workspace-write",
+    };
     let mut args: Vec<String> = [
         "exec",
         "--json",
         "--sandbox",
-        "read-only",
+        sandbox,
         "--skip-git-repo-check",
         "--ephemeral",
         "--color",
@@ -232,6 +278,9 @@ pub fn codex_args(schema: Option<&Path>) -> Vec<String> {
     .iter()
     .map(|s| s.to_string())
     .collect();
+    if model != CODEX_DEFAULT && !model.is_empty() {
+        args.extend(["--model".into(), model.into()]);
+    }
     if let Some(schema) = schema {
         args.extend([
             "--output-schema".into(),
@@ -275,24 +324,44 @@ mod tests {
     use super::*;
 
     #[test]
-    fn codex_runs_read_only_and_reads_the_prompt_from_stdin() {
-        let args = codex_args(Some(Path::new("/x/schema.json")));
-        let at = args.iter().position(|a| a == "--sandbox").unwrap();
-        assert_eq!(args[at + 1], "read-only");
-        assert_eq!(args.last().map(String::as_str), Some("-"));
-        assert!(args
+    fn codex_reads_read_only_writes_only_in_the_workspace_and_takes_the_prompt_from_stdin() {
+        let read = codex_args(
+            Access::Read,
+            CODEX_DEFAULT,
+            Some(Path::new("/x/schema.json")),
+        );
+        let at = read.iter().position(|a| a == "--sandbox").unwrap();
+        assert_eq!(read[at + 1], "read-only");
+        assert_eq!(read.last().map(String::as_str), Some("-"));
+        assert!(read
             .windows(2)
             .any(|w| w == ["--output-schema", "/x/schema.json"]));
-        assert!(!codex_args(None).iter().any(|a| a == "--output-schema"));
-        assert!(!args
+        assert!(!read.iter().any(|a| a == "--model"));
+        let write = codex_args(Access::Write, "gpt-5.1", None);
+        let at = write.iter().position(|a| a == "--sandbox").unwrap();
+        assert_eq!(write[at + 1], "workspace-write");
+        assert!(write.windows(2).any(|w| w == ["--model", "gpt-5.1"]));
+        assert!(!write
             .iter()
-            .any(|a| a.contains("danger") || a.contains("write")));
+            .any(|a| a.contains("danger") || a == "--output-schema"));
     }
 
     #[test]
-    fn only_known_reviewers_are_accepted() {
-        assert_eq!(reviewer("codex").unwrap(), "codex");
-        assert!(reviewer("gpt").is_err());
+    fn agents_models_and_review_policy_are_validated() {
+        assert_eq!(runtime("codex").unwrap(), "codex");
+        assert!(runtime("gpt").is_err());
+        assert_eq!(agent_model("claude", "opus").unwrap(), "opus");
+        assert!(agent_model("claude", "gpt-5").is_err());
+        assert_eq!(agent_model("codex", "").unwrap(), CODEX_DEFAULT);
+        assert_eq!(
+            agent_model("codex", " gpt-5.1-codex ").unwrap(),
+            "gpt-5.1-codex"
+        );
+        for bad in ["--sandbox", "-m x", "a b", "x;rm", &"a".repeat(65)] {
+            assert!(codex_model(bad).is_err(), "{bad}");
+        }
+        assert_eq!(review_when("never").unwrap(), "never");
+        assert!(review_when("talvez").is_err());
     }
 
     #[test]

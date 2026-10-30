@@ -118,8 +118,9 @@ impl Outcome {
         }
     }
 
-    pub(super) fn event_json(&self) -> String {
+    pub(super) fn event_json(&self, reviewer: &str) -> String {
         json!({
+            "reviewer": reviewer,
             "verdict": self.verdict,
             "blocking": self.blocking,
             "suggestions": self.suggestions,

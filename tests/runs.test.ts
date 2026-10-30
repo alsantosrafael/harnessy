@@ -8,6 +8,7 @@ import {
   mergeEvents,
   proofLabel,
   reviewLabel,
+  timeAgo,
   stateLabel,
   stepsFrom,
   upsertRun,
@@ -56,6 +57,8 @@ const run = (id: number, state: string): Run => ({
   reviewDiscarded: null,
   baseRunId: null,
   reviewer: null,
+  reviewerModel: null,
+  reviewWhen: null,
 });
 const event = (seq: number): RunEvent => ({ runId: 1, seq, kind: "log", text: String(seq) });
 
@@ -132,4 +135,13 @@ test("a chained step continues from the latest completed run of the previous tas
   assert.equal(chainBase(step, [failed, done])?.id, 5);
   assert.equal(chainBase({ ...step, afterId: null }, [done]), null);
   assert.equal(chainBase(step, [failed]), null);
+});
+
+test("the run list shows elapsed time in short Portuguese units", () => {
+  const now = 1_000_000;
+  assert.equal(timeAgo(now - 20, now), "agora");
+  assert.equal(timeAgo(now - 5 * 60, now), "há 5 min");
+  assert.equal(timeAgo(now - 3 * 3600, now), "há 3 h");
+  assert.equal(timeAgo(now - 2 * 86400, now), "há 2 d");
+  assert.equal(timeAgo(now + 10, now), "agora");
 });

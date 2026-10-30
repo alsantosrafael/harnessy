@@ -1,7 +1,8 @@
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { accessLabel, extraActions, originLabel, unavailableReason } from "../lib/actions";
-import { type AgentChoice, agentOf, modelLabel } from "../lib/agents";
+import { type AgentChoice, agentOf, modelName } from "../lib/agents";
+import { stateLabel } from "../lib/runs";
 import { type Block, LANES, statusName } from "../lib/board";
 import { AgentPicker } from "./AgentPicker";
 import { NewActionForm } from "./NewActionForm";
@@ -44,6 +45,9 @@ interface Props {
   onResolve: (runId: number) => void;
   onDirty: (dirty: boolean) => void;
   onClose: () => void;
+  /** Run mais recente desta tarefa, para abrir a conversa dela. */
+  lastRun: Run | null;
+  onOpenRun: () => void;
 }
 
 /** Edição, estado, prompt do agente e histórico de uma tarefa. Use `key={task.id}`. */
@@ -63,6 +67,8 @@ export function TaskDetail({
   onResolve,
   onDirty,
   onClose,
+  lastRun,
+  onOpenRun,
 }: Props) {
   const [form, setForm] = useState({
     title: task.title,
@@ -251,8 +257,13 @@ export function TaskDetail({
         >
           {starting
             ? "Iniciando…"
-            : `Implementar com ${agentOf(choice.runtime)?.label ?? choice.runtime} · ${modelLabel(choice)}`}
+            : `Implementar com ${agentOf(choice.runtime)?.label ?? choice.runtime} · ${modelName(choice.runtime, choice.model)}`}
         </button>
+        {lastRun && (
+          <button type="button" className="link-button run-link" onClick={onOpenRun}>
+            Ver a conversa da última run ({stateLabel(lastRun.state)})
+          </button>
+        )}
         {dirty && <p className="muted">Salve a tarefa antes de implementar.</p>}
         {primaryReason && <p className="local-error">{primaryReason}</p>}
       </section>

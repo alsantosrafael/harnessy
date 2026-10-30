@@ -2,26 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { applyChange, applyMove, blockedByTask, groupByStatus, statusName } from "../lib/board";
 import {
-  listRunEvents,
-  listRuns,
   listTasks,
   moveTask,
   resolveBlock,
-  onRunEvent,
-  onRunState,
   onTaskChanged,
-  startRun,
   type LocalTask,
-  type Run,
-  type RunEvent,
   type TaskStatus,
   type Workspace,
   saveTask,
 } from "../lib/desktop";
 import type { AgentChoice } from "../lib/agents";
-import { canStartRun, chainBase, isActive, mergeEvents, upsertRun } from "../lib/runs";
+import { canStartRun, chainBase, isActive } from "../lib/runs";
+import type { RunsState } from "../lib/useRuns";
 import { Kanban, KanbanSkeleton } from "./Kanban";
-import { RunsPanel } from "./RunsPanel";
 import { TaskDetail } from "./TaskDetail";
 import { WorkspaceForm } from "./WorkspaceForm";
 import "../styles/local-work.css";
@@ -30,8 +23,6 @@ import "../styles/run-board.css";
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const FLASH_MS = 700;
 const UNDO_MS = 5_000;
-/** Rede de segurança: se um evento ao vivo se perder, o banco local corrige a tela. */
-const RUN_POLL_MS = 2_000;
 
 interface Notice {
   text: string;
@@ -53,6 +44,9 @@ interface Props {
   refreshKey: number;
   choice: AgentChoice;
   onChoice: (choice: AgentChoice) => void;
+  /** Runs compartilhadas com o chat; iniciar uma abre a conversa dela. */
+  runs: RunsState;
+  onOpenRun: () => void;
 }
 
 export function BoardPanel({
@@ -68,6 +62,8 @@ export function BoardPanel({
   refreshKey,
   choice,
   onChoice,
+  runs: runsState,
+  onOpenRun,
 }: Props) {
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [tasks, setTasks] = useState<LocalTask[]>([]);
@@ -75,10 +71,6 @@ export function BoardPanel({
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [flashId, setFlashId] = useState<number | null>(null);
   const [historyTick, setHistoryTick] = useState(0);
-  const [runs, setRuns] = useState<Run[]>([]);
-  const [openRun, setOpenRun] = useState<number | null>(null);
-  const [events, setEvents] = useState<RunEvent[]>([]);
-  const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [live, setLive] = useState("");
@@ -88,16 +80,10 @@ export function BoardPanel({
   tasksRef.current = tasks;
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
-  const openRunRef = useRef(openRun);
-  openRunRef.current = openRun;
-  const runsRef = useRef(runs);
-  runsRef.current = runs;
   const dirtyRef = useRef(false);
   const timers = useRef<{ flash?: number; notice?: number }>({});
-  const lastSeq = events.reduce((max, event) => Math.max(max, event.seq), 0);
-  const lastSeqRef = useRef(0);
-  lastSeqRef.current = lastSeq;
 
+  const { runs, starting } = runsState;
   const groups = useMemo(() => groupByStatus(tasks), [tasks]);
   const working = useMemo(() => new Set(runs.filter(isActive).map((run) => run.taskId)), [runs]);
   const blocked = useMemo(() => blockedByTask(runs, tasks), [runs, tasks]);
@@ -158,13 +144,9 @@ export function BoardPanel({
     dirtyRef.current = dirty;
   }, []);
 
-  // Eventos do núcleo valem mesmo com o painel escondido.
+  // Mudanças de tarefa vindas do núcleo valem mesmo com o painel escondido.
   useEffect(() => {
     const stops = [
-      onRunState((run) => setRuns((current) => upsertRun(current, run))),
-      onRunEvent((event) => {
-        if (event.runId === openRunRef.current) setEvents((c) => mergeEvents(c, [event]));
-      }),
       onTaskChanged((change) => {
         setTasks((current) => applyChange(current, change));
         if (change.taskId === selectedRef.current) setHistoryTick((tick) => tick + 1);
@@ -183,57 +165,21 @@ export function BoardPanel({
   useEffect(() => {
     setLoading(workspaceId !== null || !workspacesReady);
     setTasks([]);
-    setRuns([]);
     setSelectedId(null);
-    setOpenRun(null);
   }, [workspaceId, workspacesReady]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `refreshKey` é o gatilho de recarga vindo do chat.
   useEffect(() => {
     if (workspaceId === null) return;
     let alive = true;
-    Promise.all([listTasks(workspaceId), listRuns(workspaceId)])
-      .then(([taskRows, runRows]) => {
-        if (!alive) return;
-        setTasks(taskRows);
-        setRuns(runRows);
-      })
+    listTasks(workspaceId)
+      .then((rows) => alive && setTasks(rows))
       .catch((cause) => alive && setError(message(cause)))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
   }, [workspaceId, refreshKey]);
-
-  useEffect(() => {
-    if (openRun === null) return;
-    let alive = true;
-    setEvents([]);
-    listRunEvents(openRun, 0)
-      .then((rows) => alive && setEvents((current) => mergeEvents(current, rows)))
-      .catch((cause) => alive && setError(message(cause)));
-    return () => {
-      alive = false;
-    };
-  }, [openRun]);
-
-  const openRunActive = runs.some((run) => run.id === openRun && isActive(run));
-  useEffect(() => {
-    if (openRun === null || workspaceId === null || !openRunActive) return;
-    let alive = true;
-    const timer = setInterval(() => {
-      listRunEvents(openRun, lastSeqRef.current)
-        .then((rows) => alive && rows.length > 0 && setEvents((c) => mergeEvents(c, rows)))
-        .catch(() => {});
-      listRuns(workspaceId)
-        .then((rows) => alive && setRuns(rows))
-        .catch(() => {});
-    }, RUN_POLL_MS);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, [openRun, workspaceId, openRunActive]);
 
   // `n` leva ao campo de nova tarefa, como em qualquer lista com atalhos.
   useEffect(() => {
@@ -272,26 +218,8 @@ export function BoardPanel({
   );
 
   async function start(taskId: number, action?: string, continueFrom: number | null = null) {
-    if (workspaceId === null) return;
-    setStarting(true);
-    setError("");
-    try {
-      const run = await startRun(
-        workspaceId,
-        taskId,
-        choice.runtime,
-        choice.model,
-        action,
-        continueFrom,
-        choice.reviewer,
-      );
-      setRuns((current) => upsertRun(current, run));
-      setOpenRun(run.id);
-    } catch (cause) {
-      setError(message(cause));
-    } finally {
-      setStarting(false);
-    }
+    const run = await runsState.start(taskId, choice, action, continueFrom);
+    if (run) onOpenRun();
   }
 
   async function resolve(runId: number) {
@@ -428,16 +356,6 @@ export function BoardPanel({
                 )}
               </p>
             )}
-            <RunsPanel
-              runs={runs}
-              openRun={openRun}
-              events={events}
-              onOpen={setOpenRun}
-              onError={setError}
-              onStepsCreated={(created) =>
-                setTasks((current) => [...created].reverse().concat(current))
-              }
-            />
           </div>
           {selected && (
             <aside className="detail-drawer" aria-label={`Tarefa #${selected.id}`}>
@@ -464,6 +382,12 @@ export function BoardPanel({
                 onResolve={resolve}
                 onDirty={setDirty}
                 onClose={() => select(null)}
+                lastRun={runs.find((run) => run.taskId === selected.id) ?? null}
+                onOpenRun={() => {
+                  const last = runs.find((run) => run.taskId === selected.id);
+                  if (last) runsState.open(last.id);
+                  onOpenRun();
+                }}
               />
               {!startable && agentReady && (
                 <p className="muted">Já existe uma run ativa neste workspace.</p>

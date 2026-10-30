@@ -50,6 +50,17 @@ export const canStartRun = (agentReady: boolean, runs: Run[]) => agentReady && !
 export const canTryNextModel = (run: Run) =>
   run.state === "failed" && run.worktreePath !== null && run.nextModel !== null;
 
+/** "agora", "há 5 min", "há 3 h" ou "há 2 d", a partir de segundos desde a época Unix. */
+export function timeAgo(startedAt: number, now = Date.now() / 1000): string {
+  const seconds = Math.max(0, Math.round(now - startedAt));
+  if (seconds < 60) return "agora";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `há ${hours} h`;
+  return `há ${Math.floor(hours / 24)} d`;
+}
+
 const reviews: Record<string, { text: string; tone: ProofTone }> = {
   approve: { text: "Revisão independente aprovou", tone: "positive" },
   request_changes: { text: "Revisão independente pediu mudanças", tone: "alert" },
