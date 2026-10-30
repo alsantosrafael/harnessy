@@ -16,7 +16,9 @@ import {
 import type { AgentChoice } from "../lib/agents";
 import { canStartRun, chainBase, isActive } from "../lib/runs";
 import type { RunsState } from "../lib/useRuns";
+import { quickStates, type QuickId } from "../lib/quick";
 import { Kanban, KanbanSkeleton } from "./Kanban";
+import { QuickActions } from "./QuickActions";
 import { TaskDetail } from "./TaskDetail";
 import { WorkspaceForm } from "./WorkspaceForm";
 import "../styles/local-work.css";
@@ -76,6 +78,9 @@ export function BoardPanel({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [live, setLive] = useState("");
+  // Continuar do passo anterior: vale para o botão do detalhe e para os comandos rápidos.
+  const [useChain, setUseChain] = useState(true);
+  const detailRef = useRef<HTMLElement>(null);
 
   // Refs deixam `move`/`select` estáveis, para os cards memoizados não re-renderizarem.
   const tasksRef = useRef(tasks);
@@ -90,6 +95,13 @@ export function BoardPanel({
   const working = useMemo(() => new Set(runs.filter(isActive).map((run) => run.taskId)), [runs]);
   const blocked = useMemo(() => blockedByTask(runs, tasks), [runs, tasks]);
   const selected = tasks.find((task) => task.id === selectedId) ?? null;
+
+  // O detalhe fica embaixo do quadro: ao escolher uma tarefa, leva a tela até ele.
+  useEffect(() => {
+    if (selectedId === null) return;
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    detailRef.current?.scrollIntoView({ block: "nearest", behavior: calm ? "auto" : "smooth" });
+  }, [selectedId]);
 
   const flash = useCallback((id: number) => {
     setFlashId(id);
@@ -140,10 +152,13 @@ export function BoardPanel({
       return;
     }
     dirtyRef.current = false;
+    setUseChain(true);
     setSelectedId(id);
   }, []);
-  const setDirty = useCallback((dirty: boolean) => {
-    dirtyRef.current = dirty;
+  const [dirty, setDirtyState] = useState(false);
+  const setDirty = useCallback((value: boolean) => {
+    dirtyRef.current = value;
+    setDirtyState(value);
   }, []);
 
   const edit = useCallback(
@@ -262,6 +277,41 @@ export function BoardPanel({
       say({ text: "Aviso dispensado. O estado da tarefa não mudou." });
     } catch (cause) {
       setError(message(cause));
+    }
+  }
+
+  function quick(id: QuickId) {
+    if (!selected) return;
+    const last = runs.find((run) => run.taskId === selected.id) ?? null;
+    switch (id) {
+      case "implement": {
+        const base = chainBase(selected, runs);
+        void start(selected.id, undefined, base && useChain ? base.id : null);
+        break;
+      }
+      case "review":
+        if (last) void review(last.id);
+        break;
+      case "conversation":
+        if (last) runsState.open(last.id);
+        onOpenRun();
+        break;
+      case "branch":
+        if (last?.branch) {
+          navigator.clipboard
+            .writeText(last.branch)
+            .then(() => say({ text: `Branch ${last.branch} copiada.` }))
+            .catch(() =>
+              setError("Não foi possível copiar. Selecione o nome da branch na conversa."),
+            );
+        }
+        break;
+      case "finish":
+        move(selected.id, "done");
+        break;
+      case "reopen":
+        move(selected.id, "todo");
+        break;
     }
   }
 
@@ -405,7 +455,26 @@ export function BoardPanel({
             )}
           </div>
           {selected && (
-            <aside className="detail-drawer" aria-label={`Tarefa #${selected.id}`}>
+            <QuickActions
+              taskId={selected.id}
+              title={selected.title}
+              states={quickStates({
+                task: selected,
+                lastRun: runs.find((run) => run.taskId === selected.id) ?? null,
+                canStart: startable,
+                starting,
+                dirty,
+              })}
+              onRun={quick}
+              onDelete={() => remove(selected.id)}
+            />
+          )}
+          {selected && (
+            <section
+              ref={detailRef}
+              className="detail-panel"
+              aria-label={`Detalhes da tarefa #${selected.id}`}
+            >
               <TaskDetail
                 key={selected.id}
                 task={selected}
@@ -427,21 +496,15 @@ export function BoardPanel({
                 }
                 onStart={start}
                 onResolve={resolve}
-                onReview={review}
-                onDelete={remove}
                 onDirty={setDirty}
                 onClose={() => select(null)}
-                lastRun={runs.find((run) => run.taskId === selected.id) ?? null}
-                onOpenRun={() => {
-                  const last = runs.find((run) => run.taskId === selected.id);
-                  if (last) runsState.open(last.id);
-                  onOpenRun();
-                }}
+                useChain={useChain}
+                onUseChain={setUseChain}
               />
               {!startable && agentReady && (
                 <p className="muted">Já existe uma run ativa neste workspace.</p>
               )}
-            </aside>
+            </section>
           )}
         </div>
       )}

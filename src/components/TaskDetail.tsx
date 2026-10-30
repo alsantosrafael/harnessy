@@ -1,8 +1,8 @@
-import { Trash2, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { accessLabel, extraActions, originLabel, unavailableReason } from "../lib/actions";
-import { type AgentChoice, agentOf, modelName, reviewerLabel } from "../lib/agents";
-import { blockHelp, blockTitle, reviewable, stateLabel } from "../lib/runs";
+import { type AgentChoice, agentOf, modelName } from "../lib/agents";
+import { blockHelp, blockTitle } from "../lib/runs";
 import { type Block, LANES, statusName } from "../lib/board";
 import { AgentPicker } from "./AgentPicker";
 import { NewActionForm } from "./NewActionForm";
@@ -43,15 +43,11 @@ interface Props {
   /** Inicia a run com a Ação escolhida; sem Ação, usa a principal (implementar). */
   onStart: (id: number, action?: string, continueFrom?: number | null) => void;
   onResolve: (runId: number) => void;
-  /** Pede a revisão de uma run concluída. */
-  onReview: (runId: number) => void;
-  onDelete: (id: number) => void;
   onDirty: (dirty: boolean) => void;
   onClose: () => void;
   /** Continuar da run do passo anterior (escolha compartilhada com os comandos rápidos). */
-  /** Run mais recente desta tarefa, para abrir a conversa dela. */
-  lastRun: Run | null;
-  onOpenRun: () => void;
+  useChain: boolean;
+  onUseChain: (on: boolean) => void;
 }
 
 /** Edição, estado, prompt do agente e histórico de uma tarefa. Use `key={task.id}`. */
@@ -69,12 +65,10 @@ export function TaskDetail({
   onSaved,
   onStart,
   onResolve,
-  onReview,
-  onDelete,
   onDirty,
   onClose,
-  lastRun,
-  onOpenRun,
+  useChain,
+  onUseChain,
 }: Props) {
   const [form, setForm] = useState({
     title: task.title,
@@ -82,7 +76,6 @@ export function TaskDetail({
     criteria: task.criteria,
   });
   const [busy, setBusy] = useState(false);
-  const [useChain, setUseChain] = useState(true);
   const continueFrom = chainFrom && useChain ? chainFrom.id : null;
   const [error, setError] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -137,44 +130,35 @@ export function TaskDetail({
 
   return (
     <div className="task-detail">
-      <form
-        className="local-form"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          setBusy(true);
-          setError("");
-          try {
-            const saved = await saveTask({
-              ...form,
-              workspaceId: task.workspaceId,
-              id: task.id,
-              revision: task.revision,
-            });
-            setForm({
-              title: saved.title,
-              description: saved.description,
-              criteria: saved.criteria,
-            });
-            onSaved(saved);
-          } catch (cause) {
-            setError(message(cause));
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        <div className="detail-header">
-          <h2>Tarefa #{task.id}</h2>
-          <span className="detail-tools">
-            <button
-              type="button"
-              className="icon-button is-danger"
-              title="Excluir tarefa"
-              aria-label="Excluir tarefa"
-              onClick={() => onDelete(task.id)}
-            >
-              <Trash2 size={16} aria-hidden="true" />
-            </button>
+      <div className="detail-col">
+        <form
+          className="local-form"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setBusy(true);
+            setError("");
+            try {
+              const saved = await saveTask({
+                ...form,
+                workspaceId: task.workspaceId,
+                id: task.id,
+                revision: task.revision,
+              });
+              setForm({
+                title: saved.title,
+                description: saved.description,
+                criteria: saved.criteria,
+              });
+              onSaved(saved);
+            } catch (cause) {
+              setError(message(cause));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <div className="detail-header">
+            <h2>Tarefa #{task.id}</h2>
             <button
               type="button"
               className="icon-button"
@@ -184,214 +168,196 @@ export function TaskDetail({
             >
               <X size={16} aria-hidden="true" />
             </button>
-          </span>
-        </div>
-        {block && (
-          <div className="block-banner" role="status">
-            <strong>{blockTitle(block.state)}</strong>
-            <p>{block.reason}</p>
-            <p className="muted">{blockHelp(block.state)}</p>
-            <div className="block-actions">
-              {block.state === "no_changes" && task.status !== "done" && (
-                <button
-                  type="button"
-                  className="button primary"
-                  onClick={() => onMove(task.id, "done")}
-                >
-                  Concluir tarefa
-                </button>
-              )}
-              <button type="button" className="button" onClick={() => onResolve(block.runId)}>
-                Dispensar aviso
-              </button>
-            </div>
           </div>
-        )}
-        <fieldset className="status-group">
-          <legend className="sr-only">Estado da tarefa</legend>
-          {LANES.map((lane) => (
-            <button
-              key={lane.status}
-              type="button"
-              className={`status-pill tone-${lane.status}`}
-              aria-pressed={task.status === lane.status}
-              onClick={() => onMove(task.id, lane.status)}
-            >
-              <span className="lane-dot" aria-hidden="true" />
-              {lane.name}
-            </button>
-          ))}
-        </fieldset>
-        <label>
-          Título
-          <input
-            id="task-title"
-            required
-            maxLength={300}
-            value={form.title}
-            disabled={busy}
-            onChange={(event) => setForm({ ...form, title: event.target.value })}
-          />
-        </label>
-        <label>
-          Descrição
-          <textarea
-            rows={5}
-            maxLength={100000}
-            value={form.description}
-            disabled={busy}
-            onChange={(event) => setForm({ ...form, description: event.target.value })}
-          />
-        </label>
-        <label>
-          Critérios de aceite
-          <textarea
-            rows={4}
-            maxLength={100000}
-            value={form.criteria}
-            disabled={busy}
-            onChange={(event) => setForm({ ...form, criteria: event.target.value })}
-          />
-        </label>
-        {error && (
-          <p className="local-error" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="form-footer">
-          <span role="status" className="muted">
-            {dirty ? "Alterações não salvas" : "Salva"}
-          </span>
-          <button className="button" disabled={busy || !dirty || !form.title.trim()}>
-            {busy ? "Salvando…" : "Salvar"}
-          </button>
-        </div>
-      </form>
-
-      <section className="run-bar" aria-label="Implementar">
-        <AgentPicker choice={choice} onChange={onChoice} />
-        {chainFrom && (
-          <label className="chain-option">
-            <input
-              type="checkbox"
-              checked={useChain}
-              onChange={(event) => setUseChain(event.target.checked)}
-            />
-            Continuar das alterações de “{previousTitle}” (branch <code>{chainFrom.branch}</code>)
-          </label>
-        )}
-        <button
-          type="button"
-          className="button primary"
-          disabled={!canStart || starting || dirty || primaryReason !== null}
-          onClick={() => onStart(task.id, undefined, continueFrom)}
-        >
-          {starting
-            ? "Iniciando…"
-            : `Implementar com ${agentOf(choice.runtime)?.label ?? choice.runtime} · ${modelName(choice.runtime, choice.model)}`}
-        </button>
-        {lastRun && (
-          <button type="button" className="link-button run-link" onClick={onOpenRun}>
-            Ver a conversa da última run ({stateLabel(lastRun.state)})
-          </button>
-        )}
-        {lastRun && reviewable(lastRun) && (
-          <div className="review-now">
-            <button
-              type="button"
-              className="button"
-              disabled={!canStart || starting}
-              onClick={() => onReview(lastRun.id)}
-            >
-              Revisar a última run agora
-            </button>
-            <small className="muted">
-              Revisor: {reviewerLabel(choice)}. Roda mesmo sem sinal de risco.
-            </small>
-          </div>
-        )}
-        {dirty && <p className="muted">Salve a tarefa antes de implementar.</p>}
-        {primaryReason && <p className="local-error">{primaryReason}</p>}
-      </section>
-
-      <details className="more-actions">
-        <summary>Mais ações</summary>
-        {extraActions(actions).length > 0 && (
-          <ul>
-            {extraActions(actions).map((action) => {
-              const reason = unavailableReason(action);
-              return (
-                <li key={action.id}>
+          {block && (
+            <div className="block-banner" role="status">
+              <strong>{blockTitle(block.state)}</strong>
+              <p>{block.reason}</p>
+              <p className="muted">{blockHelp(block.state)}</p>
+              <div className="block-actions">
+                {block.state === "no_changes" && task.status !== "done" && (
                   <button
                     type="button"
-                    className="button"
-                    disabled={!canStart || starting || dirty || reason !== null}
-                    onClick={() => onStart(task.id, action.id, continueFrom)}
+                    className="button primary"
+                    onClick={() => onMove(task.id, "done")}
                   >
-                    {action.nome}
+                    Concluir tarefa
                   </button>
-                  <p className="more-actions-note">{action.descricao}</p>
-                  <small className="more-actions-note">
-                    {[originLabel(action.origem), accessLabel(action.acesso)]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </small>
-                  {reason && <p className="local-error">{reason}</p>}
-                  {action.pendente && (
+                )}
+                <button type="button" className="button" onClick={() => onResolve(block.runId)}>
+                  Dispensar aviso
+                </button>
+              </div>
+            </div>
+          )}
+          <fieldset className="status-group">
+            <legend className="sr-only">Estado da tarefa</legend>
+            {LANES.map((lane) => (
+              <button
+                key={lane.status}
+                type="button"
+                className={`status-pill tone-${lane.status}`}
+                aria-pressed={task.status === lane.status}
+                onClick={() => onMove(task.id, lane.status)}
+              >
+                <span className="lane-dot" aria-hidden="true" />
+                {lane.name}
+              </button>
+            ))}
+          </fieldset>
+          <label>
+            Título
+            <input
+              id="task-title"
+              required
+              maxLength={300}
+              value={form.title}
+              disabled={busy}
+              onChange={(event) => setForm({ ...form, title: event.target.value })}
+            />
+          </label>
+          <label>
+            Descrição
+            <textarea
+              rows={5}
+              maxLength={100000}
+              value={form.description}
+              disabled={busy}
+              onChange={(event) => setForm({ ...form, description: event.target.value })}
+            />
+          </label>
+          <label>
+            Critérios de aceite
+            <textarea
+              rows={4}
+              maxLength={100000}
+              value={form.criteria}
+              disabled={busy}
+              onChange={(event) => setForm({ ...form, criteria: event.target.value })}
+            />
+          </label>
+          {error && (
+            <p className="local-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="form-footer">
+            <span role="status" className="muted">
+              {dirty ? "Alterações não salvas" : "Salva"}
+            </span>
+            <button className="button" disabled={busy || !dirty || !form.title.trim()}>
+              {busy ? "Salvando…" : "Salvar"}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="detail-col">
+        <section className="run-bar" aria-label="Implementar">
+          <AgentPicker choice={choice} onChange={onChoice} />
+          {chainFrom && (
+            <label className="chain-option">
+              <input
+                type="checkbox"
+                checked={useChain}
+                onChange={(event) => onUseChain(event.target.checked)}
+              />
+              Continuar das alterações de “{previousTitle}” (branch <code>{chainFrom.branch}</code>)
+            </label>
+          )}
+          <button
+            type="button"
+            className="button primary"
+            disabled={!canStart || starting || dirty || primaryReason !== null}
+            onClick={() => onStart(task.id, undefined, continueFrom)}
+          >
+            {starting
+              ? "Iniciando…"
+              : `Implementar com ${agentOf(choice.runtime)?.label ?? choice.runtime} · ${modelName(choice.runtime, choice.model)}`}
+          </button>
+          {dirty && <p className="muted">Salve a tarefa antes de implementar.</p>}
+          {primaryReason && <p className="local-error">{primaryReason}</p>}
+        </section>
+
+        <details className="more-actions">
+          <summary>Mais ações</summary>
+          {extraActions(actions).length > 0 && (
+            <ul>
+              {extraActions(actions).map((action) => {
+                const reason = unavailableReason(action);
+                return (
+                  <li key={action.id}>
                     <button
                       type="button"
                       className="button"
-                      onClick={() =>
-                        approveAction(task.workspaceId, action.id)
-                          .then(() => setActionsTick((tick) => tick + 1))
-                          .catch((cause) => setError(message(cause)))
-                      }
+                      disabled={!canStart || starting || dirty || reason !== null}
+                      onClick={() => onStart(task.id, action.id, continueFrom)}
                     >
-                      Confirmar Ação do repositório
+                      {action.nome}
                     </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <details>
-          <summary>Nova Ação</summary>
-          <NewActionForm onCreated={() => setActionsTick((tick) => tick + 1)} />
+                    <p className="more-actions-note">{action.descricao}</p>
+                    <small className="more-actions-note">
+                      {[originLabel(action.origem), accessLabel(action.acesso)]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </small>
+                    {reason && <p className="local-error">{reason}</p>}
+                    {action.pendente && (
+                      <button
+                        type="button"
+                        className="button"
+                        onClick={() =>
+                          approveAction(task.workspaceId, action.id)
+                            .then(() => setActionsTick((tick) => tick + 1))
+                            .catch((cause) => setError(message(cause)))
+                        }
+                      >
+                        Confirmar Ação do repositório
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <details>
+            <summary>Nova Ação</summary>
+            <NewActionForm onCreated={() => setActionsTick((tick) => tick + 1)} />
+          </details>
         </details>
-      </details>
 
-      <details>
-        <summary>Prompt que o agente receberá</summary>
-        <pre className="run-log">{prompt || "Carregando…"}</pre>
-      </details>
+        <details>
+          <summary>Prompt que o agente receberá</summary>
+          <pre className="run-log">{prompt || "Carregando…"}</pre>
+        </details>
 
-      <section aria-label="Histórico">
-        <h3 className="section-title">Histórico</h3>
-        <ol className="history">
-          {history.map((event) => (
-            <li key={event.seq} className={`actor-${event.actor}`}>
-              <span className="history-who">{ACTORS[event.actor] ?? "Harnessy"}</span>
-              <span>
-                {event.fromStatus === null
-                  ? `criou em ${statusName(event.toStatus)}`
-                  : event.fromStatus === event.toStatus
-                    ? `anotou em ${statusName(event.toStatus)}`
-                    : `${statusName(event.fromStatus)} → ${statusName(event.toStatus)}`}
-              </span>
-              <time dateTime={new Date(event.at * 1000).toISOString()}>
-                {new Date(event.at * 1000).toLocaleString("pt-BR", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </time>
-              {event.note && <q className="history-note">{event.note}</q>}
-            </li>
-          ))}
-        </ol>
-      </section>
+        <section aria-label="Histórico">
+          <h3 className="section-title">Histórico</h3>
+          <ol className="history">
+            {history.map((event) => (
+              <li key={event.seq} className={`actor-${event.actor}`}>
+                <span className="history-who">{ACTORS[event.actor] ?? "Harnessy"}</span>
+                <span>
+                  {event.fromStatus === null
+                    ? `criou em ${statusName(event.toStatus)}`
+                    : event.fromStatus === event.toStatus
+                      ? `anotou em ${statusName(event.toStatus)}`
+                      : `${statusName(event.fromStatus)} → ${statusName(event.toStatus)}`}
+                </span>
+                <time dateTime={new Date(event.at * 1000).toISOString()}>
+                  {new Date(event.at * 1000).toLocaleString("pt-BR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </time>
+                {event.note && <q className="history-note">{event.note}</q>}
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
     </div>
   );
 }

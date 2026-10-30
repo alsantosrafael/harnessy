@@ -2,6 +2,12 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.16.0] — 2026-10-30
+
+- Ao escolher uma tarefa, o **detalhe aparece embaixo do quadro**, na largura toda e em duas colunas (edição à esquerda; agente, ações, prompt e histórico à direita), em vez de numa coluna ao lado. O quadro continua visível em cima, com rolagem própria em cada raia, e a tela desce até o detalhe.
+- Ao lado do quadro, uma coluna de **comandos rápidos** da tarefa: Implementar, Revisar última run, Abrir conversa, Copiar branch, Concluir (ou Reabrir) e Excluir. Cada comando indisponível diz o motivo em texto. A escolha de continuar da branch do passo anterior vale para o botão do detalhe e para o comando rápido.
+- Em janelas estreitas (< 900 px) os comandos rápidos e o detalhe descem para baixo do quadro.
+
 ## Front [0.15.0] — 2026-10-30
 
 - Cada card ganhou **editar** (abre a tarefa com o cursor no título) e **excluir** (com confirmação), ao lado de mover; o painel da tarefa também tem o ícone de excluir.

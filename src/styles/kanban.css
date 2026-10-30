@@ -48,10 +48,10 @@
 .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-hover); animation: pulse 1.2s ease-in-out infinite; }
 
 /* Detalhe da tarefa: estado em um clique e histórico com o ator em texto. */
-.task-detail { display: grid; gap: var(--space-4); align-content: start; }
+.task-detail { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-5); align-items: start; }
+.detail-col { display: grid; gap: var(--space-4); align-content: start; min-width: 0; }
+@media (min-width: 1000px) { .task-detail { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 .detail-header { display: flex; align-items: center; justify-content: space-between; }
-.detail-tools { display: flex; align-items: center; gap: var(--space-2); }
-.icon-button.is-danger:hover { color: var(--critical); }
 .block-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .review-now { display: grid; gap: var(--space-1); justify-items: start; }
 .section-title { font-size: var(--text-sm); color: var(--text-muted); font-weight: 600; margin-bottom: var(--space-2); }
