@@ -1,0 +1,20 @@
+/* Conexões: estados reais das CLIs GitHub, Codex e Claude Code. */
+.connections-page { max-width: 1180px; }
+.connections-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-top: var(--space-6); }
+.connections-toolbar span { color: var(--text-muted); font-size: var(--text-sm); }
+.connections-page .local-error { margin-top: var(--space-4); }
+.connections-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--space-5); }
+.connection-card .badge .status-dot { width: 6px; height: 6px; }
+.status-dot.status-connected { background: var(--positive); }
+.status-dot.status-expired { background: var(--amber-500); }
+.status-dot.status-unavailable, .status-dot.status-web { background: var(--neutral-400); }
+.status-dot.status-unknown { background: var(--critical); }
+.status-dot.status-checking { background: var(--in-progress); }
+.connection-card[data-state="connected"] .connection-icon { background: var(--amber-100); border-color: var(--amber-500); }
+.connection-facts { display: grid; grid-template-columns: auto 1fr; gap: var(--space-2) var(--space-4); margin: 0 0 var(--space-4); font-size: var(--text-sm); line-height: 1.6; }
+.connection-facts dt { color: var(--text-muted); }
+.connection-facts dd { margin: 0; color: var(--text-secondary); overflow-wrap: anywhere; }
+.connection-command { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-muted); font-size: var(--text-sm); }
+.connection-command span { color: var(--text-muted); }
+.connection-command code { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); color: var(--text); overflow-wrap: anywhere; user-select: all; }
+@media (max-width: 1150px) { .connections-grid { grid-template-columns: 1fr; } }

@@ -9,7 +9,7 @@ Esta versão permite explorar a experiência e preparar ideias. Ela ainda não e
 ### Barra lateral
 
 - **Visão geral:** abre a área de trabalho, preservando a aba selecionada enquanto a janela está aberta.
-- **Conexões:** mostra o estado planejado de GitHub e Codex.
+- **Conexões:** verifica as sessões das CLIs do GitHub, Codex e Claude Code.
 - **Próxima tarefa / botão +:** abre o único rascunho de conversa disponível nesta etapa.
 - **Sobre esta fundação:** informa versão, plataforma e capacidades implementadas.
 
@@ -36,7 +36,9 @@ O botão à direita das abas mostra ou oculta o painel. Ele apresenta a estrutur
 
 ### Conexões
 
-GitHub aparece como **Não conectado** e Codex como **Não verificado**. Os botões estão desabilitados intencionalmente. Você não precisa fornecer tokens ou autenticar contas para explorar a fundação.
+A tela verifica as sessões das CLIs oficiais instaladas no computador: `gh` (GitHub), `codex` (Codex) e `claude` (Claude Code). Cada cartão mostra um estado: **Conectado**, **Sessão expirada**, **Indisponível** (CLI não encontrada) ou **Não verificado** (a verificação falhou ou excedeu o tempo limite).
+
+O Harnessy não solicita tokens nem abre login: para conectar, execute no terminal o comando exibido no cartão (`gh auth login --web`, `codex login` ou `claude auth login`) e clique em **Verificar novamente**. As credenciais permanecem no keychain ou nos arquivos de cada CLI; a interface recebe apenas o estado, a conta identificada e o caminho da CLI.
 
 ## Atalhos e teclado
 

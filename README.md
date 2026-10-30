@@ -36,7 +36,7 @@ O comando abre a janela desktop e inicia automaticamente o frontend de desenvolv
 1. Em **Visão geral → Board**, conheça a estrutura do workspace. O board fica vazio até existir integração com o GitHub.
 2. Clique em **Preparar tarefa** para abrir o Chat com o campo em foco.
 3. Escreva sua ideia. O rascunho é salvo neste dispositivo; sugestões acrescentam texto sem apagar o conteúdo existente.
-4. Abra **Conexões** para consultar o estado das integrações. Os botões estão desabilitados nesta etapa.
+4. Abra **Conexões** para verificar as sessões das CLIs `gh`, `codex` e `claude`. Para autenticar, execute o comando indicado no terminal e verifique novamente.
 5. Feche a janela para ocultá-la. Use o menu **H**, na barra superior do macOS, para **Abrir Harnessy** ou **Encerrar Harnessy**.
 
 O botão **Iniciar** ainda não envia o rascunho. Não coloque credenciais no chat: o armazenamento de rascunhos não é um cofre.
@@ -50,12 +50,13 @@ O botão **Iniciar** ainda não envia o rascunho. Não coloque credenciais no ch
 | Aplicativo desktop, navegação e painel de contexto | Disponível |
 | Chat com rascunho local e sugestões | Disponível |
 | Board | Estrutura visual, sem cards reais |
-| GitHub e Codex | Integrações planejadas, botões desabilitados |
+| GitHub, Codex e Claude Code | Estado real das sessões das CLIs `gh`, `codex` e `claude`; autenticação pelo terminal |
 | Agentes, worktrees e execução de tarefas | Planejados |
-| SQLite, configuração `.harnessy/` e workspaces persistidos | Planejados |
+| Workspaces e tarefas locais em SQLite | Disponível (aba Tarefas locais) |
+| Configuração `.harnessy/` versionada | Planejada |
 | Deploy, Playwright e fluxo de revisão/correção | Planejados |
 
-As configurações e workflows descritos na SPEC são requisitos futuros, não arquivos que você precise criar para abrir esta versão. Nenhum token, conta GitHub, Codex ou Docker é necessário para explorar a fundação.
+As configurações e workflows descritos na SPEC são requisitos futuros, não arquivos que você precise criar para abrir esta versão. Nenhum token ou Docker é necessário para explorar a fundação; as CLIs são opcionais e, quando presentes, sua sessão é apenas verificada.
 
 ## Gerar seu aplicativo
 
@@ -81,6 +82,7 @@ Este é um build local: não há instalador DMG, atualização automática ou re
 | Entender o que foi implementado e validado | [Fundação técnica](docs/foundation.md) |
 | Consultar arquitetura e critérios do produto | [Especificação](SPEC.md) |
 | Acompanhar versões | [Changelog](CHANGELOG.md) |
+| Ver o progresso por etapa e o que ficou pendente | [Progresso](docs/progress.md) |
 | Consultar fontes sobre harness engineering | [Pesquisa](docs/research/harness-practices.md) |
 
 ## Versionamento

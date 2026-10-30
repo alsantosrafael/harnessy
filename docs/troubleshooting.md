@@ -82,9 +82,17 @@ open src-tauri/target/release/bundle/macos/Harnessy.app
 
 Substitua manualmente sua cópia em Applications. Não existe updater nesta versão.
 
-## GitHub, Codex ou Iniciar estão desabilitados
+## Uma conexão aparece como Indisponível, Sessão expirada ou Não verificado
 
-Essas integrações ainda não foram implementadas. Não é falta de token nem erro de instalação. Você pode usar navegação e rascunhos, mas não autenticar ou executar agentes. Consulte o [estado atual](../README.md#o-que-está-disponível).
+- **Indisponível:** a CLI (`gh`, `codex` ou `claude`) não foi encontrada. O app procura no PATH do processo e em `~/.local/bin`, `~/.bun/bin`, `~/.npm-global/bin`, `~/.cargo/bin`, `/opt/homebrew/bin` e `/usr/local/bin`. Instale com o comando exibido no cartão ou crie um link simbólico em um desses diretórios.
+- **Sessão expirada:** a CLI existe, mas não tem sessão válida. Execute `gh auth login --web`, `codex login` ou `claude auth login` no terminal e clique em **Verificar novamente**.
+- **Não verificado:** a CLI não respondeu em 20 segundos ou retornou algo inesperado. Rode o comando de status manualmente (`gh auth status`, `codex login status`, `claude auth status`) para ver o erro completo.
+
+Aliases de shell não afetam a verificação: o app executa o binário diretamente, sem passar pelo shell.
+
+## O botão Iniciar está desabilitado
+
+A execução de agentes ainda não foi implementada. Você pode usar navegação, tarefas locais, rascunhos e verificação de conexões, mas não executar agentes. Consulte o [estado atual](../README.md#o-que-está-disponível).
 
 ## O cabeçalho mostra “Prévia da interface”
 

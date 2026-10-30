@@ -22,14 +22,15 @@ import { BoardPanel } from "./components/BoardPanel";
 import { ChatPanel } from "./components/ChatPanel";
 import { ConnectionsPage } from "./components/ConnectionsPage";
 import { ContextPanel } from "./components/ContextPanel";
+import { LocalWorkPanel } from "./components/LocalWorkPanel";
 
 type Page = "workspace" | "connections";
-type Tab = "board" | "chat";
-const tabNames = ["board", "chat"] as const;
+type Tab = "tasks" | "board" | "chat";
+const tabNames = ["tasks", "board", "chat"] as const;
 
 export function App() {
   const [page, setPage] = useState<Page>("workspace");
-  const [tab, setTab] = useState<Tab>("board");
+  const [tab, setTab] = useState<Tab>("tasks");
   const [details, setDetails] = useState(true);
   // The session belongs to the application, not to a screen that can unmount.
   const [draftSession] = useState(createDraftSession);
@@ -180,94 +181,108 @@ export function App() {
         </header>
 
         <main id="main" tabIndex={-1}>
-          {page === "connections" ? (
-            <ConnectionsPage />
-          ) : (
-            <section className="page workspace-page">
-              <div className="page-heading">
-                <div>
-                  <p className="eyebrow">DA INTENÇÃO À ENTREGA</p>
-                  <h1>
-                    Menos operação.
-                    <br />
-                    Mais espaço para construir.
-                  </h1>
-                  <p className="lead">
-                    Organize o trabalho. Oriente seus agentes. Decida o que vai para o mundo.
-                  </p>
-                </div>
-                <button className="button primary" onClick={() => switchTab("chat")}>
-                  <Plus size={16} aria-hidden="true" />
-                  Preparar tarefa
-                </button>
+          {page === "connections" && <ConnectionsPage />}
+          <section className="page workspace-page" hidden={page !== "workspace"}>
+            <div className="page-heading">
+              <div>
+                <p className="eyebrow">DA INTENÇÃO À ENTREGA</p>
+                <h1>
+                  Menos operação.
+                  <br />
+                  Mais espaço para construir.
+                </h1>
+                <p className="lead">
+                  Organize o trabalho. Oriente seus agentes. Decida o que vai para o mundo.
+                </p>
               </div>
-              <div className="setup-banner">
-                <span className="setup-icon" aria-hidden="true">
-                  <Plug size={19} />
-                </span>
-                <div>
-                  <strong>Vamos preparar seu primeiro projeto?</strong>
-                  <p>Conecte o GitHub e o Codex para começar a trabalhar com seus agentes.</p>
-                </div>
-                <button className="button subtle" onClick={connect}>
-                  Ver conexões
-                  <ArrowRight size={15} aria-hidden="true" />
-                </button>
+              <button className="button primary" onClick={() => switchTab("chat")}>
+                <Plus size={16} aria-hidden="true" />
+                Preparar tarefa
+              </button>
+            </div>
+            <div className="setup-banner">
+              <span className="setup-icon" aria-hidden="true">
+                <Plug size={19} />
+              </span>
+              <div>
+                <strong>Seu projeto começa aqui.</strong>
+                <p>
+                  Organize workspaces e tarefas locais e confira as sessões do GitHub, Codex e
+                  Claude Code em Conexões. Execução de agentes vem depois.
+                </p>
               </div>
-              <div className="workspace-toolbar">
-                <div className="tabs" role="tablist" aria-label="Área de trabalho">
-                  {tabNames.map((value, index) => (
-                    <button
-                      key={value}
-                      ref={(node) => {
-                        tabs.current[index] = node;
-                      }}
-                      id={`${value}-tab`}
-                      role="tab"
-                      aria-controls={`${value}-panel`}
-                      aria-selected={tab === value}
-                      tabIndex={tab === value ? 0 : -1}
-                      onClick={() => setTab(value)}
-                      onKeyDown={(event) => {
-                        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-                        event.preventDefault();
-                        const next = event.key === "Home" ? 0 : event.key === "End" ? 1 : 1 - index;
-                        setTab(tabNames[next]);
-                        tabs.current[next]?.focus();
-                      }}
-                    >
-                      {value === "board" ? (
-                        <Columns3 size={16} aria-hidden="true" />
-                      ) : (
-                        <MessageSquare size={16} aria-hidden="true" />
-                      )}
-                      {value === "board" ? "Board" : "Chat"}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  className="icon-button"
-                  aria-label={details ? "Ocultar contexto" : "Mostrar contexto"}
-                  aria-expanded={details}
-                  aria-controls={details ? "context-panel" : undefined}
-                  onClick={() => setDetails(!details)}
+              <button className="button subtle" onClick={connect}>
+                Ver conexões
+                <ArrowRight size={15} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="workspace-toolbar">
+              <div className="tabs" role="tablist" aria-label="Área de trabalho">
+                {tabNames.map((value, index) => (
+                  <button
+                    key={value}
+                    ref={(node) => {
+                      tabs.current[index] = node;
+                    }}
+                    id={`${value}-tab`}
+                    role="tab"
+                    aria-controls={`${value}-panel`}
+                    aria-selected={tab === value}
+                    tabIndex={tab === value ? 0 : -1}
+                    onClick={() => setTab(value)}
+                    onKeyDown={(event) => {
+                      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                      event.preventDefault();
+                      const next =
+                        event.key === "Home"
+                          ? 0
+                          : event.key === "End"
+                            ? tabNames.length - 1
+                            : (index + (event.key === "ArrowRight" ? 1 : -1) + tabNames.length) %
+                              tabNames.length;
+                      setTab(tabNames[next]);
+                      tabs.current[next]?.focus();
+                    }}
+                  >
+                    {value === "board" ? (
+                      <Columns3 size={16} aria-hidden="true" />
+                    ) : (
+                      <MessageSquare size={16} aria-hidden="true" />
+                    )}
+                    {value === "tasks" ? "Tarefas locais" : value === "board" ? "Board" : "Chat"}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="icon-button"
+                aria-label={details ? "Ocultar contexto" : "Mostrar contexto"}
+                aria-expanded={details}
+                aria-controls={details ? "context-panel" : undefined}
+                onClick={() => setDetails(!details)}
+              >
+                {details ? (
+                  <PanelRightClose size={18} aria-hidden="true" />
+                ) : (
+                  <PanelRightOpen size={18} aria-hidden="true" />
+                )}
+              </button>
+            </div>
+            <div className="work-area">
+              <div className="work-content">
+                <div
+                  id="tasks-panel"
+                  role="tabpanel"
+                  aria-labelledby="tasks-tab"
+                  hidden={tab !== "tasks"}
                 >
-                  {details ? (
-                    <PanelRightClose size={18} aria-hidden="true" />
-                  ) : (
-                    <PanelRightOpen size={18} aria-hidden="true" />
-                  )}
-                </button>
-              </div>
-              <div className="work-area">
-                <div className="work-content">
-                  <BoardPanel hidden={tab !== "board"} onConnect={connect} />
-                  <ChatPanel hidden={tab !== "chat"} session={draftSession} />
+                  <LocalWorkPanel hidden={tab !== "tasks"} />
                 </div>
-                {details && <ContextPanel />}
+                <BoardPanel hidden={tab !== "board"} onConnect={connect} />
+                <ChatPanel hidden={tab !== "chat"} session={draftSession} />
               </div>
-            </section>
-          )}
+              {details && <ContextPanel />}
+            </div>
+          </section>
         </main>
 
         <footer className="statusbar">
@@ -275,7 +290,7 @@ export function App() {
             <span className={`status-dot ${runtimeError ? "status-error" : ""}`} />
             {runtimeError
               ? "Erro de comunicação com o núcleo"
-              : "Fundação · integrações ainda não disponíveis"}
+              : "Trabalho local · conexões verificadas pelas CLIs · agentes ainda não executam"}
           </span>
           <span>
             <Command size={11} aria-hidden="true" />1 Workspace
@@ -312,8 +327,9 @@ export function App() {
           Harnessy {info?.version ?? __APP_VERSION__} · {info?.platform ?? "prévia web"}
         </p>
         <p>
-          Interface React, núcleo Rust e janela Tauri. Nesta versão você pode navegar e preparar um
-          rascunho local. GitHub, Codex, execução, deploy e sandbox ainda não estão implementados.
+          Interface React, núcleo Rust e janela Tauri. Organize workspaces e tarefas em SQLite e
+          prepare um rascunho local. GitHub, Codex, execução, deploy e sandbox ainda não estão
+          implementados.
         </p>
         <p>
           Fechar a janela mantém o aplicativo ativo. Use o menu “H” na barra do macOS para reabrir

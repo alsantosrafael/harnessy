@@ -1,4 +1,6 @@
 use serde::Serialize;
+mod connections;
+mod local_work;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
@@ -36,8 +38,21 @@ fn show_main_window(app: &tauri::AppHandle) {
 
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![app_info])
+        .invoke_handler(tauri::generate_handler![
+            app_info,
+            local_work::list_workspaces,
+            local_work::create_workspace,
+            local_work::list_tasks,
+            local_work::save_task,
+            connections::check_connections
+        ])
         .setup(|app| {
+            let data = app.path().app_data_dir()?;
+            std::fs::create_dir_all(&data)?;
+            app.manage(
+                local_work::LocalWork::open(&data.join("local-work.sqlite3"))
+                    .map_err(std::io::Error::other)?,
+            );
             let open = MenuItem::with_id(app, "open", "Abrir Harnessy", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Encerrar Harnessy", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open, &quit])?;

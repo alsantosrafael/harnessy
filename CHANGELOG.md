@@ -17,3 +17,5 @@ O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor
 - Sessão de rascunho preservada entre telas, recuperação explícita de registro inválido e retry de gravação.
 - Regressões de rascunho com Vitest; Bun para instalação/scripts e Vite para frontend, com `bun.lock`.
 - Separação das telas Board/Conexões/Contexto e erros de lifecycle Rust observáveis.
+- Workspaces e tarefas locais persistidos em SQLite, com controle de revisão para edições concorrentes.
+- Conexões reais com GitHub, Codex e Claude Code via estado das CLIs oficiais (`gh`, `codex`, `claude`): detecção de instalação, sessão e conta, sem leitura ou armazenamento de credenciais; autenticação continua pelo terminal.

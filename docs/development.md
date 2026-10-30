@@ -65,7 +65,7 @@ docs/                      # Uso, desenvolvimento e pesquisa
 ## Regras da fundação
 
 - Rust controla operações privilegiadas; React não recebe shell ou acesso genérico a arquivos.
-- O único comando IPC implementado é `app_info`; ele retorna versão, plataforma e disponibilidade de execução, atualmente `false`.
+- Comandos IPC: `app_info` (metadados), `list_workspaces`/`create_workspace`/`list_tasks`/`save_task` (SQLite local) e `check_connections` (estado das CLIs `gh`, `codex` e `claude`). A verificação de conexões executa apenas comandos de status fixos, com entrada fechada e tempo limite; nunca lê, copia ou devolve tokens à WebView.
 - Não apresentar integração como funcional sem implementação real. Estados vazios e desabilitados são intencionais.
 - A sessão do rascunho vive durante toda a aplicação e só o chat assina suas atualizações; evitar atualização do shell inteiro a cada tecla. Navegar não destrói texto não persistido.
 - Usar tokens para aparência e preservar teclado, foco e movimento reduzido.
@@ -116,7 +116,7 @@ A CLI pode gerar também tamanhos para plataformas não utilizadas; o bundle des
 3. Preparar tarefa, escrever, inserir sugestão e verificar que o texto foi preservado.
 4. Aguardar salvamento e confirmar o rascunho após reabertura no mesmo contexto.
 5. Abrir Sobre, fechar com Escape e conferir retorno do foco.
-6. Conferir que conexões e envio continuam indisponíveis enquanto não implementados.
+6. Abrir Conexões, confirmar o estado real de `gh`, `codex` e `claude` e usar “Verificar novamente”; conferir que o envio continua indisponível.
 7. Fechar janela, reabrir pela bandeja e encerrar explicitamente.
 
 IPC e lifecycle precisam de verificação no Tauri real. Navegador/WebKit ajuda a validar a interface, mas não comprova a integração desktop. Para requisitos e próximos gates, consulte [SPEC.md](../SPEC.md).
