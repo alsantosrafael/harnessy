@@ -2,6 +2,10 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.16.1] — 2026-10-30
+
+- Corrigido: **Excluir** (e os avisos de "descartar alterações") não faziam nada no app. Eles usavam o `window.confirm` do navegador, que na janela do macOS pode devolver "não" sem mostrar nada. Agora a confirmação é um diálogo do próprio app, com **Cancelar** em foco e o botão de perigo em vermelho; Esc fecha.
+
 ## Front [0.16.0] — 2026-10-30
 
 - Ao escolher uma tarefa, o **detalhe aparece embaixo do quadro**, na largura toda e em duas colunas (edição à esquerda; agente, ações, prompt e histórico à direita), em vez de numa coluna ao lado. O quadro continua visível em cima, com rolagem própria em cada raia, e a tela desce até o detalhe.

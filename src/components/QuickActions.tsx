@@ -8,7 +8,7 @@ import {
   Trash2,
   type LucideIcon,
 } from "lucide-react";
-import { type QuickId, type QuickState } from "../lib/quick";
+import type { QuickId, QuickState } from "../lib/quick";
 
 const icons: Record<QuickId, LucideIcon> = {
   implement: Play,

@@ -17,6 +17,7 @@ import type { AgentChoice } from "../lib/agents";
 import { canStartRun, chainBase, isActive } from "../lib/runs";
 import type { RunsState } from "../lib/useRuns";
 import { quickStates, type QuickId } from "../lib/quick";
+import { type Confirmation, ConfirmDialog } from "./ConfirmDialog";
 import { Kanban, KanbanSkeleton } from "./Kanban";
 import { QuickActions } from "./QuickActions";
 import { TaskDetail } from "./TaskDetail";
@@ -78,6 +79,7 @@ export function BoardPanel({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [live, setLive] = useState("");
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   // Continuar do passo anterior: vale para o botão do detalhe e para os comandos rápidos.
   const [useChain, setUseChain] = useState(true);
   const detailRef = useRef<HTMLElement>(null);
@@ -148,12 +150,19 @@ export function BoardPanel({
   );
 
   const select = useCallback((id: number | null) => {
-    if (dirtyRef.current && !window.confirm("Descartar as alterações não salvas desta tarefa?")) {
-      return;
-    }
-    dirtyRef.current = false;
-    setUseChain(true);
-    setSelectedId(id);
+    const open = () => {
+      dirtyRef.current = false;
+      setUseChain(true);
+      setSelectedId(id);
+    };
+    if (!dirtyRef.current) return open();
+    setConfirmation({
+      title: "Descartar alterações?",
+      body: "Esta tarefa tem alterações não salvas. Se continuar, elas se perdem.",
+      confirmLabel: "Descartar",
+      danger: true,
+      onConfirm: open,
+    });
   }, []);
   const [dirty, setDirtyState] = useState(false);
   const setDirty = useCallback((value: boolean) => {
@@ -174,21 +183,24 @@ export function BoardPanel({
     (id: number) => {
       const task = tasksRef.current.find((item) => item.id === id);
       if (!task || workspaceId === null) return;
-      const ok = window.confirm(
-        `Excluir a tarefa #${task.id} "${task.title}"?\n\nO histórico e as runs dela somem do Harnessy. As branches no git ficam. Não dá para desfazer.`,
-      );
-      if (!ok) return;
-      deleteTask(workspaceId, id)
-        .then(() => {
-          setTasks((current) => current.filter((item) => item.id !== id));
-          runsState.forgetTask(id);
-          if (selectedRef.current === id) {
-            dirtyRef.current = false;
-            setSelectedId(null);
-          }
-          say({ text: `Tarefa #${id} excluída.` });
-        })
-        .catch((cause) => setError(message(cause)));
+      setConfirmation({
+        title: `Excluir a tarefa #${task.id}?`,
+        body: `"${task.title}" some do Harnessy, com o histórico e as runs dela. As branches no git ficam. Não dá para desfazer.`,
+        confirmLabel: "Excluir",
+        danger: true,
+        onConfirm: () =>
+          deleteTask(workspaceId, id)
+            .then(() => {
+              setTasks((current) => current.filter((item) => item.id !== id));
+              runsState.forgetTask(id);
+              if (selectedRef.current === id) {
+                dirtyRef.current = false;
+                setSelectedId(null);
+              }
+              say({ text: `Tarefa #${id} excluída.` });
+            })
+            .catch((cause) => setError(message(cause))),
+      });
     },
     [workspaceId, runsState.forgetTask, say],
   );
@@ -338,10 +350,19 @@ export function BoardPanel({
             <select
               value={workspaceId ?? ""}
               onChange={(event) => {
-                if (!dirtyRef.current || window.confirm("Descartar as alterações não salvas?")) {
+                const next = Number(event.target.value);
+                const change = () => {
                   dirtyRef.current = false;
-                  onWorkspaceChange(Number(event.target.value));
-                }
+                  onWorkspaceChange(next);
+                };
+                if (!dirtyRef.current) return change();
+                setConfirmation({
+                  title: "Descartar alterações?",
+                  body: "Esta tarefa tem alterações não salvas. Se trocar de workspace, elas se perdem.",
+                  confirmLabel: "Descartar",
+                  danger: true,
+                  onConfirm: change,
+                });
               }}
             >
               {workspaces.map((item) => (
@@ -508,6 +529,7 @@ export function BoardPanel({
           )}
         </div>
       )}
+      <ConfirmDialog ask={confirmation} onClose={() => setConfirmation(null)} />
     </section>
   );
 }
