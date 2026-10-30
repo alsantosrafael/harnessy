@@ -59,6 +59,8 @@ export function shortcutTarget(status: TaskStatus, key: string): TaskStatus | nu
 
 export interface Block {
   runId: number;
+  /** Estado da run bloqueada: `no_changes`, `failed` ou `completed` (com ações negadas). */
+  state: string;
   reason: string;
 }
 
@@ -76,7 +78,7 @@ export function blockedByTask(runs: Run[], tasks: LocalTask[]): Map<number, Bloc
   const blocked = new Map<number, Block>();
   for (const [taskId, run] of latest) {
     if (!done.has(taskId) && !isActive(run) && run.blocked) {
-      blocked.set(taskId, { runId: run.id, reason: run.blocked });
+      blocked.set(taskId, { runId: run.id, state: run.state, reason: run.blocked });
     }
   }
   return blocked;

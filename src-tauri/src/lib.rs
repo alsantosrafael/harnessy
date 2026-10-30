@@ -33,6 +33,8 @@ pub fn run() {
             flow::commands::approve_action,
             flow::commands::create_action,
             flow::commands::resolve_block,
+            flow::commands::delete_task,
+            flow::commands::review_run,
             flow::commands::list_actions,
             run::commands::list_runs,
             run::commands::list_run_events,

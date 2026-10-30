@@ -480,6 +480,31 @@ pub fn active_runs(db: &Connection) -> Result<Vec<(i64, i64, i64)>> {
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
+/// A tarefa tem alguma run ainda em andamento?
+pub fn has_active(db: &Connection, task_id: i64) -> Result<bool> {
+    Ok(active_runs(db)?.iter().any(|(_, task, _)| *task == task_id))
+}
+
+/// Apaga as runs da tarefa com seus eventos e ciclos. Runs de outras tarefas que
+/// partiam de uma dessas perdem só a referência. As branches ficam no git.
+pub fn delete_for_task(db: &Connection, task_id: i64) -> Result<()> {
+    let mine = "SELECT id FROM runs WHERE task_id=?1";
+    db.execute(
+        &format!("UPDATE runs SET base_run_id=NULL WHERE base_run_id IN ({mine})"),
+        [task_id],
+    )?;
+    db.execute(
+        &format!("DELETE FROM run_events WHERE run_id IN ({mine})"),
+        [task_id],
+    )?;
+    db.execute(
+        &format!("DELETE FROM run_cycles WHERE run_id IN ({mine})"),
+        [task_id],
+    )?;
+    db.execute("DELETE FROM runs WHERE task_id=?1", [task_id])?;
+    Ok(())
+}
+
 /// Runs que estavam ativas quando o app fechou não têm mais processo.
 pub fn mark_interrupted(db: &Connection) -> Result<()> {
     db.execute(

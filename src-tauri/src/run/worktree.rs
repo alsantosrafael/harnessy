@@ -150,13 +150,15 @@ pub fn grep_files(
     }
 }
 
-/// Diff unificado entre a base e o HEAD da run, com `context` linhas de contexto.
-/// Saída limitada a [`LIST_LIMIT`]; quem entrega ao agente corta no próprio orçamento.
-pub fn diff_text(
+/// Diff unificado entre a base e `head` (o HEAD do worktree ou uma branch), com `context`
+/// linhas de contexto. Saída limitada a [`LIST_LIMIT`]; quem entrega ao agente corta no
+/// próprio orçamento.
+pub fn diff_range(
     git_bin: &Path,
     dirs: &[PathBuf],
     dir: &Path,
     base_sha: &str,
+    head: &str,
     context: u32,
 ) -> Result<String, String> {
     let options = Options {
@@ -173,7 +175,7 @@ pub fn diff_text(
         "--no-ext-diff",
         &unified,
         base_sha,
-        "HEAD",
+        head,
     ];
     let output = process::run_with(git_bin, &args, dirs, &options)?;
     if output.succeeded() {

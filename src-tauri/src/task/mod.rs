@@ -232,6 +232,18 @@ pub fn get(db: &Connection, workspace_id: i64, id: i64) -> Result<Task> {
     .map_err(|_| AppError::Validation("Tarefa não encontrada."))
 }
 
+/// Remove a tarefa e o histórico dela. Passos que dependiam dela perdem só o vínculo.
+/// As runs são apagadas por quem orquestra ([`crate::flow`]), que também abre a
+/// transação: esta função não abre uma própria.
+pub fn delete(db: &Connection, workspace_id: i64, id: i64) -> Result<()> {
+    get(db, workspace_id, id)?;
+    db.execute("UPDATE tasks SET parent_id=NULL WHERE parent_id=?1", [id])?;
+    db.execute("UPDATE tasks SET after_id=NULL WHERE after_id=?1", [id])?;
+    db.execute("DELETE FROM task_events WHERE task_id=?1", [id])?;
+    db.execute("DELETE FROM tasks WHERE id=?1", [id])?;
+    Ok(())
+}
+
 pub fn save(db: &Connection, input: &TaskInput) -> Result<Task> {
     let title = input.validated_title()?;
     let id = match input.id {

@@ -1,8 +1,8 @@
-import { X } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { accessLabel, extraActions, originLabel, unavailableReason } from "../lib/actions";
-import { type AgentChoice, agentOf, modelName } from "../lib/agents";
-import { stateLabel } from "../lib/runs";
+import { type AgentChoice, agentOf, modelName, reviewerLabel } from "../lib/agents";
+import { blockHelp, blockTitle, reviewable, stateLabel } from "../lib/runs";
 import { type Block, LANES, statusName } from "../lib/board";
 import { AgentPicker } from "./AgentPicker";
 import { NewActionForm } from "./NewActionForm";
@@ -43,8 +43,12 @@ interface Props {
   /** Inicia a run com a Ação escolhida; sem Ação, usa a principal (implementar). */
   onStart: (id: number, action?: string, continueFrom?: number | null) => void;
   onResolve: (runId: number) => void;
+  /** Pede a revisão de uma run concluída. */
+  onReview: (runId: number) => void;
+  onDelete: (id: number) => void;
   onDirty: (dirty: boolean) => void;
   onClose: () => void;
+  /** Continuar da run do passo anterior (escolha compartilhada com os comandos rápidos). */
   /** Run mais recente desta tarefa, para abrir a conversa dela. */
   lastRun: Run | null;
   onOpenRun: () => void;
@@ -65,6 +69,8 @@ export function TaskDetail({
   onSaved,
   onStart,
   onResolve,
+  onReview,
+  onDelete,
   onDirty,
   onClose,
   lastRun,
@@ -159,22 +165,46 @@ export function TaskDetail({
       >
         <div className="detail-header">
           <h2>Tarefa #{task.id}</h2>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Fechar tarefa"
-            onClick={onClose}
-          >
-            <X size={16} aria-hidden="true" />
-          </button>
+          <span className="detail-tools">
+            <button
+              type="button"
+              className="icon-button is-danger"
+              title="Excluir tarefa"
+              aria-label="Excluir tarefa"
+              onClick={() => onDelete(task.id)}
+            >
+              <Trash2 size={16} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              title="Fechar"
+              aria-label="Fechar tarefa"
+              onClick={onClose}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          </span>
         </div>
         {block && (
           <div className="block-banner" role="status">
-            <strong>Bloqueada</strong>
+            <strong>{blockTitle(block.state)}</strong>
             <p>{block.reason}</p>
-            <button type="button" className="button" onClick={() => onResolve(block.runId)}>
-              Marcar como resolvido
-            </button>
+            <p className="muted">{blockHelp(block.state)}</p>
+            <div className="block-actions">
+              {block.state === "no_changes" && task.status !== "done" && (
+                <button
+                  type="button"
+                  className="button primary"
+                  onClick={() => onMove(task.id, "done")}
+                >
+                  Concluir tarefa
+                </button>
+              )}
+              <button type="button" className="button" onClick={() => onResolve(block.runId)}>
+                Dispensar aviso
+              </button>
+            </div>
           </div>
         )}
         <fieldset className="status-group">
@@ -195,6 +225,7 @@ export function TaskDetail({
         <label>
           Título
           <input
+            id="task-title"
             required
             maxLength={300}
             value={form.title}
@@ -263,6 +294,21 @@ export function TaskDetail({
           <button type="button" className="link-button run-link" onClick={onOpenRun}>
             Ver a conversa da última run ({stateLabel(lastRun.state)})
           </button>
+        )}
+        {lastRun && reviewable(lastRun) && (
+          <div className="review-now">
+            <button
+              type="button"
+              className="button"
+              disabled={!canStart || starting}
+              onClick={() => onReview(lastRun.id)}
+            >
+              Revisar a última run agora
+            </button>
+            <small className="muted">
+              Revisor: {reviewerLabel(choice)}. Roda mesmo sem sinal de risco.
+            </small>
+          </div>
         )}
         {dirty && <p className="muted">Salve a tarefa antes de implementar.</p>}
         {primaryReason && <p className="local-error">{primaryReason}</p>}

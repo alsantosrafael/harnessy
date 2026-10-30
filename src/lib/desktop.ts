@@ -216,6 +216,16 @@ export const approveAction = (workspaceId: number, id: string) =>
 export const createAction = (input: NewAction) => localCall<ActionInfo>("create_action", { input });
 /** Dá o bloqueio de uma run por resolvido; fica registrado no histórico da tarefa. */
 export const resolveBlock = (runId: number) => localCall<void>("resolve_block", { runId });
+/** Exclui a tarefa e as runs dela; o núcleo recusa enquanto houver run em andamento. */
+export const deleteTask = (workspaceId: number, taskId: number) =>
+  localCall<void>("delete_task", { workspaceId, taskId });
+/** Pede a revisão de uma run concluída, com o revisor escolhido; roda mesmo sem risco. */
+export const reviewRun = (runId: number, choice: AgentChoice) =>
+  localCall<Run>("review_run", {
+    runId,
+    reviewer: choice.reviewer,
+    reviewerModel: choice.reviewerModel,
+  });
 export const cancelRun = (runId: number) => localCall<void>("cancel_run", { runId });
 /** Ciclo extra numa run que falhou, com o próximo modelo da lista (decidido pelo núcleo). */
 export const continueRun = (runId: number) => localCall<Run>("continue_run", { runId });

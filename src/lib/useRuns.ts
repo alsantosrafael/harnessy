@@ -21,6 +21,8 @@ export interface RunsState {
   events: RunEvent[];
   starting: boolean;
   open: (id: number | null) => void;
+  /** Esquece as runs de uma tarefa excluída. */
+  forgetTask: (taskId: number) => void;
   /** Inicia uma run e a abre; devolve `null` (e chama `onError`) se falhar. */
   start: (
     taskId: number,
@@ -46,6 +48,8 @@ export function useRuns(
   const [starting, setStarting] = useState(false);
   const openRef = useRef(openRun);
   openRef.current = openRun;
+  const runsRef = useRef(runs);
+  runsRef.current = runs;
   const lastSeqRef = useRef(0);
   lastSeqRef.current = events.reduce((max, event) => Math.max(max, event.seq), 0);
 
@@ -129,5 +133,11 @@ export function useRuns(
     [workspaceId, onError],
   );
 
-  return { runs, openRun, events, starting, open: setOpenRun, start };
+  const forgetTask = useCallback((taskId: number) => {
+    const open = runsRef.current.find((run) => run.id === openRef.current);
+    if (open?.taskId === taskId) setOpenRun(null);
+    setRuns((current) => current.filter((run) => run.taskId !== taskId));
+  }, []);
+
+  return { runs, openRun, events, starting, open: setOpenRun, forgetTask, start };
 }

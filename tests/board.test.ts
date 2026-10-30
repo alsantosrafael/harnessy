@@ -129,7 +129,7 @@ test("only the latest finished run of an open task can block it", () => {
   ];
   const blocked = blockedByTask(runs, open);
   assert.deepEqual([...blocked.keys()], [1, 2]);
-  assert.deepEqual(blocked.get(1), { runId: 1, reason: "Run falhou." });
+  assert.deepEqual(blocked.get(1), { runId: 1, state: "failed", reason: "Run falhou." });
   assert.equal(blocked.has(3), false, "concluída não mostra bloqueio");
   assert.equal(blocked.has(4), false, "run nova supera a anterior");
 });

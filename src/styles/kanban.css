@@ -28,12 +28,15 @@
 .kanban-card::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--amber-100); opacity: 0; pointer-events: none; }
 .kanban-card.is-flash::after { animation: flash 600ms ease-out; }
 .tone-done .kanban-card { color: var(--text-secondary); }
-.card-open { display: grid; gap: var(--space-2); width: 100%; padding: var(--space-3) var(--space-8) var(--space-3) var(--space-3); text-align: left; border: 0; border-radius: inherit; background: none; color: var(--text); overflow-wrap: anywhere; }
+.card-open { display: grid; gap: var(--space-2); width: 100%; padding: var(--space-3) var(--space-3) var(--space-3) var(--space-3); text-align: left; border: 0; border-radius: inherit; background: none; color: var(--text); overflow-wrap: anywhere; }
 .tone-done .card-open { color: var(--text-secondary); }
-.card-open:focus-visible, .card-advance:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
-.card-advance { position: absolute; top: var(--space-2); right: var(--space-2); display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid transparent; border-radius: var(--radius-sm); background: none; color: var(--text-secondary); opacity: 0; transition: opacity var(--duration-fast) ease; }
-.kanban-card:hover .card-advance, .kanban-card:focus-within .card-advance { opacity: 1; }
-.card-advance:hover { background: var(--surface-selected); border-color: var(--border); color: var(--text); }
+.card-open:focus-visible, .card-tool:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.card-tools { position: absolute; top: var(--space-2); right: var(--space-2); display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-sm); background: var(--surface-raised); opacity: 0; transition: opacity var(--duration-fast) ease; }
+.kanban-card:hover .card-tools, .kanban-card:focus-within .card-tools { opacity: 1; }
+.card-tool { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid transparent; border-radius: var(--radius-sm); background: none; color: var(--text-secondary); }
+.card-tool:hover { background: var(--surface-selected); border-color: var(--border); color: var(--text); }
+.card-tool.is-danger:hover { color: var(--critical); border-color: var(--critical); }
+@media (hover: none) { .card-tools { opacity: 1; position: static; justify-content: flex-end; } }
 .card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--text-secondary); }
 .chip { padding: 1px 6px; border-radius: 4px; background: var(--surface-muted); border: 1px solid var(--border); font-weight: 600; font-variant-numeric: tabular-nums; }
 .chip.is-blocked { display: inline-flex; align-items: center; gap: 4px; border-color: var(--critical); color: var(--critical); background: var(--surface-raised); }
@@ -47,6 +50,10 @@
 /* Detalhe da tarefa: estado em um clique e histórico com o ator em texto. */
 .task-detail { display: grid; gap: var(--space-4); align-content: start; }
 .detail-header { display: flex; align-items: center; justify-content: space-between; }
+.detail-tools { display: flex; align-items: center; gap: var(--space-2); }
+.icon-button.is-danger:hover { color: var(--critical); }
+.block-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.review-now { display: grid; gap: var(--space-1); justify-items: start; }
 .section-title { font-size: var(--text-sm); color: var(--text-muted); font-weight: 600; margin-bottom: var(--space-2); }
 .run-bar { display: grid; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-muted); }
 .form-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }

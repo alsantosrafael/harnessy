@@ -146,3 +146,16 @@ export function ledgerItems(run: Run): { label: string; value: string }[] {
     { label: "Ciclos", value: ledgerCount(run.cycles) },
   ];
 }
+
+/** Título do aviso de bloqueio, conforme como a run terminou. */
+export const blockTitle = (state: string) =>
+  state === "no_changes" ? "Sem alterações" : state === "failed" ? "A run falhou" : "Ações negadas";
+
+/** O que "Dispensar aviso" faz e qual é o próximo passo natural. */
+export const blockHelp = (state: string) =>
+  state === "no_changes"
+    ? "Se o trabalho já existe, conclua a tarefa. Dispensar só esconde este aviso; não muda o estado nem inicia nada."
+    : "Dispensar só esconde este aviso; não muda o estado nem inicia nada. Para tentar de novo, use Implementar abaixo.";
+
+/** Uma run concluída com alterações na branch pode receber revisão sob demanda. */
+export const reviewable = (run: Run) => run.state === "completed" && Boolean(run.branch);

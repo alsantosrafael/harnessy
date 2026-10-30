@@ -506,19 +506,47 @@ fn review_cycle(
         );
         return None;
     }
-    sink.event(
-        id,
-        "status",
-        &format!("Revisão independente ({})…", reviewer.model),
-    );
     let checks: String = job
         .checks
         .iter()
         .map(|check| format!("- {}: passou\n", check.name))
         .collect();
-    let prompt = review::prompt_for(reviewer, &diffs.unified, &checks, &proof.message());
-    let mut spec = AgentSpec::new(
+    Some(review_diff(
+        id,
+        reviewer,
+        &diffs,
         &plan.dir,
+        &checks,
+        &proof.message(),
+        number,
+        registry,
+        sink,
+        runtime,
+    ))
+}
+
+/// Roda o revisor sobre um diff já calculado e grava ciclo, veredito e eventos.
+#[allow(clippy::too_many_arguments)]
+fn review_diff(
+    id: i64,
+    reviewer: &review::Reviewer,
+    diffs: &review::Diffs,
+    dir: &std::path::Path,
+    checks: &str,
+    proof_message: &str,
+    number: i64,
+    registry: &Registry,
+    sink: &dyn Sink,
+    runtime: &dyn Runtime,
+) -> review::Outcome {
+    sink.event(
+        id,
+        "status",
+        &format!("Revisão independente ({})…", reviewer.model),
+    );
+    let prompt = review::prompt_for(reviewer, &diffs.unified, checks, proof_message);
+    let mut spec = AgentSpec::new(
+        dir,
         &prompt,
         &reviewer.model,
         actions::max_turns(&reviewer.action),
@@ -582,7 +610,58 @@ fn review_cycle(
     sink.review(id, outcome.verdict, outcome.discarded);
     sink.event(id, "status", &outcome.message());
     sink.event(id, "review", &outcome.event_json(&reviewer.model));
-    Some(outcome)
+    outcome
+}
+
+/// Revisão pedida à mão sobre uma run concluída: o diff vem da branch dela
+/// (o worktree já foi removido), no repositório do workspace. O veredito e o
+/// ciclo do revisor entram na run como numa revisão automática; o estado dela
+/// e o card não mudam.
+#[allow(clippy::too_many_arguments)]
+pub fn review_existing(
+    run_id: i64,
+    reviewer: &review::Reviewer,
+    repo: &std::path::Path,
+    base: &str,
+    branch: &str,
+    proof: &str,
+    number: i64,
+    registry: &Registry,
+    sink: &dyn Sink,
+    runtime: &dyn Runtime,
+) {
+    let dirs = process::search_dirs();
+    let diffs = process::find_binary("git", &dirs)
+        .ok_or_else(|| "git não encontrado.".to_owned())
+        .and_then(|git| review::diffs_between(&git, &dirs, repo, base, branch));
+    match diffs {
+        Err(reason) => sink.event(
+            run_id,
+            "status",
+            &format!("Revisão não rodou: {reason} Confira se a branch ainda existe."),
+        ),
+        Ok(diffs) if diffs.size == 0 => sink.event(
+            run_id,
+            "status",
+            "Revisão não rodou: a branch não tem alterações.",
+        ),
+        Ok(diffs) => {
+            let proof = format!("Contraprova registrada na run: {proof}.");
+            review_diff(
+                run_id,
+                reviewer,
+                &diffs,
+                repo,
+                "- verificações da run: passaram\n",
+                &proof,
+                number,
+                registry,
+                sink,
+                runtime,
+            );
+        }
+    }
+    registry.unregister(run_id);
 }
 
 /// Um ciclo do agente: eventos para o log, negações e fim reportado.
@@ -934,6 +1013,16 @@ mod tests {
         review_json: &str,
         external: Option<Box<dyn Runtime + Send>>,
     ) -> (TempDatabase, i64, ReviewedAgent) {
+        let (_repo, temp, run_id, agent) = reviewed_run_kept(label, review_json, external);
+        (temp, run_id, agent)
+    }
+
+    /// Como [`reviewed_run_with`], mas devolve o repositório para o teste continuar usando a branch.
+    fn reviewed_run_kept(
+        label: &str,
+        review_json: &str,
+        external: Option<Box<dyn Runtime + Send>>,
+    ) -> (TempRepo, TempDatabase, i64, ReviewedAgent) {
         let repo = TempRepo::new(label);
         let temp = TempDatabase::new(&format!("flow-{label}"));
         let store = temp.open();
@@ -988,7 +1077,7 @@ mod tests {
         let summary = execute(job, &registry, &DbSink { store: &store }, &agent);
         assert!(summary.passed);
         drop(store);
-        (temp, run_id, agent)
+        (repo, temp, run_id, agent)
     }
 
     fn cycle_rows(db: &rusqlite::Connection, run_id: i64) -> Vec<(i64, String, String)> {
@@ -1051,6 +1140,60 @@ mod tests {
             run::get(&db, run_id).unwrap().review.as_deref(),
             Some("approve")
         );
+    }
+
+    #[test]
+    fn a_finished_run_can_be_reviewed_by_hand_from_its_branch() {
+        let (_repo, temp, run_id, _) = reviewed_run_kept(
+            "review-manual",
+            r#"{"veredito":"approve","achados":[]}"#,
+            None,
+        );
+        let store = temp.open();
+        let (run, folder) = {
+            let db = store.connection().unwrap();
+            let run = run::get(&db, run_id).unwrap();
+            let folder: String = db
+                .query_row("SELECT folder FROM workspaces WHERE id=1", [], |r| r.get(0))
+                .unwrap();
+            (run, folder)
+        };
+        let action =
+            crate::action::parse(include_str!("../action/embutidas/revisar.toml")).unwrap();
+        let reviewer = review::Reviewer {
+            model: "opus".into(),
+            action,
+            tarefa: "Criar arquivo".into(),
+            descricao: String::new(),
+            criterios: "ok.txt existe".into(),
+            runtime: None,
+        };
+        let agent = ReviewedAgent {
+            review_json: r#"{"veredito":"request_changes","achados":[{"arquivo":"ok.txt","linha":1,"severidade":"bloqueia","texto":"Falta algo."}]}"#.into(),
+            calls: Default::default(),
+            implementer_calls: Cell::new(0),
+        };
+        let registry = Registry::default();
+        registry.register(run_id);
+        review_existing(
+            run_id,
+            &reviewer,
+            std::path::Path::new(&folder),
+            run.base_sha.as_deref().unwrap(),
+            run.branch.as_deref().unwrap(),
+            "proved",
+            9,
+            &registry,
+            &DbSink { store: &store },
+            &agent,
+        );
+        let db = store.connection().unwrap();
+        let after = run::get(&db, run_id).unwrap();
+        assert_eq!(after.review.as_deref(), Some("request_changes"));
+        assert_eq!(after.state, run::COMPLETED, "a revisão não muda a run");
+        assert_eq!(run::last_cycle(&db, run_id).unwrap(), 9);
+        assert_eq!(agent.calls.borrow().len(), 1);
+        assert!(agent.calls.borrow()[0].prompt.contains("```diff"));
     }
 
     #[test]

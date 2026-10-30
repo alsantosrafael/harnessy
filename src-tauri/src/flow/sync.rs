@@ -8,7 +8,7 @@
 use rusqlite::Connection;
 
 use crate::{
-    error::Result,
+    error::{AppError, Result},
     run::{self, Run},
     task::{self, Actor, Change, Status},
 };
@@ -100,6 +100,39 @@ pub fn resolve(db: &Connection, run_id: i64) -> Result<(Run, Option<Change>)> {
     let status = task::get(db, run.workspace_id, run.task_id)?.status;
     let change = task::transition(db, run.task_id, status, Actor::User, NOTE_RESOLVED)?;
     Ok((run::get(db, run_id)?, change))
+}
+
+/// Uma run pode ser revisada à mão se terminou com alterações commitadas numa
+/// branch e nenhuma outra run está em andamento.
+pub fn ensure_reviewable(db: &Connection, run: &Run) -> Result<()> {
+    let has_commit = run.branch.is_some() && run.base_sha.is_some();
+    if run.state != run::COMPLETED || !has_commit {
+        return Err(AppError::Validation(
+            "Só uma run concluída, com alterações na branch, pode ser revisada.",
+        ));
+    }
+    if !run::active_runs(db)?.is_empty() {
+        return Err(AppError::Validation(
+            "Há uma run em andamento. Espere terminar para revisar.",
+        ));
+    }
+    Ok(())
+}
+
+/// Exclui a tarefa com as runs dela. Recusa enquanto houver run em andamento:
+/// o processo do agente ainda escreve no banco.
+pub fn remove_task(db: &Connection, workspace_id: i64, task_id: i64) -> Result<()> {
+    task::get(db, workspace_id, task_id)?;
+    if run::has_active(db, task_id)? {
+        return Err(AppError::Validation(
+            "A tarefa tem uma run em andamento. Cancele a run antes de excluir.",
+        ));
+    }
+    let tx = db.unchecked_transaction()?;
+    run::delete_for_task(&tx, task_id)?;
+    task::delete(&tx, workspace_id, task_id)?;
+    tx.commit()?;
+    Ok(())
 }
 
 /// Corta em `max` bytes e marca o corte; uma linha só, sem quebras.
@@ -233,6 +266,71 @@ mod tests {
         assert_eq!(change.event.actor, "system");
         assert_eq!(change.event.note, "Troquei o rótulo.");
         assert!(completed.blocked.is_empty());
+    }
+
+    #[test]
+    fn only_a_completed_run_with_a_branch_is_reviewable_and_never_during_another_run() {
+        let temp = TempDatabase::new("sync-reviewable");
+        let store = temp.open();
+        let db = store.connection().unwrap();
+        let (_, run) = fixture(&db);
+        assert!(ensure_reviewable(&db, &run).is_err(), "ainda em andamento");
+
+        let completed = finish(&db, &run, run::COMPLETED, "ok", &[]);
+        assert!(ensure_reviewable(&db, &completed).is_err(), "sem branch");
+
+        db.execute(
+            "UPDATE runs SET branch='harnessy/run-1', base_sha='abc' WHERE id=?1",
+            [run.id],
+        )
+        .unwrap();
+        let ready = run::get(&db, run.id).unwrap();
+        ensure_reviewable(&db, &ready).unwrap();
+
+        let (task, _) = (add_task(&db, "Outra"), ());
+        run::create(
+            &db,
+            &NewRun {
+                workspace_id: 1,
+                task_id: task,
+                title: "Outra",
+                action: "implement",
+                role: "implementador",
+                runtime: "claude",
+                model: "sonnet",
+                effort: None,
+                base_run_id: None,
+            },
+        )
+        .unwrap();
+        assert!(ensure_reviewable(&db, &ready).is_err(), "outra run ativa");
+    }
+
+    #[test]
+    fn a_task_with_an_active_run_cannot_be_deleted_and_a_finished_one_takes_its_runs_along() {
+        let temp = TempDatabase::new("sync-delete");
+        let store = temp.open();
+        let db = store.connection().unwrap();
+        let (task_id, run) = fixture(&db);
+        let other = add_task(&db, "Outra");
+        db.execute("UPDATE tasks SET after_id=?1 WHERE id=?2", [task_id, other])
+            .unwrap();
+        run::append_event(&db, run.id, "status", "x").unwrap();
+
+        assert!(remove_task(&db, 1, task_id).is_err(), "run ainda ativa");
+        assert!(task::get(&db, 1, task_id).is_ok());
+
+        finish(&db, &run, run::COMPLETED, "ok", &[]);
+        remove_task(&db, 1, task_id).unwrap();
+        assert!(task::get(&db, 1, task_id).is_err());
+        assert!(run::get(&db, run.id).is_err());
+        assert!(task::history(&db, task_id).unwrap().is_empty());
+        let events: i64 = db
+            .query_row("SELECT COUNT(*) FROM run_events", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(events, 0);
+        assert!(task::get(&db, 1, other).is_ok(), "a outra tarefa fica");
+        assert!(remove_task(&db, 1, task_id).is_err(), "já não existe");
     }
 
     #[test]

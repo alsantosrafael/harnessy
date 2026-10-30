@@ -7,7 +7,8 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use super::{
-    actions, continue_with, execute, likely, read, review::Reviewer, sync, verify, Job, Sink, ROLE,
+    actions, continue_with, execute, likely, read, review::Reviewer, review_existing, sync, verify,
+    Job, Sink, ROLE,
 };
 use crate::{
     action::{self, Acesso, Alvo, Contexto, Quando, Repositorio, Saida},
@@ -485,6 +486,80 @@ pub fn continue_run(
         continue_with(job, dir, base, offset, &registry, &sink, agent.as_ref());
     });
     Ok(reopened)
+}
+
+/// Revisão sob demanda de uma run concluída, com o revisor escolhido na interface
+/// (sempre roda, qualquer que seja o `quando` da Ação). A resposta chega pelos
+/// eventos `run-event` e `run-state`.
+#[tauri::command]
+pub fn review_run(
+    app: AppHandle,
+    store: State<'_, Database>,
+    registry: State<'_, Registry>,
+    run_id: i64,
+    reviewer: String,
+    reviewer_model: String,
+) -> Result<Run> {
+    let (previous, ws, task, number) = {
+        let db = store.connection()?;
+        let previous = run::get(&db, run_id)?;
+        sync::ensure_reviewable(&db, &previous)?;
+        let ws = workspace::get(&db, previous.workspace_id)?;
+        let task = task::get(&db, previous.workspace_id, previous.task_id)?;
+        let number = run::last_cycle(&db, run_id)? + 1;
+        (previous, ws, task, number)
+    };
+    let pick = ReviewPick::parse(&reviewer, &reviewer_model, "always")?;
+    process::wait_for_login_path();
+    let dirs = process::search_dirs();
+    let data_dir = app_data(&app)?;
+    let runtime = agent_runtime(pick.runtime, &dirs, &data_dir)?;
+    let (repo_dir, aprovados) = repo_catalog(&store, &ws)?;
+    let repo = Repositorio {
+        dir: repo_dir,
+        aprovados: &aprovados,
+    };
+    let implementer = previous.model.clone().unwrap_or_default();
+    let reviewer = reviewer_for(&data_dir, Some(&repo), &task, &implementer, &pick, runtime)
+        .ok_or(AppError::Validation(
+            "A Ação de revisão não está disponível.",
+        ))?;
+    let (base, branch) = (
+        previous.base_sha.clone().unwrap_or_default(),
+        previous.branch.clone().unwrap_or_default(),
+    );
+    let proof = previous
+        .proof
+        .clone()
+        .unwrap_or_else(|| "não registrada".into());
+    registry.register(run_id);
+    let handle = app.clone();
+    let folder = PathBuf::from(&ws.folder);
+    let sink = AppSink {
+        app: app.clone(),
+        read_only: false,
+    };
+    std::thread::spawn(move || {
+        let registry = handle.state::<Registry>();
+        let Some(runtime) = reviewer.runtime.as_deref() else {
+            registry.unregister(run_id);
+            return;
+        };
+        review_existing(
+            run_id, &reviewer, &folder, &base, &branch, &proof, number, &registry, &sink, runtime,
+        );
+        let store = handle.state::<Database>();
+        if let Ok(updated) = store.connection().and_then(|db| run::get(&db, run_id)) {
+            let _ = handle.emit("run-state", updated);
+        }
+    });
+    Ok(previous)
+}
+
+/// Exclui uma tarefa (e as runs dela) a pedido do usuário.
+#[tauri::command]
+pub fn delete_task(store: State<'_, Database>, workspace_id: i64, task_id: i64) -> Result<()> {
+    sync::remove_task(&*store.connection()?, workspace_id, task_id)
 }
 
 /// O usuário deu o bloqueio de uma run por resolvido (regras em [`sync::resolve`]).

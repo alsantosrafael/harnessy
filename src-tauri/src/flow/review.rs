@@ -249,8 +249,19 @@ pub(super) struct Diffs {
 }
 
 pub(super) fn diffs(git: &Path, dirs: &[PathBuf], dir: &Path, base: &str) -> Result<Diffs, String> {
-    let unified = worktree::diff_text(git, dirs, dir, base, CONTEXT_LINES)?;
-    let zero = worktree::diff_text(git, dirs, dir, base, 0)?;
+    diffs_between(git, dirs, dir, base, "HEAD")
+}
+
+/// Diff da base até `head`; `dir` só precisa ser um repositório que tenha os dois.
+pub(super) fn diffs_between(
+    git: &Path,
+    dirs: &[PathBuf],
+    dir: &Path,
+    base: &str,
+    head: &str,
+) -> Result<Diffs, String> {
+    let unified = worktree::diff_range(git, dirs, dir, base, head, CONTEXT_LINES)?;
+    let zero = worktree::diff_range(git, dirs, dir, base, head, 0)?;
     Ok(Diffs {
         size: diff_size(&zero),
         changed: changed_lines(&zero),

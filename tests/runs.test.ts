@@ -4,11 +4,14 @@ import type { Run, RunEvent } from "../src/lib/desktop.ts";
 import {
   canStartRun,
   canTryNextModel,
+  blockHelp,
+  blockTitle,
   chainBase,
   ledgerCost,
   ledgerItems,
   mergeEvents,
   proofLabel,
+  reviewable,
   reviewLabel,
   timeAgo,
   stateLabel,
@@ -174,4 +177,20 @@ test("the run ledger shows null as not reported and real zero as zero", () => {
 
   const empty = values({});
   assert.deepEqual(Object.values(empty), Array(6).fill("não informado"));
+});
+
+test("block notices say what happened and what dismissing does", () => {
+  assert.equal(blockTitle("no_changes"), "Sem alterações");
+  assert.equal(blockTitle("failed"), "A run falhou");
+  assert.equal(blockTitle("completed"), "Ações negadas");
+  assert.match(blockHelp("no_changes"), /conclua a tarefa/);
+  assert.match(blockHelp("failed"), /Implementar/);
+  assert.match(blockHelp("failed"), /não muda o estado/);
+});
+
+test("only a completed run with a branch can be reviewed on demand", () => {
+  const done = { ...run(1, "completed"), branch: "harnessy/run-1-x" };
+  assert.equal(reviewable(done), true);
+  assert.equal(reviewable({ ...done, branch: null }), false);
+  assert.equal(reviewable({ ...done, state: "failed" }), false);
 });

@@ -2,9 +2,9 @@ import { Plus, Send } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import type { AgentChoice } from "../lib/agents";
 import { splitDraft } from "../lib/chatTask";
-import { saveTask, type LocalTask, type Workspace } from "../lib/desktop";
+import { reviewRun, saveTask, type LocalTask, type Workspace } from "../lib/desktop";
 import { DRAFT_LIMIT, type DraftSession } from "../lib/drafts";
-import { isActive } from "../lib/runs";
+import { canStartRun, isActive } from "../lib/runs";
 import type { RunsState } from "../lib/useRuns";
 import { AgentPicker } from "./AgentPicker";
 import { RunFeed } from "./RunFeed";
@@ -137,6 +137,11 @@ export function ChatPanel({
               events={events}
               onError={onError}
               onStepsCreated={onStepsCreated}
+              choice={choice}
+              canReview={canStartRun(agentReady, runs)}
+              onReview={async (runId) => {
+                await reviewRun(runId, choice);
+              }}
             />
           ) : (
             <div className="chat-empty">

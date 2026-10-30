@@ -2,6 +2,17 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.15.0] — 2026-10-30
+
+- Cada card ganhou **editar** (abre a tarefa com o cursor no título) e **excluir** (com confirmação), ao lado de mover; o painel da tarefa também tem o ícone de excluir.
+- O aviso de bloqueio ficou claro: título conforme o motivo (sem alterações, run falhou, ações negadas), uma frase dizendo o que **Dispensar aviso** faz (só esconde o aviso, não muda o estado) e, quando a run terminou sem alterações, o botão **Concluir tarefa** para quando o trabalho já existe. Dispensar mostra uma confirmação.
+- **Revisar agora** (na conversa da run) e **Revisar a última run agora** (no painel da tarefa) disparam a revisão à mão, com o revisor escolhido, mesmo sem sinal de risco. O botão indica "Revisando…" até o veredito.
+
+## Back [0.15.0] — 2026-10-30
+
+- Novo comando `delete_task(workspaceId, taskId)`: exclui a tarefa, o histórico e as runs (eventos e ciclos) numa transação; recusa com run em andamento; passos que dependiam dela perdem só o vínculo. As branches continuam no git.
+- Novo comando `review_run(runId, reviewer, reviewerModel)`: revisão sob demanda de uma run concluída, sobre o diff da branch (`base..branch`, já que o worktree é removido). Grava veredito e ciclo; o estado da run e o card não mudam. Recusa outra run em andamento.
+
 ## Front [0.14.0] — 2026-10-30
 
 - No **Chat**, com uma run aberta o campo vira **Pedir ajuste**: o texto continua na mesma tarefa, partindo da branch da run concluída, em vez de criar uma tarefa nova. **Nova tarefa** (ao lado do botão) volta ao modo de criação. Com a run em andamento, o campo explica que é preciso esperar.

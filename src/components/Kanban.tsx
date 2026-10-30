@@ -1,4 +1,4 @@
-import { ArrowRight, TriangleAlert } from "lucide-react";
+import { ArrowRight, Pencil, Trash2, TriangleAlert } from "lucide-react";
 import { memo, useRef, useState } from "react";
 import { type Block, LANES, neighbor, shortcutTarget, statusName } from "../lib/board";
 import type { LocalTask, TaskStatus } from "../lib/desktop";
@@ -15,6 +15,9 @@ interface Props {
   flashId: number | null;
   onSelect: (id: number) => void;
   onMove: (id: number, to: TaskStatus) => void;
+  /** Abre a tarefa com o cursor no título. */
+  onEdit: (id: number) => void;
+  onDelete: (id: number) => void;
   onCreate: (title: string) => Promise<void>;
 }
 
@@ -27,6 +30,8 @@ export function Kanban({
   flashId,
   onSelect,
   onMove,
+  onEdit,
+  onDelete,
   onCreate,
 }: Props) {
   const [over, setOver] = useState<TaskStatus | null>(null);
@@ -71,6 +76,8 @@ export function Kanban({
                 flash={flashId === task.id}
                 onSelect={onSelect}
                 onMove={onMove}
+                onEdit={onEdit}
+                onDelete={onDelete}
                 onDragStart={(id) => {
                   dragging.current = id;
                 }}
@@ -124,6 +131,8 @@ interface CardProps {
   flash: boolean;
   onSelect: (id: number) => void;
   onMove: (id: number, to: TaskStatus) => void;
+  onEdit: (id: number) => void;
+  onDelete: (id: number) => void;
   onDragStart: (id: number) => void;
 }
 
@@ -136,6 +145,8 @@ const KanbanCard = memo(function KanbanCard({
   flash,
   onSelect,
   onMove,
+  onEdit,
+  onDelete,
   onDragStart,
 }: CardProps) {
   const next = neighbor(task.status, 1);
@@ -182,17 +193,37 @@ const KanbanCard = memo(function KanbanCard({
           )}
         </span>
       </button>
-      {next && (
+      <div className="card-tools">
         <button
           type="button"
-          className="card-advance"
-          title={`Mover para ${statusName(next)} (])`}
-          aria-label={`Mover "${task.title}" para ${statusName(next)}`}
-          onClick={() => onMove(task.id, next)}
+          className="card-tool"
+          title="Editar"
+          aria-label={`Editar "${task.title}"`}
+          onClick={() => onEdit(task.id)}
         >
-          <ArrowRight size={14} aria-hidden="true" />
+          <Pencil size={14} aria-hidden="true" />
         </button>
-      )}
+        <button
+          type="button"
+          className="card-tool is-danger"
+          title="Excluir"
+          aria-label={`Excluir "${task.title}"`}
+          onClick={() => onDelete(task.id)}
+        >
+          <Trash2 size={14} aria-hidden="true" />
+        </button>
+        {next && (
+          <button
+            type="button"
+            className="card-tool"
+            title={`Mover para ${statusName(next)} (])`}
+            aria-label={`Mover "${task.title}" para ${statusName(next)}`}
+            onClick={() => onMove(task.id, next)}
+          >
+            <ArrowRight size={14} aria-hidden="true" />
+          </button>
+        )}
+      </div>
     </li>
   );
 });

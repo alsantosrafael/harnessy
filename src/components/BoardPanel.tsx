@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { applyChange, applyMove, blockedByTask, groupByStatus, statusName } from "../lib/board";
 import {
+  deleteTask,
   listTasks,
   moveTask,
   resolveBlock,
+  reviewRun,
   onTaskChanged,
   type LocalTask,
   type TaskStatus,
@@ -144,6 +146,38 @@ export function BoardPanel({
     dirtyRef.current = dirty;
   }, []);
 
+  const edit = useCallback(
+    (id: number) => {
+      select(id);
+      // O painel monta no próximo quadro; o cursor vai para o título.
+      requestAnimationFrame(() => document.getElementById("task-title")?.focus());
+    },
+    [select],
+  );
+
+  const remove = useCallback(
+    (id: number) => {
+      const task = tasksRef.current.find((item) => item.id === id);
+      if (!task || workspaceId === null) return;
+      const ok = window.confirm(
+        `Excluir a tarefa #${task.id} "${task.title}"?\n\nO histórico e as runs dela somem do Harnessy. As branches no git ficam. Não dá para desfazer.`,
+      );
+      if (!ok) return;
+      deleteTask(workspaceId, id)
+        .then(() => {
+          setTasks((current) => current.filter((item) => item.id !== id));
+          runsState.forgetTask(id);
+          if (selectedRef.current === id) {
+            dirtyRef.current = false;
+            setSelectedId(null);
+          }
+          say({ text: `Tarefa #${id} excluída.` });
+        })
+        .catch((cause) => setError(message(cause)));
+    },
+    [workspaceId, runsState.forgetTask, say],
+  );
+
   // Mudanças de tarefa vindas do núcleo valem mesmo com o painel escondido.
   useEffect(() => {
     const stops = [
@@ -225,6 +259,17 @@ export function BoardPanel({
   async function resolve(runId: number) {
     try {
       await resolveBlock(runId);
+      say({ text: "Aviso dispensado. O estado da tarefa não mudou." });
+    } catch (cause) {
+      setError(message(cause));
+    }
+  }
+
+  async function review(runId: number) {
+    try {
+      await reviewRun(runId, choice);
+      runsState.open(runId);
+      onOpenRun();
     } catch (cause) {
       setError(message(cause));
     }
@@ -333,6 +378,8 @@ export function BoardPanel({
                 flashId={flashId}
                 onSelect={select}
                 onMove={move}
+                onEdit={edit}
+                onDelete={remove}
                 onCreate={create}
               />
             )}
@@ -380,6 +427,8 @@ export function BoardPanel({
                 }
                 onStart={start}
                 onResolve={resolve}
+                onReview={review}
+                onDelete={remove}
                 onDirty={setDirty}
                 onClose={() => select(null)}
                 lastRun={runs.find((run) => run.taskId === selected.id) ?? null}

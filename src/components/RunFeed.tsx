@@ -10,7 +10,7 @@ import {
   type StepProposal,
 } from "../lib/desktop";
 import { type FeedItem, type ReviewPayload, buildFeed } from "../lib/feed";
-import { agentOf, modelName } from "../lib/agents";
+import { type AgentChoice, agentOf, modelName, reviewerLabel } from "../lib/agents";
 import type { Runtime } from "../lib/roles";
 import {
   canTryNextModel,
@@ -18,6 +18,7 @@ import {
   ledgerItems,
   proofLabel,
   type ProofTone,
+  reviewable,
   stateLabel,
   stepsFrom,
 } from "../lib/runs";
@@ -132,6 +133,12 @@ interface Props {
   onError: (text: string) => void;
   /** Passos confirmados viraram tarefas. */
   onStepsCreated: (tasks: LocalTask[]) => void;
+  /** Revisor escolhido, mostrado no botão de revisar. */
+  choice: AgentChoice;
+  /** Nenhuma outra run em andamento: a revisão sob demanda pode começar. */
+  canReview: boolean;
+  /** Pede a revisão desta run; rejeita se o núcleo recusar. */
+  onReview: (runId: number) => Promise<void>;
 }
 
 const agentLabel = (runtime: string) => agentOf(runtime as Runtime)?.label ?? runtime;
@@ -233,13 +240,30 @@ function FeedEntry({ item, agent }: { item: FeedItem; agent: string }) {
 }
 
 /** Conversa da run: o que o agente disse e fez, a revisão e as ações possíveis agora. */
-export function RunFeed({ run, events, onError, onStepsCreated }: Props) {
+export function RunFeed({
+  run,
+  events,
+  onError,
+  onStepsCreated,
+  choice,
+  canReview,
+  onReview,
+}: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const feed = buildFeed(events);
   const active = isActive(run);
   const proposed = run.state === "completed" ? stepsFrom(events) : null;
   const agent = agentLabel(run.runtime);
+  // Revisão sob demanda: "revisando" vale até chegar o veredito ou o aviso de que não rodou.
+  const [since, setSince] = useState<number | null>(null);
+  const reviewing =
+    since !== null &&
+    !events.some(
+      (event) =>
+        event.seq > since &&
+        (event.kind === "review" || event.text.startsWith("Revisão não rodou")),
+    );
 
   // Acompanha o fim da conversa, a menos que a pessoa tenha rolado para ler algo acima.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `events` e `run.state` disparam o acompanhamento.
@@ -301,6 +325,27 @@ export function RunFeed({ run, events, onError, onStepsCreated }: Props) {
               <p className="muted">
                 Branch <code>{run.branch}</code>: revise e teste antes do merge.
               </p>
+            )}
+            {reviewable(run) && (
+              <div className="review-now">
+                <button
+                  type="button"
+                  className="button"
+                  disabled={!canReview || reviewing}
+                  onClick={() => {
+                    setSince(events.reduce((max, event) => Math.max(max, event.seq), 0));
+                    onReview(run.id).catch((cause) => {
+                      setSince(null);
+                      onError(message(cause));
+                    });
+                  }}
+                >
+                  {reviewing ? "Revisando…" : run.review ? "Revisar de novo" : "Revisar agora"}
+                </button>
+                <small className="muted">
+                  Revisor: {reviewerLabel(choice)}. Roda mesmo sem sinal de risco.
+                </small>
+              </div>
             )}
             {canTryNextModel(run) && (
               <div className="run-next-model">

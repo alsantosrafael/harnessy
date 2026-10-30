@@ -141,3 +141,6 @@ export function saveChoice(choice: AgentChoice) {
     // A escolha vale nesta sessão mesmo sem persistir.
   }
 }
+
+/** Quem revisa e como, em uma frase curta para o botão de revisar. */
+export const reviewerLabel = (choice: AgentChoice) => who(choice.reviewer, choice.reviewerModel);
