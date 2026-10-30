@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { accessLabel, extraActions, originLabel, unavailableReason } from "../lib/actions";
 import { type AgentChoice, agentOf, modelLabel } from "../lib/agents";
@@ -42,6 +43,7 @@ interface Props {
   onStart: (id: number, action?: string, continueFrom?: number | null) => void;
   onResolve: (runId: number) => void;
   onDirty: (dirty: boolean) => void;
+  onClose: () => void;
 }
 
 /** Edição, estado, prompt do agente e histórico de uma tarefa. Use `key={task.id}`. */
@@ -60,6 +62,7 @@ export function TaskDetail({
   onStart,
   onResolve,
   onDirty,
+  onClose,
 }: Props) {
   const [form, setForm] = useState({
     title: task.title,
@@ -121,7 +124,7 @@ export function TaskDetail({
   }, [task.id, historyTick]);
 
   return (
-    <div className="task-editor task-detail">
+    <div className="task-detail">
       <form
         className="local-form"
         onSubmit={async (event) => {
@@ -148,7 +151,17 @@ export function TaskDetail({
           }
         }}
       >
-        <h3>Tarefa #{task.id}</h3>
+        <div className="detail-header">
+          <h2>Tarefa #{task.id}</h2>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Fechar tarefa"
+            onClick={onClose}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
         {block && (
           <div className="block-banner" role="status">
             <strong>Bloqueada</strong>
@@ -208,37 +221,41 @@ export function TaskDetail({
             {error}
           </p>
         )}
-        <div className="local-heading">
-          <span role="status">{dirty ? "Alterações não salvas" : "Salva localmente"}</span>
+        <div className="form-footer">
+          <span role="status" className="muted">
+            {dirty ? "Alterações não salvas" : "Salva"}
+          </span>
           <button className="button" disabled={busy || !dirty || !form.title.trim()}>
             {busy ? "Salvando…" : "Salvar"}
           </button>
         </div>
       </form>
 
-      <AgentPicker choice={choice} onChange={onChoice} />
-      {chainFrom && (
-        <label className="chain-option">
-          <input
-            type="checkbox"
-            checked={useChain}
-            onChange={(event) => setUseChain(event.target.checked)}
-          />
-          Continuar das alterações de “{previousTitle}” (branch <code>{chainFrom.branch}</code>)
-        </label>
-      )}
-      <button
-        type="button"
-        className="button primary"
-        disabled={!canStart || starting || dirty || primaryReason !== null}
-        onClick={() => onStart(task.id, undefined, continueFrom)}
-      >
-        {starting
-          ? "Iniciando…"
-          : `Implementar com ${agentOf(choice.runtime)?.label ?? choice.runtime} · ${modelLabel(choice)}`}
-      </button>
-      {dirty && <p>Salve a tarefa antes de implementar.</p>}
-      {primaryReason && <p className="local-error">{primaryReason}</p>}
+      <section className="run-bar" aria-label="Implementar">
+        <AgentPicker choice={choice} onChange={onChoice} />
+        {chainFrom && (
+          <label className="chain-option">
+            <input
+              type="checkbox"
+              checked={useChain}
+              onChange={(event) => setUseChain(event.target.checked)}
+            />
+            Continuar das alterações de “{previousTitle}” (branch <code>{chainFrom.branch}</code>)
+          </label>
+        )}
+        <button
+          type="button"
+          className="button primary"
+          disabled={!canStart || starting || dirty || primaryReason !== null}
+          onClick={() => onStart(task.id, undefined, continueFrom)}
+        >
+          {starting
+            ? "Iniciando…"
+            : `Implementar com ${agentOf(choice.runtime)?.label ?? choice.runtime} · ${modelLabel(choice)}`}
+        </button>
+        {dirty && <p className="muted">Salve a tarefa antes de implementar.</p>}
+        {primaryReason && <p className="local-error">{primaryReason}</p>}
+      </section>
 
       <details className="more-actions">
         <summary>Mais ações</summary>
@@ -293,7 +310,7 @@ export function TaskDetail({
       </details>
 
       <section aria-label="Histórico">
-        <h3>Histórico</h3>
+        <h3 className="section-title">Histórico</h3>
         <ol className="history">
           {history.map((event) => (
             <li key={event.seq} className={`actor-${event.actor}`}>

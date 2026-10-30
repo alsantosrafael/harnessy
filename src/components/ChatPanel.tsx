@@ -1,5 +1,5 @@
-import { useRef, useState, useSyncExternalStore } from "react";
-import { ArrowDown, Send, Sparkles } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
+import { Send } from "lucide-react";
 import type { AgentChoice } from "../lib/agents";
 import { splitDraft } from "../lib/chatTask";
 import { saveTask, startRun, type Workspace } from "../lib/desktop";
@@ -7,12 +7,6 @@ import { DRAFT_LIMIT, type DraftSession } from "../lib/drafts";
 import { AgentPicker } from "./AgentPicker";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
-const suggestions = [
-  "Implementar uma tarefa",
-  "Revisar um pull request",
-  "Planejar um novo projeto",
-];
 
 interface Props {
   hidden: boolean;
@@ -43,7 +37,6 @@ export function ChatPanel({
     session.subscribe,
     session.getSnapshot,
   );
-  const input = useRef<HTMLTextAreaElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -91,48 +84,22 @@ export function ChatPanel({
     }
   }
 
-  function insertSuggestion(value: string) {
-    // Suggestions never destroy existing work; focus the composer after insertion.
-    session.appendSuggestion(value);
-    input.current?.focus();
-  }
-
   const status =
     saveState === "saving"
-      ? "Salvando rascunho…"
+      ? "Salvando…"
       : saveState === "error"
         ? "Não foi possível salvar. Mantenha esta janela aberta para preservar o texto."
         : saveState === "blocked"
           ? "O registro anterior não pôde ser lido. Ele foi preservado; seu novo texto permanece apenas na memória."
           : saveState === "empty"
-            ? "Seu rascunho será salvo neste dispositivo quando você começar a escrever."
-            : "Rascunho salvo neste dispositivo.";
+            ? ""
+            : "Rascunho salvo";
 
   return (
-    <section id="chat-panel" role="tabpanel" aria-labelledby="chat-tab" hidden={hidden}>
-      <div className="chat-intro">
-        <span className="chat-spark" aria-hidden="true">
-          <Sparkles size={24} strokeWidth={1.4} />
-        </span>
-        <h2>O que vamos construir?</h2>
-        <p>
-          Descreva o que quer fazer. Ao iniciar, o Harnessy cria a tarefa e manda o agente que você
-          escolher implementar.
-        </p>
-      </div>
-      {/* biome-ignore lint/a11y/useSemanticElements: suggestions are a group, not form fields. */}
-      <div
-        role="group"
-        className="prompt-suggestions"
-        aria-label="Sugestões para adicionar ao rascunho"
-      >
-        {suggestions.map((text) => (
-          <button key={text} type="button" onClick={() => insertSuggestion(text)}>
-            {text}
-            <ArrowDown size={13} aria-hidden="true" />
-          </button>
-        ))}
-      </div>
+    <section id="chat-panel" className="chat-panel" aria-label="Nova tarefa" hidden={hidden}>
+      <header className="page-header">
+        <h1>Nova tarefa</h1>
+      </header>
       <form
         className="composer"
         onSubmit={(event) => {
@@ -140,18 +107,17 @@ export function ChatPanel({
           void start();
         }}
       >
-        <label htmlFor="prompt">
-          Próxima tarefa <span>Rascunho local</span>
+        <label className="sr-only" htmlFor="prompt">
+          Descrição da tarefa
         </label>
         <textarea
-          ref={input}
           id="prompt"
           maxLength={DRAFT_LIMIT}
           value={draft}
           onChange={(event) => session.edit(event.target.value)}
-          placeholder="Descreva o que você quer fazer…"
-          aria-describedby="start-hint draft-status"
-          rows={4}
+          placeholder="O que o agente deve fazer? Não inclua senhas, tokens ou arquivos .env."
+          aria-describedby={blockedBy ? "start-hint draft-status" : "draft-status"}
+          rows={6}
         />
         <div className="composer-actions">
           <div className="composer-controls">
@@ -175,7 +141,7 @@ export function ChatPanel({
           <button
             className="button primary"
             disabled={Boolean(blockedBy) || busy}
-            aria-describedby="start-hint"
+            aria-describedby={blockedBy ? "start-hint" : undefined}
           >
             {busy ? "Iniciando…" : "Iniciar"}
             <Send size={14} aria-hidden="true" />
@@ -206,15 +172,16 @@ export function ChatPanel({
           </button>
         </div>
       )}
-      <p id="start-hint" className="composer-hint">
-        {blockedBy || "Cria a tarefa em A fazer e inicia a run com o agente e o modelo escolhidos."}
-      </p>
+      {blockedBy && (
+        <p id="start-hint" className="composer-hint">
+          {blockedBy}
+        </p>
+      )}
       {error && (
         <p className="local-error composer-error" role="alert">
           {error}
         </p>
       )}
-      <p className="secrets-note">Não inclua senhas, tokens ou conteúdo de arquivos .env.</p>
     </section>
   );
 }

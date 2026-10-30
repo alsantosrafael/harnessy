@@ -4,31 +4,31 @@
 @keyframes flash { from { opacity: 1; } to { opacity: 0; } }
 
 /* Raias: o tom vem do papel da coluna, só por token. O texto nunca usa a cor da raia. */
-.kanban { display: grid; grid-template-columns: repeat(4, minmax(210px, 1fr)); gap: var(--space-4); margin-top: var(--space-4); overflow-x: auto; padding-bottom: var(--space-3); }
-.kanban-lane { --tone: var(--neutral-400); display: flex; flex-direction: column; gap: var(--space-3); min-height: 220px; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: color-mix(in srgb, var(--tone) 9%, var(--surface-muted)); transition: border-color var(--duration-fast) ease, background-color var(--duration-fast) ease; }
+.kanban { display: grid; grid-template-columns: repeat(4, minmax(200px, 1fr)); gap: var(--space-4); overflow-x: auto; padding-bottom: var(--space-3); }
+.kanban-lane { --tone: var(--neutral-400); display: flex; flex-direction: column; gap: var(--space-3); min-height: 160px; padding: var(--space-2); border: 1px solid transparent; border-radius: var(--radius-md); background: var(--surface-muted); transition: border-color var(--duration-fast) ease, background-color var(--duration-fast) ease; }
 .kanban-lane.tone-doing { --tone: var(--in-progress); }
 .kanban-lane.tone-review { --tone: var(--review); }
 .kanban-lane.tone-done { --tone: var(--positive); }
 .kanban-lane.is-over { border: 1px dashed var(--accent-hover); background: color-mix(in srgb, var(--accent) 14%, var(--surface-muted)); }
-.lane-title { display: flex; align-items: center; gap: var(--space-2); min-height: 24px; margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--text); }
+.lane-title { display: flex; align-items: center; gap: var(--space-2); min-height: 24px; margin: 0; padding: 0 var(--space-1); font-size: var(--text-sm); font-weight: 600; color: var(--text); }
 .lane-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tone); flex-shrink: 0; }
-.lane-count { min-width: 22px; margin-left: auto; padding: 1px 6px; text-align: center; font-variant-numeric: tabular-nums; border-radius: 999px; background: var(--surface-raised); border: 1px solid var(--border); color: var(--text-secondary); font-weight: 600; }
+.lane-count { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--text-muted); font-weight: 400; }
 .lane-cards { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.lane-empty { margin: 0; padding: var(--space-5) var(--space-3); border: 1px dashed var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); text-align: center; font-size: var(--text-sm); line-height: 1.5; }
+.lane-empty { margin: 0; padding: var(--space-3) var(--space-2); color: var(--text-muted); font-size: var(--text-sm); line-height: 1.5; }
 
 .composer-inline input { width: 100%; padding: var(--space-3); border: 1px solid var(--input-border); border-radius: var(--radius-sm); background: var(--input-bg); color: var(--text); font: inherit; }
 .composer-inline input::placeholder { color: var(--text-secondary); }
 .composer-inline input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 
 /* Cards: o botão abre; o de avançar fica ao lado (botão dentro de botão não existe em HTML). */
-.kanban-card { position: relative; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-raised); box-shadow: 0 1px 2px rgb(45 42 35 / 0.08); transition: transform var(--duration-fast) ease, box-shadow var(--duration-fast) ease; }
-.kanban-card:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgb(45 42 35 / 0.1); }
+.kanban-card { position: relative; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-raised); transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease; }
+.kanban-card:hover { border-color: var(--neutral-400); }
 .kanban-card.is-selected { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
 .kanban-card[draggable="true"] { cursor: grab; }
 .kanban-card::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--amber-100); opacity: 0; pointer-events: none; }
 .kanban-card.is-flash::after { animation: flash 600ms ease-out; }
 .tone-done .kanban-card { color: var(--text-secondary); }
-.card-open { display: grid; gap: var(--space-2); width: 100%; padding: var(--space-3) var(--space-8) var(--space-3) var(--space-4); text-align: left; border: 0; border-radius: inherit; background: none; color: var(--text); overflow-wrap: anywhere; }
+.card-open { display: grid; gap: var(--space-2); width: 100%; padding: var(--space-3) var(--space-8) var(--space-3) var(--space-3); text-align: left; border: 0; border-radius: inherit; background: none; color: var(--text); overflow-wrap: anywhere; }
 .tone-done .card-open { color: var(--text-secondary); }
 .card-open:focus-visible, .card-advance:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .card-advance { position: absolute; top: var(--space-2); right: var(--space-2); display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid transparent; border-radius: var(--radius-sm); background: none; color: var(--text-secondary); opacity: 0; transition: opacity var(--duration-fast) ease; }
@@ -46,6 +46,10 @@
 
 /* Detalhe da tarefa: estado em um clique e histórico com o ator em texto. */
 .task-detail { display: grid; gap: var(--space-4); align-content: start; }
+.detail-header { display: flex; align-items: center; justify-content: space-between; }
+.section-title { font-size: var(--text-sm); color: var(--text-muted); font-weight: 600; margin-bottom: var(--space-2); }
+.run-bar { display: grid; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-muted); }
+.form-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .status-group { margin: 0; padding: 0; border: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .status-pill { --tone: var(--neutral-400); display: inline-flex; align-items: center; gap: var(--space-2); min-height: 28px; padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-raised); color: var(--text-secondary); font-size: var(--text-sm); }
 .status-pill.tone-doing { --tone: var(--in-progress); }
@@ -65,11 +69,11 @@
 .skeleton-title { height: 14px; width: 55%; }
 .skeleton-card { height: 62px; }
 
-.toast { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-4); padding: var(--space-3) var(--space-4); border: 1px solid var(--positive); border-left-width: 4px; border-radius: var(--radius-sm); background: var(--surface-raised); }
-kbd { padding: 0 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--surface-raised); font: inherit; font-size: var(--text-sm); color: var(--text); }
+.toast { position: fixed; left: 50%; bottom: var(--space-6); transform: translateX(-50%); z-index: 20; display: flex; align-items: center; gap: var(--space-3); margin: 0; padding: var(--space-2) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--text); color: var(--surface-raised); box-shadow: 0 6px 20px rgb(45 42 35 / 0.25); }
+.toast .link-button { color: var(--amber-400); }
 
 @media (prefers-reduced-motion: reduce) {
   .pulse, .skeleton { animation: none; }
-  .kanban-card:hover { transform: none; }
+  
   .kanban-card.is-flash::after { animation: none; }
 }

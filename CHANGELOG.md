@@ -2,6 +2,15 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.10.0] — 2026-10-30
+
+- Interface mais enxuta: removidos o texto de apresentação, o banner de início, o painel de contexto, o rodapé de status e a seção de conversas. A sidebar ficou com **Nova tarefa**, **Tarefas** e **Conexões**.
+- A tarefa selecionada abre num painel lateral ao lado do quadro, com botão de fechar, em vez de aparecer abaixo das raias. Em janelas estreitas o painel desce para baixo do quadro.
+- Cabeçalho da página com workspace e pasta; atalhos recolhidos em **Atalhos**; confirmações aparecem como toast sobreposto.
+- **Nova tarefa** é só o campo de texto, o workspace, o agente e o botão; as sugestões de texto saíram da tela.
+- **Conexões** virou uma lista com uma linha por CLI, sem textos explicativos.
+- Atalhos: ⌘1 Tarefas, ⌘2 Nova tarefa, ⌘3 Conexões (antes, ⌘2 abria Conexões).
+
 ## Back [0.11.1] — 2026-10-30
 
 - Corrigido: uma run do agente era bloqueada quando o comando composto usava `grep`, `sort`, `uniq`, `tr`, `stat`, `file`, `which`, `true` ou `false`, porque a lista de permissões não os tinha e cada parte do comando precisa ser permitida. Esses utilitários de leitura agora são permitidos; `sed`, `awk` e `xargs` continuam fora da lista, porque escrevem ou executam.

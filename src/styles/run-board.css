@@ -1,8 +1,4 @@
-.board-controls { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-4); margin-top: var(--space-5); }
 .run-log { max-height: 320px; overflow: auto; margin: var(--space-3) 0; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--text); font-size: var(--text-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
-.link-button { padding: 0; border: 0; background: none; color: var(--focus); text-decoration: underline; font: inherit; cursor: pointer; }
-.task-editor details { margin: var(--space-3) 0; }
-.board-detail { margin-top: var(--space-5); }
 .run-proof { display: flex; align-items: center; gap: var(--space-2); color: var(--text-muted); }
 .run-proof.is-positive { color: var(--positive); }
 .run-proof.is-alert { color: var(--critical); }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Plus } from "lucide-react";
 import { applyChange, applyMove, blockedByTask, groupByStatus, statusName } from "../lib/board";
 import {
   listRunEvents,
@@ -304,32 +305,52 @@ export function BoardPanel({
   const startable = canStartRun(agentReady, runs);
 
   return (
-    <section
-      id="board-panel"
-      className="local-work"
-      role="tabpanel"
-      aria-labelledby="board-tab"
-      hidden={hidden}
-    >
-      <div className="local-heading">
-        <div>
-          <p className="eyebrow">DA TAREFA AO PR</p>
-          <h2>Escreva a tarefa. O agente faz o resto.</h2>
-          <p>
-            Tecle <kbd>n</kbd> para criar. No card, <kbd>]</kbd> avança e <kbd>[</kbd> volta uma
-            raia. O card anda sozinho enquanto o agente trabalha, e a run que ficar presa aparece
-            como bloqueada.
-          </p>
+    <section id="board-panel" className="local-work" aria-label="Tarefas" hidden={hidden}>
+      <header className="page-header">
+        <h1>Tarefas</h1>
+        {workspaces.length > 0 && (
+          <label className="workspace-picker">
+            <span className="sr-only">Workspace</span>
+            <select
+              value={workspaceId ?? ""}
+              onChange={(event) => {
+                if (!dirtyRef.current || window.confirm("Descartar as alterações não salvas?")) {
+                  dirtyRef.current = false;
+                  onWorkspaceChange(Number(event.target.value));
+                }
+              }}
+            >
+              {workspaces.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {workspace && (
+          <span className="local-folder" title={workspace.folder}>
+            {workspace.folder}
+          </span>
+        )}
+        <div className="page-actions">
+          <details className="shortcuts">
+            <summary>Atalhos</summary>
+            <p>
+              <kbd>n</kbd> nova tarefa · <kbd>]</kbd> avança · <kbd>[</kbd> volta
+            </p>
+          </details>
+          <button
+            type="button"
+            className="button"
+            aria-expanded={creatingWorkspace}
+            onClick={() => setCreatingWorkspace(!creatingWorkspace)}
+          >
+            <Plus size={14} aria-hidden="true" />
+            Workspace
+          </button>
         </div>
-        <button
-          type="button"
-          className="button"
-          aria-expanded={creatingWorkspace}
-          onClick={() => setCreatingWorkspace(!creatingWorkspace)}
-        >
-          Novo workspace
-        </button>
-      </div>
+      </header>
       {!agentReady && (
         <p className="local-error" role="status">
           Claude Code ou git não foram encontrados. Verifique em{" "}
@@ -370,64 +391,55 @@ export function BoardPanel({
         </div>
       )}
       {workspaces.length > 0 && (
-        <>
-          <div className="board-controls">
-            <label className="workspace-picker">
-              Workspace
-              <select
-                value={workspaceId ?? ""}
-                onChange={(event) => {
-                  if (!dirtyRef.current || window.confirm("Descartar as alterações não salvas?")) {
-                    dirtyRef.current = false;
-                    onWorkspaceChange(Number(event.target.value));
-                  }
-                }}
-              >
-                {workspaces.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {workspace && <p className="local-folder">{workspace.folder}</p>}
-          </div>
-          {loading ? (
-            <KanbanSkeleton />
-          ) : (
-            <Kanban
-              groups={groups}
-              selectedId={selectedId}
-              working={working}
-              blocked={blocked}
-              flashId={flashId}
-              onSelect={select}
-              onMove={move}
-              onCreate={create}
-            />
-          )}
-          <p className="sr-only" role="status" aria-live="polite">
-            {live}
-          </p>
-          {notice && (
-            <p className="toast" role="presentation">
-              <span aria-hidden="true">✓</span> {notice.text}
-              {notice.undo && (
-                <button
-                  type="button"
-                  className="link-button"
-                  onClick={() => {
-                    notice.undo?.();
-                    setNotice(null);
-                  }}
-                >
-                  Desfazer
-                </button>
-              )}
+        <div className={`board-layout${selected ? " has-detail" : ""}`}>
+          <div className="board-main">
+            {loading ? (
+              <KanbanSkeleton />
+            ) : (
+              <Kanban
+                groups={groups}
+                selectedId={selectedId}
+                working={working}
+                blocked={blocked}
+                flashId={flashId}
+                onSelect={select}
+                onMove={move}
+                onCreate={create}
+              />
+            )}
+            <p className="sr-only" role="status" aria-live="polite">
+              {live}
             </p>
-          )}
-          <div className="board-detail">
-            {selected ? (
+            {notice && (
+              <p className="toast" role="presentation">
+                <span aria-hidden="true">✓</span> {notice.text}
+                {notice.undo && (
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() => {
+                      notice.undo?.();
+                      setNotice(null);
+                    }}
+                  >
+                    Desfazer
+                  </button>
+                )}
+              </p>
+            )}
+            <RunsPanel
+              runs={runs}
+              openRun={openRun}
+              events={events}
+              onOpen={setOpenRun}
+              onError={setError}
+              onStepsCreated={(created) =>
+                setTasks((current) => [...created].reverse().concat(current))
+              }
+            />
+          </div>
+          {selected && (
+            <aside className="detail-drawer" aria-label={`Tarefa #${selected.id}`}>
               <TaskDetail
                 key={selected.id}
                 task={selected}
@@ -450,28 +462,14 @@ export function BoardPanel({
                 onStart={start}
                 onResolve={resolve}
                 onDirty={setDirty}
+                onClose={() => select(null)}
               />
-            ) : (
-              <div className="local-empty">
-                <h3>Qual é o próximo passo?</h3>
-                <p>Abra um card para editar, ver o histórico ou mandar o agente implementar.</p>
-              </div>
-            )}
-            {!startable && agentReady && selected && (
-              <p>Já existe uma run ativa neste workspace.</p>
-            )}
-          </div>
-          <RunsPanel
-            runs={runs}
-            openRun={openRun}
-            events={events}
-            onOpen={setOpenRun}
-            onError={setError}
-            onStepsCreated={(created) =>
-              setTasks((current) => [...created].reverse().concat(current))
-            }
-          />
-        </>
+              {!startable && agentReady && (
+                <p className="muted">Já existe uma run ativa neste workspace.</p>
+              )}
+            </aside>
+          )}
+        </div>
       )}
     </section>
   );

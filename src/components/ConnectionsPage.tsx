@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useState } from "react";
-import { Github, RefreshCw, ShieldCheck, Sparkles, Terminal } from "lucide-react";
+import { Github, RefreshCw, Sparkles, Terminal } from "lucide-react";
 import { isTauri } from "@tauri-apps/api/core";
 import {
   checkConnections,
@@ -12,25 +12,21 @@ import { rolesFor } from "../lib/roles";
 const providers: {
   provider: Provider;
   title: string;
-  description: string;
   icon: ReactNode;
 }[] = [
   {
     provider: "github",
     title: "GitHub",
-    description: "Seus repositórios e pull requests, no mesmo fluxo.",
     icon: <Github aria-hidden="true" />,
   },
   {
     provider: "codex",
     title: "Codex",
-    description: "Revisa e testa o que foi implementado, em sessão independente.",
     icon: <Terminal aria-hidden="true" />,
   },
   {
     provider: "claude",
     title: "Claude Code",
-    description: "Refina e implementa as tarefas, com a sessão da sua conta.",
     icon: <Sparkles aria-hidden="true" />,
   },
 ];
@@ -71,28 +67,25 @@ export function ConnectionsPage() {
   const connected = statuses?.filter((status) => status.state === "connected").length ?? 0;
 
   return (
-    <section className="page connections-page">
-      <p className="eyebrow">O COMEÇO DE CADA ENTREGA</p>
-      <h1>Conecte suas ferramentas.</h1>
-      <p className="lead">
-        Uma interface. Suas contas. O Harnessy reutiliza a sessão das CLIs oficiais e nunca lê nem
-        guarda suas credenciais.
-      </p>
-      <div className="connections-toolbar">
-        <span role="status">
+    <section className="page connections-page" aria-label="Conexões">
+      <header className="page-header">
+        <h1>Conexões</h1>
+        <span className="muted" role="status">
           {!desktop
-            ? "A verificação só funciona no aplicativo desktop."
+            ? "Verificação só no aplicativo desktop"
             : checking
-              ? "Verificando sessões das CLIs…"
+              ? "Verificando…"
               : statuses
-                ? `${connected} de ${providers.length} conexões ativas.`
+                ? `${connected} de ${providers.length} ativas`
                 : ""}
         </span>
-        <button className="button" onClick={refresh} disabled={!desktop || checking}>
-          <RefreshCw size={15} aria-hidden="true" />
-          Verificar novamente
-        </button>
-      </div>
+        <div className="page-actions">
+          <button className="button" onClick={refresh} disabled={!desktop || checking}>
+            <RefreshCw size={14} aria-hidden="true" />
+            Verificar
+          </button>
+        </div>
+      </header>
       {error && (
         <div className="local-error" role="alert">
           {error}
@@ -108,17 +101,6 @@ export function ConnectionsPage() {
           />
         ))}
       </div>
-      <div className="notice">
-        <ShieldCheck size={19} aria-hidden="true" />
-        <div>
-          <strong>Autenticação pelo terminal, não pelo aplicativo</strong>
-          <p>
-            Para conectar ou renovar uma sessão, execute o comando indicado no seu terminal e depois
-            use “Verificar novamente”. Tokens ficam no keychain ou nos arquivos de cada CLI; a
-            interface recebe apenas o estado da conexão.
-          </p>
-        </div>
-      </div>
     </section>
   );
 }
@@ -127,14 +109,12 @@ function Connection({
   provider,
   icon,
   title,
-  description,
   status,
   phase,
 }: {
   provider: Provider;
   icon: ReactNode;
   title: string;
-  description: string;
   status: ConnectionStatus | null;
   phase: "web" | "checking" | "ready";
 }) {
@@ -156,14 +136,13 @@ function Connection({
     <article className="connection-card" data-state={state}>
       <div className="connection-top">
         <span className="connection-icon">{icon}</span>
+        <h2>{title}</h2>
         <span className="badge">
           <span className={`status-dot status-${state}`} aria-hidden="true" />
           {stateLabel[state]}
         </span>
       </div>
-      <h2>{title}</h2>
-      <p>{description}</p>
-      {roleNames && <p className="connection-roles">Papéis: {roleNames}</p>}
+      {roleNames && <p className="connection-roles">{roleNames}</p>}
       <dl className="connection-facts">
         <dt>Estado</dt>
         <dd>
@@ -192,13 +171,6 @@ function Connection({
           <code>{command}</code>
         </div>
       )}
-      <span className="connection-footnote">
-        {state === "connected"
-          ? "Pronta para uso quando os agentes forem habilitados."
-          : state === "web"
-            ? "Disponível no aplicativo desktop"
-            : "Depois de autenticar, verifique novamente."}
-      </span>
     </article>
   );
 }
