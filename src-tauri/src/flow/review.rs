@@ -42,6 +42,8 @@ pub struct Reviewer {
     pub tarefa: String,
     pub descricao: String,
     pub criterios: String,
+    /// Esforço pedido ao revisor pelo usuário; vence o da Ação.
+    pub effort: Option<String>,
     /// Bloco do harness do projeto (já lido do commit base); vazio se o projeto não tem.
     pub harness: String,
     /// Runtime próprio do revisor (o Codex); `None` usa o do implementador.

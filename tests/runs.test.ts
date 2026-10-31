@@ -68,6 +68,7 @@ const run = (id: number, state: string): Run => ({
   reviewer: null,
   reviewerModel: null,
   reviewWhen: null,
+  reviewerEffort: null,
 });
 const event = (seq: number): RunEvent => ({ runId: 1, seq, kind: "log", text: String(seq) });
 

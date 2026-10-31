@@ -12,6 +12,7 @@ mod db;
 mod delivery;
 mod error;
 mod flow;
+mod preferences;
 mod process;
 mod profile;
 mod run;
@@ -23,6 +24,8 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             app::app_info,
+            preferences::commands::get_preference,
+            preferences::commands::set_preference,
             app::attention::set_attention_count,
             app::attention::notify_attention,
             workspace::commands::list_workspaces,

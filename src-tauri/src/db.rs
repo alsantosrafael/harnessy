@@ -218,6 +218,14 @@ const MIGRATIONS: &[&str] = &[
     CREATE INDEX automation_events_task ON automation_events(task_id, id);
     CREATE INDEX automation_events_workspace ON automation_events(workspace_id, id);
 ",
+    "
+    CREATE TABLE preferences (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+    ALTER TABLE runs ADD COLUMN reviewer_effort TEXT;
+",
 ];
 
 /// Segundos desde a época Unix; `0` se o relógio estiver antes dela.

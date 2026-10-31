@@ -318,6 +318,7 @@ fn economico() {
                             descricao: task.body.clone(),
                             criterios: task.criteria.clone(),
                             harness: String::new(),
+                            effort: None,
                             runtime: None,
                         }),
                         base_ref: None,

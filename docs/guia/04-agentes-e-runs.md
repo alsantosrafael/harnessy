@@ -23,16 +23,20 @@ Muitos projetos têm um manual de regras escrito para agentes (arquivos como `AG
 
 ## Escolher o agente e o modelo
 
-No seletor de agente você escolhe:
+No seletor de agente (a linha recolhida logo acima do botão de implementar) você escolhe, **separadamente para quem implementa e para quem revisa**:
 
 | Campo | O que é |
 |---|---|
-| **Agente** | Quem implementa. Hoje: **Claude Code**. O Codex aparece, mas ainda não implementa |
-| **Modelo** | O "tamanho" do cérebro: modelos maiores resolvem coisas mais difíceis, custam mais e demoram mais. O padrão é **Sonnet** |
-| **Revisor** | Quem revisa o resultado: Claude Code (um modelo acima do que implementou, por padrão) ou Codex |
+| **Agente** | **Claude Code** ou **Codex**. Os dois podem implementar e revisar |
+| **Modelo** | O "tamanho do cérebro": modelos maiores resolvem coisas mais difíceis, custam mais e demoram mais. O padrão de quem implementa é **Sonnet**; o revisor pode ficar em **Automático** (um acima) |
+| **Esforço** | Quanto o agente **pensa antes de agir**: **Baixo**, **Médio**, **Alto**, **Muito alto** e **Máximo** no Claude Code (o Codex tem Baixo, Médio e Alto). **Padrão** deixa a decisão com a Ação ou a ferramenta. Mais esforço custa mais e demora mais |
 | **Quando revisar** | **Sempre** (padrão), **Só com risco** ou **Nunca** |
 
-A escolha fica salva no seu Mac e vale para todas as tarefas.
+O resumo do seletor mostra o que está valendo, por exemplo: `Claude Code · Sonnet · esforço médio · revisa: Codex (sempre)`.
+
+A escolha fica guardada **no banco local do Harnessy**, então vale para qualquer janela do app (instalada ou em desenvolvimento) e para todas as tarefas. A revisão sob demanda (**Revisar agora**) usa o revisor, o modelo e o esforço que estiverem escolhidos naquele momento.
+
+> **Dica de custo:** o esforço e o modelo do **revisor** pesam muito. Uma revisão com um modelo maior pode custar mais do que a própria implementação. Para mudanças pequenas, escolha **Só com risco** ou um revisor mais leve.
 
 > Quando uma run **falha** ou o resultado não convence, o botão **Tentar com** o próximo modelo repete o trabalho com um modelo maior, sem perder o que já foi feito.
 

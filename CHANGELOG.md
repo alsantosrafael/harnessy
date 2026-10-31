@@ -10,6 +10,18 @@ Rodar localmente para testar a mudança (fatia 2a):
 - Painel **Ambiente de teste** na tarefa: estado em texto (Subindo…, No ar, Parado, Caiu com o código), endereço, **Abrir no navegador**, **Parar** / **Rodar de novo** e o log ao vivo, rolável por teclado.
 - O card mostra **No ar** enquanto o ambiente da tarefa está rodando.
 
+## Front [0.26.0] — 2026-10-31
+
+Você escolhe agente, modelo e **esforço** de quem implementa e de quem revisa, e a escolha deixa de se perder:
+
+- O seletor ganhou **Esforço** (Padrão, Baixo, Médio, Alto, Muito alto, Máximo no Claude Code; Padrão, Baixo, Médio, Alto no Codex), separado para quem implementa e para o revisor. Trocar de agente descarta um esforço que ele não conhece. O resumo mostra o que vale ("Claude Code · Sonnet · esforço médio · revisa: Codex (sempre)").
+- A escolha agora fica no **banco local**, não no `localStorage` da WebView. Antes, o app em desenvolvimento e o instalado tinham escolhas diferentes (foi assim que uma revisão feita pelo Claude saiu mesmo com o Codex escolhido) e ela se perdia ao limpar o cache. Uma escolha antiga do navegador migra para o banco na primeira abertura, sem sobrescrever uma já gravada.
+
+## Back [0.23.0] — 2026-10-31
+
+- Novo domínio `preferences` (tabela `preferences`) e comandos `get_preference` e `set_preference`, com lista de chaves aceitas, objeto JSON de até 4 KB.
+- **Esforço escolhido pelo usuário.** `start_run` aceita `effort` e `reviewerEffort`, e `review_run` aceita `reviewerEffort`; vencem o esforço da Ação. Validados por agente (`guard::user_effort`): Claude Code aceita `low`, `medium`, `high`, `xhigh` e `max`; Codex aceita `low`, `medium` e `high`, que agora recebe como `-c model_reasoning_effort` (antes ignorava o esforço). O esforço do revisor fica em `runs.reviewer_effort` (migração) e é reaproveitado no ciclo extra.
+
 ## Front [0.25.0] — 2026-10-31
 
 Correções do primeiro uso no próprio Harnessy:

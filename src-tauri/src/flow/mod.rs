@@ -558,7 +558,10 @@ fn review_diff(
         actions::max_turns(&reviewer.action),
         Access::Read,
     );
-    spec.effort = reviewer.action.esforco.as_deref();
+    spec.effort = reviewer
+        .effort
+        .as_deref()
+        .or(reviewer.action.esforco.as_deref());
     spec.json_schema = Some(review::SCHEMA);
     let session = Session {
         run_id: id,
@@ -1072,6 +1075,7 @@ mod tests {
             descricao: String::new(),
             criterios: "ok.txt existe".into(),
             harness: String::new(),
+            effort: None,
             runtime: external,
         });
         let agent = ReviewedAgent {
@@ -1174,6 +1178,7 @@ mod tests {
             descricao: String::new(),
             criterios: "ok.txt existe".into(),
             harness: String::new(),
+            effort: None,
             runtime: None,
         };
         let agent = ReviewedAgent {

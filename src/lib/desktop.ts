@@ -134,6 +134,8 @@ export interface Run {
   reviewerModel: string | null;
   /** Quando revisar (`auto`, `always`, `never`); `null` vale `auto`. */
   reviewWhen: string | null;
+  /** Esforço pedido ao revisor; `null` = o padrão. */
+  reviewerEffort: string | null;
   /** Achados do revisor descartados por não apontarem para o diff. */
   reviewDiscarded: number | null;
   /** Run cuja branch serviu de base (passo encadeado). */
@@ -197,6 +199,8 @@ export const startRun = (
     reviewerModel: choice.reviewerModel,
     reviewWhen: choice.reviewWhen,
     instruction,
+    effort: choice.effort || null,
+    reviewerEffort: choice.reviewerEffort || null,
   });
 /** Passo proposto por "Dividir em passos", editável antes de virar tarefa. */
 export interface StepProposal {
@@ -225,6 +229,7 @@ export const reviewRun = (runId: number, choice: AgentChoice) =>
     runId,
     reviewer: choice.reviewer,
     reviewerModel: choice.reviewerModel,
+    reviewerEffort: choice.reviewerEffort || null,
   });
 /** PR de uma run, como o núcleo o conhece; `checks` e `mergeable` vêm do GitHub. */
 export interface Delivery {
@@ -307,6 +312,10 @@ export const openPreview = (runId: number) => localCall<void>("open_preview", { 
 export const previewSnapshot = (runId: number) =>
   localCall<[PreviewInfo | null, string[]]>("preview_snapshot", { runId });
 export const listPreviews = () => localCall<PreviewInfo[]>("list_previews");
+/** Preferência pessoal guardada no banco local; `null` se ainda não foi definida. */
+export const getPreference = (key: string) => localCall<string | null>("get_preference", { key });
+export const setPreference = (key: string, value: string) =>
+  localCall<void>("set_preference", { key, value });
 export const cancelRun = (runId: number) => localCall<void>("cancel_run", { runId });
 /** Ciclo extra numa run que falhou, com o próximo modelo da lista (decidido pelo núcleo). */
 export const continueRun = (runId: number) => localCall<Run>("continue_run", { runId });

@@ -9,8 +9,22 @@ import {
   SquarePen,
   X,
 } from "lucide-react";
-import { type AgentChoice, loadChoice, saveChoice } from "./lib/agents";
-import { getAppInfo, listWorkspaces, type AppInfo, type Workspace } from "./lib/desktop";
+import {
+  type AgentChoice,
+  hasStoredChoice,
+  loadChoice,
+  normalizeChoice,
+  PREFERENCE_KEY,
+  saveChoice,
+} from "./lib/agents";
+import {
+  getAppInfo,
+  getPreference,
+  listWorkspaces,
+  setPreference,
+  type AppInfo,
+  type Workspace,
+} from "./lib/desktop";
 import { createDraftSession } from "./lib/drafts";
 import { isActive } from "./lib/runs";
 import { useRuns } from "./lib/useRuns";
@@ -73,7 +87,22 @@ export function App() {
   function chooseAgent(next: AgentChoice) {
     setChoice(next);
     saveChoice(next);
+    // No banco local a escolha vale para qualquer janela (instalada ou em desenvolvimento).
+    setPreference(PREFERENCE_KEY, JSON.stringify(next)).catch(() => undefined);
   }
+
+  // A escolha do banco vence a do navegador; sem ela, a do navegador (se for explícita) migra para o banco.
+  useEffect(() => {
+    getPreference(PREFERENCE_KEY)
+      .then((raw) => {
+        if (raw) {
+          setChoice(normalizeChoice(JSON.parse(raw)));
+        } else if (hasStoredChoice()) {
+          setPreference(PREFERENCE_KEY, JSON.stringify(loadChoice())).catch(() => undefined);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     let alive = true;

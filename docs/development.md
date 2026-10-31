@@ -95,6 +95,8 @@ Superfície IPC: `list_actions(workspaceId?)`, `approve_action(workspaceId, id)`
 
 Atenção: `set_attention_count(count)` escreve o contador no ícone da bandeja e `notify_attention(title, body)` mostra uma notificação do macOS (peça a permissão na primeira vez; recusada, não insiste). O plugin de notificação é usado só no Rust, sem permissão extra em `capabilities/main.json`; os textos vêm do front e são curtos, sem saída de agente nem credenciais.
 
+Preferências e esforço: `get_preference(key)` e `set_preference(key, value)` guardam a escolha de agente no banco (`agent-choice`, objeto JSON de até 4 KB; chaves fora da lista são recusadas), que vale para qualquer janela. `start_run` aceita `effort` e `reviewerEffort` opcionais (`low`, `medium`, `high`, `xhigh`, `max` no Claude Code; `low`, `medium`, `high` no Codex, que os recebe como `-c model_reasoning_effort`), que vencem o esforço declarado pela Ação; `review_run` aceita `reviewerEffort`. O esforço do revisor fica em `runs.reviewer_effort`.
+
 Alterações: `run_diff(runId)` devolve os arquivos de `base..branch` (status, contagens, patch com limites) para a tela de leitura, sem escrever nada.
 
 Automação: `get_automation(workspaceId, taskId?)`, `save_automation(workspaceId, modes, guardrails)`, `apply_automation_preset(workspaceId, preset)`, `set_automation_paused(workspaceId, paused)`, `save_task_automation(taskId, overrides)` e `list_automation_events(workspaceId, taskId?, limit)`. Modos: `manual`, `assisted`, `auto` por etapa (`start`, `review`, `qa`, `preview`, `publish`, `merge`); o núcleo recusa `auto` no merge. A configuração é local e pessoal, e o repositório só aperta as travas.

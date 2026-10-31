@@ -4,6 +4,8 @@ import {
   agentOf,
   agents,
   choiceSummary,
+  effortsOf,
+  validEffort,
   type ReviewWhen,
   reviewWhens,
 } from "../lib/agents";
@@ -21,13 +23,15 @@ interface AgentFieldsProps {
   id: string;
   runtime: Runtime;
   model: string;
+  effort: string;
   /** Modelo "automático" (vazio) permitido: só o revisor Claude. */
   auto?: boolean;
   onChange: (runtime: Runtime, model: string) => void;
+  onEffort: (effort: string) => void;
 }
 
 /** Agente + modelo: lista para o Claude Code; lista com id livre para o Codex. */
-function AgentFields({ id, runtime, model, auto, onChange }: AgentFieldsProps) {
+function AgentFields({ id, runtime, model, effort, auto, onChange, onEffort }: AgentFieldsProps) {
   const agent = agentOf(runtime);
   return (
     <>
@@ -88,6 +92,25 @@ function AgentFields({ id, runtime, model, auto, onChange }: AgentFieldsProps) {
           </select>
         )}
       </label>
+      <label htmlFor={`${id}-effort`}>
+        Esforço
+        <select
+          id={`${id}-effort`}
+          value={effort}
+          aria-describedby={`${id}-effort-help`}
+          onChange={(event) => onEffort(event.target.value)}
+        >
+          <option value="">Padrão</option>
+          {effortsOf(runtime).map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+        <small id={`${id}-effort-help`} className="muted">
+          Mais esforço pensa mais, custa mais e demora mais.
+        </small>
+      </label>
     </>
   );
 }
@@ -109,7 +132,11 @@ export function AgentPicker({ choice, onChange, compact }: Props) {
           id={`${id}-impl`}
           runtime={choice.runtime}
           model={choice.model}
-          onChange={(runtime, model) => onChange({ ...choice, runtime, model })}
+          effort={choice.effort}
+          onChange={(runtime, model) =>
+            onChange({ ...choice, runtime, model, effort: validEffort(runtime, choice.effort) })
+          }
+          onEffort={(effort) => onChange({ ...choice, effort })}
         />
       </fieldset>
       {!compact && (
@@ -136,10 +163,17 @@ export function AgentPicker({ choice, onChange, compact }: Props) {
               id={`${id}-rev`}
               runtime={choice.reviewer}
               model={choice.reviewerModel}
+              effort={choice.reviewerEffort}
               auto
               onChange={(reviewer, reviewerModel) =>
-                onChange({ ...choice, reviewer, reviewerModel })
+                onChange({
+                  ...choice,
+                  reviewer,
+                  reviewerModel,
+                  reviewerEffort: validEffort(reviewer, choice.reviewerEffort),
+                })
               }
+              onEffort={(reviewerEffort) => onChange({ ...choice, reviewerEffort })}
             />
           )}
         </fieldset>

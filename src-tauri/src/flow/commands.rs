@@ -59,10 +59,12 @@ struct ReviewPick {
     runtime: &'static str,
     model: String,
     when: &'static str,
+    /// Esforço escolhido para o revisor; `None` = o padrão da Ação ou da CLI.
+    effort: Option<&'static str>,
 }
 
 impl ReviewPick {
-    fn parse(runtime: &str, model: &str, when: &str) -> Result<Self> {
+    fn parse(runtime: &str, model: &str, when: &str, effort: Option<&str>) -> Result<Self> {
         let runtime = guard::runtime(runtime)?;
         let model = if runtime == "claude" && model.trim().is_empty() {
             String::new()
@@ -73,6 +75,7 @@ impl ReviewPick {
             runtime,
             model,
             when: guard::review_when(when)?,
+            effort: guard::user_effort(runtime, effort)?,
         })
     }
 }
@@ -140,6 +143,7 @@ fn reviewer_for(
         tarefa: task.title.clone(),
         descricao: task.description.clone(),
         criterios: task.criteria.clone(),
+        effort: pick.effort.map(str::to_owned),
         harness,
     })
 }
@@ -154,6 +158,10 @@ fn prompt_for(acao: &action::Action, task: &Task, folder: &str, avoid: &[String]
 
 /// Harness do projeto no commit `rev`, em bloco de dados para o prompt. Lido pelo Rust do
 /// commit base (nunca do worktree da run); sem git ou sem arquivos, vazio.
+fn runtime_of(run: &Run) -> &str {
+    run.runtime.as_str()
+}
+
 fn project_harness(folder: &str, rev: &str) -> String {
     let dirs = process::search_dirs();
     let Some(git) = process::find_binary("git", &dirs) else {
@@ -273,10 +281,19 @@ pub fn start_run(
     reviewer_model: String,
     review_when: String,
     instruction: Option<String>,
+    effort: Option<String>,
+    reviewer_effort: Option<String>,
 ) -> Result<Run> {
     let runtime_id = guard::runtime(&runtime)?;
     let model = guard::agent_model(runtime_id, &model)?;
-    let pick = ReviewPick::parse(&reviewer, &reviewer_model, &review_when)?;
+    // O esforço que o usuário escolheu vence o declarado pela Ação.
+    let user_effort = guard::user_effort(runtime_id, effort.as_deref())?;
+    let pick = ReviewPick::parse(
+        &reviewer,
+        &reviewer_model,
+        &review_when,
+        reviewer_effort.as_deref(),
+    )?;
     let (ws, task, avoid) = {
         let db = store.connection()?;
         (
@@ -355,7 +372,7 @@ pub fn start_run(
             role: ROLE,
             runtime: runtime_id,
             model: &model,
-            effort: acao.esforco.as_deref(),
+            effort: user_effort.or(acao.esforco.as_deref()),
             base_run_id: base.as_ref().map(|(id, _)| *id),
         },
     )?;
@@ -366,6 +383,7 @@ pub fn start_run(
             pick.runtime,
             &pick.model,
             pick.when,
+            pick.effort,
         )?;
     }
     registry.register(created.id);
@@ -407,7 +425,7 @@ pub fn start_run(
         },
         contraprova: acao.contraprova,
         require_proof: acao.exigir_prova,
-        effort: acao.esforco.clone(),
+        effort: user_effort.or(acao.esforco.as_deref()).map(str::to_owned),
         max_turns: actions::max_turns(&acao),
         review: review_runtime.and_then(|runtime| {
             reviewer_for(
@@ -483,6 +501,7 @@ pub fn continue_run(
         previous.reviewer.as_deref().unwrap_or("claude"),
         previous.reviewer_model.as_deref().unwrap_or(""),
         previous.review_when.as_deref().unwrap_or("auto"),
+        previous.reviewer_effort.as_deref(),
     )?;
     let review_runtime = agent_runtime(pick.runtime, &dirs, &data_dir)?;
     let (reopened, offset) = {
@@ -505,7 +524,9 @@ pub fn continue_run(
         max_corrections: 0,
         contraprova: acao.contraprova,
         require_proof: acao.exigir_prova,
-        effort: acao.esforco.clone(),
+        effort: guard::user_effort(runtime_of(&previous), previous.effort.as_deref())?
+            .or(acao.esforco.as_deref())
+            .map(str::to_owned),
         max_turns: actions::max_turns(&acao),
         review: reviewer_for(
             &app_data(&app)?,
@@ -542,6 +563,7 @@ pub fn review_run(
     run_id: i64,
     reviewer: String,
     reviewer_model: String,
+    reviewer_effort: Option<String>,
 ) -> Result<Run> {
     let (previous, ws, task, number) = {
         let db = store.connection()?;
@@ -552,7 +574,12 @@ pub fn review_run(
         let number = run::last_cycle(&db, run_id)? + 1;
         (previous, ws, task, number)
     };
-    let pick = ReviewPick::parse(&reviewer, &reviewer_model, "always")?;
+    let pick = ReviewPick::parse(
+        &reviewer,
+        &reviewer_model,
+        "always",
+        reviewer_effort.as_deref(),
+    )?;
     process::wait_for_login_path();
     let dirs = process::search_dirs();
     let data_dir = app_data(&app)?;
