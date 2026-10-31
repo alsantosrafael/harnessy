@@ -2,6 +2,10 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Back [0.17.1] — 2026-10-31
+
+- A Ação embutida `revisar` agora é um **staff engineer**: avalia simplicidade e complexidade proporcional à tarefa, fundamentos, aderência às regras e à arquitetura do projeto (lê `AGENTS.md`, `.claude/rules` e `docs/adr`), testabilidade, manutenção e o impacto no usuário. Bugs e casos de borda deixam de ser o foco dela: são do QA, papel separado que entra com o ambiente de teste. O filtro do núcleo continua descartando achados fora das linhas alteradas.
+
 ## Front [0.20.0] — 2026-10-31
 
 O quadro passa a mostrar a entrega de cada tarefa:

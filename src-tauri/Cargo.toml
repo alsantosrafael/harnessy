@@ -1,7 +1,7 @@
 [package]
 name = "harnessy"
 # Back-end version, versioned independently of the front-end in package.json.
-version = "0.17.0"
+version = "0.17.1"
 edition = "2021"
 rust-version = "1.77.2"
 
