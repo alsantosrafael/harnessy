@@ -250,6 +250,24 @@ export const refreshDelivery = (runId: number) =>
 export const mergeDelivery = (runId: number) => localCall<Delivery>("merge_delivery", { runId });
 export const listDeliveries = (workspaceId: number) =>
   localCall<Delivery[]>("list_deliveries", { workspaceId });
+/** Um arquivo alterado pela run, com os hunks para leitura. */
+export interface FileDiff {
+  path: string;
+  status: "modified" | "added" | "deleted" | "renamed";
+  additions: number;
+  deletions: number;
+  binary: boolean;
+  patch: string;
+  truncated: boolean;
+}
+export interface RunDiff {
+  files: FileDiff[];
+  additions: number;
+  deletions: number;
+  truncated: boolean;
+}
+/** Alterações da run (`base..branch`) por arquivo, só leitura. */
+export const runDiff = (runId: number) => localCall<RunDiff>("run_diff", { runId });
 /** Como subir o projeto: o perfil do workspace e se o usuário já confirmou o comando. */
 export interface ProfileView {
   exists: boolean;

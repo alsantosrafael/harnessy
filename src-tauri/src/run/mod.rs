@@ -9,6 +9,7 @@
 pub mod claude;
 pub mod codex;
 pub mod commands;
+pub mod diff;
 pub mod guard;
 pub mod harness;
 pub mod preview;

@@ -10,6 +10,18 @@ Rodar localmente para testar a mudança (fatia 2a):
 - Painel **Ambiente de teste** na tarefa: estado em texto (Subindo…, No ar, Parado, Caiu com o código), endereço, **Abrir no navegador**, **Parar** / **Rodar de novo** e o log ao vivo, rolável por teclado.
 - O card mostra **No ar** enquanto o ambiente da tarefa está rodando.
 
+## Front [0.23.0] — 2026-10-31
+
+Ver o que a run mudou, dentro do app:
+
+- Novo painel **Alterações da run** na tarefa (recolhido; lê ao abrir): resumo ("3 arquivos · +40 −12"), lista de arquivos com status e contagem, e o patch de um arquivo por vez, com número de linha dos dois lados e sinais `+`/`−` (o estado não depende só da cor). Abre pelo primeiro arquivo que a revisão comentou.
+- Os achados da revisão aparecem **na linha** a que se referem, com "Bloqueia" ou "Sugere" em texto (quando o log da run já foi carregado).
+- A área do patch é rolável e focável por teclado; binários e arquivos grandes dizem o que não é mostrado.
+
+## Back [0.21.0] — 2026-10-31
+
+- Novo comando `run_diff(runId)`: lê `base..branch` no repositório e devolve os arquivos alterados (status, linhas adicionadas e removidas, patch). O parser (`run::diff`) limita a 200 arquivos, 60 KB por patch e 400 KB no total, e avisa quando cortou. Assíncrono e só leitura.
+
 ## Front [0.22.0] — 2026-10-31
 
 Um próximo passo por tarefa:

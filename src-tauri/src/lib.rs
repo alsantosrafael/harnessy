@@ -42,6 +42,7 @@ pub fn run() {
             flow::commands::refresh_delivery,
             flow::commands::merge_delivery,
             flow::commands::list_deliveries,
+            flow::commands::run_diff,
             automation::commands::get_automation,
             automation::commands::save_automation,
             automation::commands::apply_automation_preset,

@@ -948,3 +948,29 @@ pub fn list_previews(
 ) -> Result<Vec<run::preview::Info>> {
     Ok(previews.active())
 }
+
+/// Alterações da run (`base..branch`) separadas por arquivo, para o humano ler no app.
+#[tauri::command]
+pub async fn run_diff(store: State<'_, Database>, run_id: i64) -> Result<run::diff::RunDiff> {
+    let (run, folder) = {
+        let db = store.connection()?;
+        let run = run::get(&db, run_id)?;
+        let folder = workspace::get(&db, run.workspace_id)?.folder;
+        (run, folder)
+    };
+    let (Some(base), Some(branch)) = (run.base_sha.as_deref(), run.branch.as_deref()) else {
+        return Err(AppError::Validation("Esta run não deixou uma branch."));
+    };
+    process::wait_for_login_path();
+    let dirs = process::search_dirs();
+    let git = process::find_binary("git", &dirs)
+        .ok_or(AppError::Validation("git não encontrado neste computador."))?;
+    let text =
+        worktree::diff_range(&git, &dirs, Path::new(&folder), base, branch, 3).map_err(|_| {
+            AppError::Validation("Não foi possível ler as alterações; a branch ainda existe?")
+        })?;
+    let mut diff = run::diff::parse(&text);
+    // O git devolve no máximo ~512 KB: se chegou perto, o final pode ter ficado de fora.
+    diff.truncated |= text.len() >= 500 * 1024;
+    Ok(diff)
+}

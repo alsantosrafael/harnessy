@@ -26,6 +26,7 @@ import {
 } from "../lib/desktop";
 import type { AgentChoice } from "../lib/agents";
 import { deliveryOf, needsRefresh, stagesByTask, workRun } from "../lib/delivery";
+import { parseReview, type Finding } from "../lib/feed";
 import { isLive } from "../lib/preview";
 import { canStartRun, chainBase, isActive } from "../lib/runs";
 import { usePreviews } from "../lib/usePreviews";
@@ -33,6 +34,7 @@ import type { RunsState } from "../lib/useRuns";
 import { nextAction, quickStates, type QuickId } from "../lib/quick";
 import { type Confirmation, ConfirmDialog } from "./ConfirmDialog";
 import { Kanban, KanbanSkeleton, type NewTaskDraft } from "./Kanban";
+import { ChangesPanel } from "./ChangesPanel";
 import { PreviewPanel } from "./PreviewPanel";
 import { PreviewSetup } from "./PreviewSetup";
 import { QuickActions } from "./QuickActions";
@@ -40,6 +42,13 @@ import { TaskDetail } from "./TaskDetail";
 import { WorkspaceForm } from "./WorkspaceForm";
 import "../styles/local-work.css";
 import "../styles/run-board.css";
+
+/** Achados da última revisão da run (os que bloqueiam e as sugestões), se o log dela já foi carregado. */
+function reviewFindings(events: { kind: string; text: string }[] | undefined): Finding[] {
+  const last = [...(events ?? [])].reverse().find((event) => event.kind === "review");
+  const review = last ? parseReview(last.text) : null;
+  return review ? [...review.blocking, ...review.suggestions] : [];
+}
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const FLASH_MS = 700;
@@ -705,6 +714,14 @@ export function BoardPanel({
               className="detail-panel"
               aria-label={`Detalhes da tarefa #${selected.id}`}
             >
+              {selectedWork && (
+                <ChangesPanel
+                  key={selectedWork.id}
+                  runId={selectedWork.id}
+                  taskId={selected.id}
+                  findings={reviewFindings(runsState.eventsByRun[selectedWork.id])}
+                />
+              )}
               {(() => {
                 const work = workRun(runs, selected.id);
                 const info = work ? previews.infos[work.id] : undefined;
