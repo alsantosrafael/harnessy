@@ -80,7 +80,7 @@ docs/                      # Uso, desenvolvimento e pesquisa
 
 ## Ações
 
-Cada opção da Tarefa é uma Ação: um TOML embutido (`src-tauri/src/action/embutidas/`: `implementar`, `explicar`, `revisar` e `dividir-em-passos`), um arquivo do usuário em `<dados do app>/actions/*.toml` (válido em todos os workspaces, criado à mão ou pelo formulário **Nova Ação**) ou um arquivo versionado no repositório em `.harnessy/actions/*.toml`.
+Cada opção da Tarefa é uma Ação: um TOML embutido (`src-tauri/src/action/embutidas/`: `implementar`, `explicar`, `revisar`, `dividir-em-passos` e `refinar`), um arquivo do usuário em `<dados do app>/actions/*.toml` (válido em todos os workspaces, criado à mão ou pelo formulário **Nova Ação**) ou um arquivo versionado no repositório em `.harnessy/actions/*.toml`.
 
 Campos: `schema = 1`, `id`, `nome`, `descricao`, `papel` (só `implementador`), `acesso` (`leitura` ou `escrita`), `modelo` (opcional; sem ele vale o modelo escolhido), `esforco` (`low`…`max`, repassado como `--effort`), `max_turns` (até 25), `contraprova` (só escrita; padrão ligada), `exigir_prova` (só escrita com contraprova: sem teste que prove a mudança, um ciclo extra pede um), `alvo` (`tarefa` ou `run`), `saida` (`texto`, `revisao` ou `passos`; estruturada só em leitura), `quando` (só em `alvo = "run"`: `risco`, `sempre` ou `manual`) e `pedido`. Variáveis: `{{tarefa}}`, `{{descricao}}`, `{{criterios}}`, `{{arquivos_provaveis}}` (calculado por `git ls-files` + `git grep`) e, só em Ação sobre Run, `{{diff}}`, `{{checks}}` e `{{contraprova}}`. Campo desconhecido, variável desconhecida ou combinação inválida é recusada citando a linha.
 

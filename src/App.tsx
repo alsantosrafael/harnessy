@@ -340,6 +340,7 @@ export function App() {
               runs={runs}
               onCreated={() => setBoardTick((tick) => tick + 1)}
               onStepsCreated={() => setBoardTick((tick) => tick + 1)}
+              onTaskChanged={() => setBoardTick((tick) => tick + 1)}
               onError={setRunError}
             />
           </div>

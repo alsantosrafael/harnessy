@@ -4,6 +4,7 @@ import { isLive } from "./preview";
 import { isActive, reviewable } from "./runs";
 
 export type QuickId =
+  | "refine"
   | "implement"
   | "review"
   | "preview"
@@ -39,6 +40,7 @@ interface Input {
 
 const DONE_REASON = "Tarefa concluída. Reabra para continuar.";
 const LOCKED_WHEN_DONE: ReadonlySet<QuickId> = new Set([
+  "refine",
   "implement",
   "review",
   "preview",
@@ -59,6 +61,17 @@ export function quickStates({
 }: Input): QuickState[] {
   const busy = starting || (lastRun !== null && isActive(lastRun));
   const states: QuickState[] = [
+    {
+      id: "refine",
+      label: "Refinar",
+      reason: dirty
+        ? "Salve a tarefa antes."
+        : busy
+          ? "Há uma run em andamento."
+          : canStart
+            ? null
+            : "Agente ou git indisponível, ou outra run ativa.",
+    },
     {
       id: "implement",
       label: "Implementar",

@@ -134,8 +134,27 @@ mod tests {
         assert!(prompt.contains("Explique onde e como fazer a mudança"));
         assert_eq!(
             read_only_ids(&temp.path),
-            [action::EXPLAIN, action::REVIEW, action::SPLIT]
+            [
+                action::EXPLAIN,
+                action::REVIEW,
+                action::SPLIT,
+                action::REFINE
+            ]
         );
+    }
+
+    #[test]
+    fn refinar_asks_closed_questions_and_forbids_delivery_process() {
+        let temp = TempDir::new("refinar");
+        let action = find(&temp.path, None, action::REFINE).unwrap();
+        assert_eq!(run_access(action.acesso), Access::Read);
+        let prompt = build_prompt(&action, &contexto("", ""), &[], "");
+        assert!(prompt.contains("só de leitura"));
+        assert!(prompt.contains("sim/não ou opções curtas"));
+        assert!(prompt.contains("Nada de processo"));
+        assert!(prompt.contains("`pronta`"));
+        assert!(prompt.contains("Não escreva uma seção \"Decisões\""));
+        assert!(!prompt.contains("{{"));
     }
 
     #[test]

@@ -159,7 +159,13 @@ fn reviewer_for(
 /// e comandos que o Harnessy já negou ali.
 fn prompt_for(acao: &action::Action, task: &Task, folder: &str, avoid: &[String]) -> String {
     let arquivos = likely::find(Path::new(folder), &task.title, &task.criteria);
-    let harness = project_harness(folder, "HEAD");
+    // Refinar não recebe as regras de entrega do projeto: elas vazam para os critérios
+    // (versão, changelog, checks) e custam contexto sem melhorar a especificação.
+    let harness = if acao.saida == Saida::Refinamento {
+        String::new()
+    } else {
+        project_harness(folder, "HEAD")
+    };
     actions::build_prompt(acao, &contexto(task, &arquivos), avoid, &harness)
 }
 
@@ -472,7 +478,11 @@ pub fn start_run(
             )
         }),
         base_ref: base.map(|(_, branch)| branch),
-        output_schema: (acao.saida == Saida::Passos).then_some(read::STEPS_SCHEMA),
+        output_schema: match acao.saida {
+            Saida::Passos => Some(read::STEPS_SCHEMA),
+            Saida::Refinamento => Some(read::REFINE_SCHEMA),
+            _ => None,
+        },
     };
     let handle = app.clone();
     let sink = AppSink {

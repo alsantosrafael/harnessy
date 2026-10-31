@@ -4,9 +4,12 @@ import {
   cancelRun,
   continueRun,
   createSteps,
+  listTasks,
   type LocalTask,
+  type Refinement,
   type Run,
   type RunEvent,
+  saveTask,
   type StepProposal,
 } from "../lib/desktop";
 import { type FeedItem, type ReviewPayload, buildFeed } from "../lib/feed";
@@ -16,8 +19,15 @@ import {
   canTryNextModel,
   isActive,
   ledgerItems,
+  type Decision,
+  decisionsOf,
+  MAX_REFINE_ROUNDS,
   proofLabel,
   type ProofTone,
+  refineInstruction,
+  refinementFrom,
+  refineRounds,
+  withDecisions,
   reviewable,
   stateLabel,
   stepsFrom,
@@ -127,6 +137,176 @@ function StepsProposal({
   );
 }
 
+/** Rascunho do refinamento: responda às perguntas, refine de novo ou aplique à tarefa. */
+function RefinementProposal({
+  run,
+  draft,
+  earlier,
+  canRefine,
+  onRefine,
+  onApplied,
+  onError,
+}: {
+  run: Run;
+  draft: Refinement;
+  /** Decisões das rodadas anteriores, registradas na descrição ao aplicar. */
+  earlier: Decision[];
+  /** Ainda há rodada disponível (limite por conversa). */
+  canRefine: boolean;
+  onRefine: (taskId: number, instruction: string, decisions: Decision[]) => Promise<void>;
+  onApplied: () => void;
+  onError: (text: string) => void;
+}) {
+  const [answers, setAnswers] = useState(() => draft.questions.map((q) => q.recommended));
+  const [description, setDescription] = useState(draft.description);
+  const [criteria, setCriteria] = useState(draft.criteria);
+  const [busy, setBusy] = useState(false);
+  const [applied, setApplied] = useState(false);
+  // Revisão da tarefa quando o rascunho apareceu: se ela mudou depois, salvar recusa em vez de sobrescrever.
+  const [revision, setRevision] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    listTasks(run.workspaceId)
+      .then((tasks) => {
+        const found = tasks.find((task) => task.id === run.taskId);
+        if (live && found) setRevision(found.revision);
+      })
+      .catch((cause) => onError(message(cause)));
+    return () => {
+      live = false;
+    };
+  }, [run.workspaceId, run.taskId, onError]);
+  if (applied) return <p role="status">Descrição e critérios aplicados à tarefa.</p>;
+
+  const decisions = [...earlier, ...decisionsOf(draft.questions, answers)];
+  const apply = async () => {
+    const current = (await listTasks(run.workspaceId)).find((task) => task.id === run.taskId);
+    if (!current || revision === null) throw new Error("A tarefa não existe mais.");
+    await saveTask({
+      id: current.id,
+      workspaceId: current.workspaceId,
+      revision,
+      title: current.title,
+      description: withDecisions(description, decisions),
+      criteria,
+    });
+    setApplied(true);
+    onApplied();
+  };
+  const guard = (work: () => Promise<void>) => {
+    setBusy(true);
+    work()
+      .catch((cause) => onError(message(cause)))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <form
+      className="local-form refinement-proposal"
+      onSubmit={(event) => {
+        event.preventDefault();
+        guard(apply);
+      }}
+    >
+      <h4>Refinamento proposto</h4>
+      {draft.ready && (
+        <p role="status">
+          <CircleCheck aria-hidden="true" size={16} /> Pronta para implementar: nenhuma pergunta em
+          aberto muda o rascunho.
+        </p>
+      )}
+      {draft.questions.length > 0 && (
+        <>
+          <p>
+            Responda ou ajuste. A resposta recomendada já vem preenchida: deixe como está para
+            aceitá-la.
+          </p>
+          <ol>
+            {draft.questions.map((item, at) => (
+              <li key={item.question}>
+                <label>
+                  {item.question}
+                  <textarea
+                    rows={2}
+                    value={answers[at] ?? ""}
+                    disabled={busy}
+                    onChange={(event) =>
+                      setAnswers((current) =>
+                        current.map((value, i) => (i === at ? event.target.value : value)),
+                      )
+                    }
+                  />
+                </label>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+      <label>
+        Descrição proposta
+        <textarea
+          rows={5}
+          value={description}
+          disabled={busy}
+          onChange={(event) => setDescription(event.target.value)}
+        />
+      </label>
+      <label>
+        Critérios propostos
+        <textarea
+          rows={5}
+          value={criteria}
+          disabled={busy}
+          onChange={(event) => setCriteria(event.target.value)}
+        />
+      </label>
+      {decisions.length > 0 && (
+        <details>
+          <summary>{decisions.length} decisão(ões) serão registradas na descrição</summary>
+          <ul>
+            {decisions.map((item) => (
+              <li key={item.question}>
+                {item.question} → {item.answer}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <p className="muted">Aplicar substitui a descrição e os critérios atuais da tarefa.</p>
+      {!canRefine && draft.questions.length > 0 && (
+        <p className="muted">
+          Limite de {MAX_REFINE_ROUNDS} rodadas atingido. Aplique e ajuste o texto à mão.
+        </p>
+      )}
+      <div className="composer-actions">
+        {canRefine && draft.questions.length > 0 && (
+          <button
+            type="button"
+            className="button"
+            disabled={busy}
+            onClick={() =>
+              guard(() =>
+                onRefine(
+                  run.taskId,
+                  refineInstruction(draft.questions, answers, description, criteria),
+                  decisions,
+                ),
+              )
+            }
+          >
+            Refinar de novo
+          </button>
+        )}
+        <button
+          className="button primary"
+          disabled={busy || revision === null || !description.trim()}
+        >
+          {busy ? "Aplicando…" : "Aplicar à tarefa"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 interface Props {
   /** Runs da tarefa, da mais antiga à mais nova: a conversa inteira. */
   thread: Run[];
@@ -134,6 +314,10 @@ interface Props {
   onError: (text: string) => void;
   /** Passos confirmados viraram tarefas. */
   onStepsCreated: (tasks: LocalTask[]) => void;
+  /** Um refinamento foi aplicado à tarefa. */
+  onTaskChanged: () => void;
+  /** Nova rodada de refinamento com as respostas; rejeita se o núcleo recusar. */
+  onRefine: (taskId: number, instruction: string) => Promise<void>;
   /** Revisor escolhido, mostrado no botão de revisar. */
   choice: AgentChoice;
   /** Nenhuma outra run em andamento: a revisão sob demanda pode começar. */
@@ -253,6 +437,8 @@ export function RunFeed({
   eventsByRun,
   onError,
   onStepsCreated,
+  onTaskChanged,
+  onRefine,
   choice,
   canReview,
   onReview,
@@ -263,6 +449,10 @@ export function RunFeed({
   const events = eventsByRun[run.id] ?? [];
   const active = isActive(run);
   const proposed = run.state === "completed" ? stepsFrom(events) : null;
+  const refinement = run.state === "completed" ? refinementFrom(events) : null;
+  // Decisões já tomadas em rodadas anteriores desta conversa (só em memória; o limite é de 2 rodadas).
+  const [earlier, setEarlier] = useState<{ taskId: number; decisions: Decision[] } | null>(null);
+  const canRefine = refineRounds(thread, eventsByRun) < MAX_REFINE_ROUNDS;
   const agent = agentLabel(run.runtime);
   const eventTotal = thread.reduce((sum, item) => sum + (eventsByRun[item.id]?.length ?? 0), 0);
   // Revisão sob demanda: "revisando" vale até chegar o veredito ou o aviso de que não rodou.
@@ -391,6 +581,24 @@ export function RunFeed({
                   Tentar com {run.nextModel}
                 </button>
               </div>
+            )}
+            {refinement && (
+              <RefinementProposal
+                key={run.id}
+                run={run}
+                draft={refinement}
+                earlier={earlier?.taskId === run.taskId ? earlier.decisions : []}
+                canRefine={canRefine}
+                onRefine={async (taskId, instruction, decisions) => {
+                  await onRefine(taskId, instruction);
+                  setEarlier({ taskId, decisions });
+                }}
+                onApplied={() => {
+                  setEarlier(null);
+                  onTaskChanged();
+                }}
+                onError={onError}
+              />
             )}
             {proposed && (
               <StepsProposal
