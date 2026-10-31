@@ -1436,7 +1436,7 @@ dependencies = [
 
 [[package]]
 name = "harnessy"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "rusqlite",
  "serde",

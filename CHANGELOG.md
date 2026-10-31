@@ -10,6 +10,19 @@ Rodar localmente para testar a mudança (fatia 2a):
 - Painel **Ambiente de teste** na tarefa: estado em texto (Subindo…, No ar, Parado, Caiu com o código), endereço, **Abrir no navegador**, **Parar** / **Rodar de novo** e o log ao vivo, rolável por teclado.
 - O card mostra **No ar** enquanto o ambiente da tarefa está rodando.
 
+## Front [0.27.0] — 2026-10-31
+
+Rodar localmente mais simples e a escolha de agente à vista:
+
+- O diálogo **Como subir este projeto?** perdeu o campo de porta e pede só o comando. `{port}` no comando faz o Harnessy escolher uma porta livre; para projetos Vite a sugestão já vem com ele.
+- Quando o ambiente cai por **porta ocupada**, o painel explica (pode ser o próprio Harnessy em desenvolvimento) e oferece **Editar comando**.
+- O seletor de **agente, modelo e esforço** (de quem implementa e de quem revisa) agora aparece **aberto** no detalhe da tarefa, em vez de recolhido.
+
+## Back [0.24.0] — 2026-10-31
+
+- O comando do perfil aceita o marcador `{port}`, trocado por uma **porta livre** escolhida pelo núcleo (a declarada, se estiver livre); o `PORT` do ambiente e a detecção do endereço usam a mesma porta. Qualquer outro `{...}` é recusado. A sugestão para scripts do Vite já traz `--port {port}`.
+- Sem `{port}`, uma porta declarada que já está em uso falha **antes** de recriar a cópia e instalar dependências, com a frase de como resolver.
+
 ## Front [0.26.0] — 2026-10-31
 
 Você escolhe agente, modelo e **esforço** de quem implementa e de quem revisa, e a escolha deixa de se perder:

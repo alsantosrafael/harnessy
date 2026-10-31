@@ -1,7 +1,7 @@
 import { ExternalLink, Play, Square } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { PreviewInfo } from "../lib/desktop";
-import { isLive, previewLabel } from "../lib/preview";
+import { hintFor, isLive, previewLabel } from "../lib/preview";
 
 interface Props {
   taskId: number;
@@ -10,10 +10,21 @@ interface Props {
   onOpen: () => void;
   onStop: () => void;
   onRestart: () => void;
+  /** Abre o diálogo para trocar o comando de subir o projeto. */
+  onEditCommand: () => void;
 }
 
 /** Ambiente de teste da tarefa: estado em texto, endereço, ações e o log do que sobe. */
-export function PreviewPanel({ taskId, info, log, onOpen, onStop, onRestart }: Props) {
+export function PreviewPanel({
+  taskId,
+  info,
+  log,
+  onOpen,
+  onStop,
+  onRestart,
+  onEditCommand,
+}: Props) {
+  const hint = hintFor(info, log);
   const label = previewLabel(info);
   const live = isLive(info);
   const box = useRef<HTMLPreElement>(null);
@@ -60,6 +71,14 @@ export function PreviewPanel({ taskId, info, log, onOpen, onStop, onRestart }: P
           </button>
         )}
       </div>
+      {hint && (
+        <p className="preview-hint" role="status">
+          {hint}{" "}
+          <button type="button" className="link-button" onClick={onEditCommand}>
+            Editar comando
+          </button>
+        </p>
+      )}
       <pre
         ref={box}
         className="preview-log"

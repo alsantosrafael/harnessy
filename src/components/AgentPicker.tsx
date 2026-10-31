@@ -17,6 +17,8 @@ interface Props {
   onChange: (choice: AgentChoice) => void;
   /** Esconde o bloco de revisão (ex.: quando a Ação só lê). */
   compact?: boolean;
+  /** Já aberto ao montar: no detalhe da tarefa, escolher quem faz o quê é parte do trabalho. */
+  defaultOpen?: boolean;
 }
 
 interface AgentFieldsProps {
@@ -119,10 +121,10 @@ function AgentFields({ id, runtime, model, effort, auto, onChange, onEffort }: A
  * Configuração da run num bloco recolhível: o resumo mostra quem implementa e quem
  * revisa; aberto, deixa escolher agente e modelo de cada um e quando revisar.
  */
-export function AgentPicker({ choice, onChange, compact }: Props) {
+export function AgentPicker({ choice, onChange, compact, defaultOpen = false }: Props) {
   const id = useId();
   return (
-    <details className="agent-picker">
+    <details className="agent-picker" open={defaultOpen || undefined}>
       <summary>
         {compact ? choiceSummary({ ...choice, reviewWhen: "never" }) : choiceSummary(choice)}
       </summary>

@@ -9,9 +9,8 @@ Ler as alterações mostra **o que** mudou; só usar mostra **se funciona**. O b
 ## Como usar
 
 1. Selecione a tarefa. Se o próximo passo for testar, o botão principal é **Rodar localmente**. Ele também está em **Mais ações**.
-2. **Na primeira vez**, o Harnessy pergunta **"Como subir este projeto?"**:
-   - **Comando**: o que você digitaria no Terminal para ligar o projeto (por exemplo, `bun run dev` ou `npm run dev`). O Harnessy já sugere um, lendo o `package.json`.
-   - **Porta** (opcional): o "número da porta" em que o projeto abre, como `5173`. Sem ela, o Harnessy descobre o endereço lendo o que o comando escreve.
+2. **Na primeira vez**, o Harnessy pergunta **"Como subir este projeto?"** e pede só o **Comando**: o que você digitaria no Terminal para ligar o projeto (por exemplo, `bun run dev`). Ele já sugere um, lendo o `package.json`.
+   - **Porta:** se o projeto usa um número de porta, escreva `{port}` no lugar dele (por exemplo, `bun run dev --port {port}`). O Harnessy **escolhe uma porta livre sozinho** e você nunca tem conflito. Quando o projeto usa Vite, a sugestão já vem assim.
 3. Clique em **Salvar e rodar**. O comando é gravado em `.harnessy/workspace.toml`, dentro do projeto, e confirmado por você.
 4. Acompanhe no painel **Ambiente de teste**:
 
@@ -45,9 +44,9 @@ A confirmação vale para **aquele texto exato**. Se o arquivo for editado, o Ha
 
 | Sintoma | O que fazer |
 |---|---|
-| Fica em **Subindo…** | O comando não imprimiu um endereço e você não informou a porta. Veja o log; se o projeto abre numa porta fixa, informe-a e rode de novo |
+| Fica em **Subindo…** | O comando não imprimiu um endereço. Veja o log; se o projeto abre numa porta, use `{port}` no comando para o Harnessy descobrir o endereço |
 | **Caiu (código 1)** | Leia o final do log. Muitas vezes falta instalar algo ou a porta já está em uso |
-| "Porta já em uso" | Outro programa usa a porta. Troque a porta no comando ou feche o outro programa |
+| "A porta já está em uso" | Outro programa usa a porta (o próprio Harnessy em desenvolvimento ocupa a 1420). No painel, clique em **Editar comando** e escreva `{port}` no lugar do número da porta: o Harnessy escolhe uma livre |
 | Falha ao "recriar a cópia" | A branch da run não existe mais no git (foi apagada) ou já está aberta em outro lugar. Leia o motivo no log do painel |
 | Pede confirmação de novo | O arquivo `.harnessy/workspace.toml` mudou desde a última confirmação |
 

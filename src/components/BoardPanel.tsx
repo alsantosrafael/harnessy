@@ -539,10 +539,21 @@ export function BoardPanel({
     }
   }
 
-  async function saveSetup(run: string, port: number | null) {
+  /** Reabre o diálogo com o comando atual, para trocá-lo (por exemplo, para usar `{port}`). */
+  async function editCommand(runId: number) {
+    if (workspaceId === null) return;
+    try {
+      const profile = await getProfile(workspaceId);
+      setSetup({ runId, suggestion: profile.run ?? profile.suggestion ?? "", error: null });
+    } catch (cause) {
+      fail(cause);
+    }
+  }
+
+  async function saveSetup(run: string) {
     if (workspaceId === null || !setup) return;
     const { runId } = setup;
-    await saveProfile(workspaceId, run, port);
+    await saveProfile(workspaceId, run, null);
     setSetup(null);
     await startPreview(runId).catch(fail);
     await previews.load(runId).catch(fail);
@@ -889,6 +900,7 @@ export function BoardPanel({
                     onOpen={() => void openPreview(work.id).catch(fail)}
                     onStop={() => void stopPreview(work.id).catch(fail)}
                     onRestart={() => void runPreview(work.id)}
+                    onEditCommand={() => void editCommand(work.id)}
                   />
                 ) : null;
               })()}

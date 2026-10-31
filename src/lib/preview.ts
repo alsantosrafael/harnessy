@@ -42,3 +42,20 @@ export function appendLog(lines: string[], line: string, max = MAX_LOG_LINES): s
   const next = [...lines, line];
   return next.length > max ? next.slice(next.length - max) : next;
 }
+
+const PORT_BUSY = /already in use|EADDRINUSE|address already in use|porta .* em uso/i;
+
+/**
+ * Frase de ajuda quando o ambiente caiu por um motivo que o usuário resolve no comando,
+ * deduzida do fim do log; `null` quando não há uma dica segura.
+ */
+export function hintFor(
+  info: PreviewInfo | null | undefined,
+  log: readonly string[],
+): string | null {
+  if (info?.state !== "failed") return null;
+  if (log.slice(-30).some((line) => PORT_BUSY.test(line))) {
+    return "A porta está ocupada por outro programa (pode ser o próprio Harnessy em desenvolvimento). Escreva {port} no comando, no lugar do número da porta, e o Harnessy escolhe uma livre.";
+  }
+  return null;
+}

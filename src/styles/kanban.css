@@ -169,3 +169,4 @@
 .digest h3 { margin: 0; font-size: var(--text-sm); }
 .digest ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); }
 .digest-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.preview-hint { margin: 0; padding: var(--space-2) var(--space-3); border: 1px solid var(--amber-500); border-left-width: 4px; border-radius: var(--radius-sm); background: var(--amber-100); color: var(--text); font-size: var(--text-sm); }

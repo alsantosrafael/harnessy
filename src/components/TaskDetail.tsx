@@ -257,7 +257,7 @@ export function TaskDetail({
 
       <div className="detail-col">
         <section className="run-bar" aria-label="Implementar">
-          <AgentPicker choice={choice} onChange={onChoice} />
+          <AgentPicker choice={choice} onChange={onChoice} defaultOpen />
           {chainFrom && (
             <label className="chain-option">
               <input

@@ -4,7 +4,7 @@ interface Props {
   /** Abre com o comando sugerido; `null` mantém o diálogo fechado. */
   open: { suggestion: string; error: string | null } | null;
   onClose: () => void;
-  onSave: (run: string, port: number | null) => Promise<void>;
+  onSave: (run: string) => Promise<void>;
 }
 
 /**
@@ -14,7 +14,6 @@ interface Props {
 export function PreviewSetup({ open, onClose, onSave }: Props) {
   const box = useRef<HTMLDialogElement>(null);
   const [run, setRun] = useState("");
-  const [port, setPort] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
 
@@ -23,7 +22,6 @@ export function PreviewSetup({ open, onClose, onSave }: Props) {
     if (!dialog) return;
     if (open && !dialog.open) {
       setRun(open.suggestion);
-      setPort("");
       setProblem(open.error ?? "");
       dialog.showModal();
       // O diálogo existe para preencher este campo: o foco começa nele.
@@ -34,15 +32,11 @@ export function PreviewSetup({ open, onClose, onSave }: Props) {
 
   async function submit() {
     const command = run.trim();
-    const number = port.trim() === "" ? null : Number(port);
     if (!command) return setProblem("Digite o comando que sobe o projeto.");
-    if (number !== null && (!Number.isInteger(number) || number < 1024 || number > 65535)) {
-      return setProblem("A porta deve ser um número entre 1024 e 65535.");
-    }
     setBusy(true);
     setProblem("");
     try {
-      await onSave(command, number);
+      await onSave(command);
     } catch (cause) {
       setProblem(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -72,7 +66,10 @@ export function PreviewSetup({ open, onClose, onSave }: Props) {
           <h2 id="setup-title">Como subir este projeto?</h2>
           <p id="setup-help">
             O comando roda neste computador, na pasta da run, e fica salvo em{" "}
-            <code>.harnessy/workspace.toml</code> no repositório. Você confirma uma vez.
+            <code>.harnessy/workspace.toml</code> no repositório. Você confirma uma vez. Se o
+            projeto usa uma porta (como `--port 3000`), escreva <code>{"{port}"}</code> no lugar do
+            número: o Harnessy escolhe uma porta livre e você não precisa se preocupar com
+            conflitos.
           </p>
           <label className="field">
             Comando
@@ -83,20 +80,6 @@ export function PreviewSetup({ open, onClose, onSave }: Props) {
               placeholder="bun run dev"
               onChange={(event) => setRun(event.target.value)}
             />
-          </label>
-          <label className="field">
-            Porta (opcional)
-            <input
-              inputMode="numeric"
-              value={port}
-              maxLength={5}
-              placeholder="5173"
-              aria-describedby="setup-port-help"
-              onChange={(event) => setPort(event.target.value.replace(/\D/g, ""))}
-            />
-            <small id="setup-port-help" className="muted">
-              Sem porta, o endereço vem do que o comando imprime.
-            </small>
           </label>
           {problem && (
             <p className="field-error" role="alert">

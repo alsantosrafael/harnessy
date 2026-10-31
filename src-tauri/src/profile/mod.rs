@@ -71,6 +71,9 @@ pub fn parse(text: &str) -> Result<Profile> {
             "preview.run deve ter uma linha de até 300 caracteres",
         ));
     }
+    if has_foreign_placeholder(run) {
+        return Err(invalid("o único marcador aceito em preview.run é {port}"));
+    }
     if profile.preview.port.is_some_and(|port| port < 1024) {
         return Err(invalid("preview.port deve ser 1024 ou mais"));
     }
@@ -83,6 +86,14 @@ pub fn parse(text: &str) -> Result<Profile> {
         return Err(invalid("preview.ready deve ter uma linha curta"));
     }
     Ok(profile)
+}
+
+/// Marcador que o Harnessy troca por uma porta livre.
+pub const PORT_PLACEHOLDER: &str = "{port}";
+
+/// Há `{...}` no comando que não seja o marcador de porta.
+fn has_foreign_placeholder(run: &str) -> bool {
+    run.replace(PORT_PLACEHOLDER, "").contains(['{', '}'])
 }
 
 /// Texto do arquivo para um comando e porta escolhidos.
@@ -128,17 +139,24 @@ pub fn write(dir: &Path, run: &str, port: Option<u16>) -> Result<String> {
     Ok(sha256(&text))
 }
 
-/// Comando sugerido a partir do `package.json` (script `dev`, senão `start`).
+/// Comando sugerido a partir do `package.json` (script `dev`, senão `start`). Quando o script
+/// é do Vite, o comando já leva `{port}` para o Harnessy escolher uma porta livre.
 pub fn suggest(package_json: &str, uses_bun: bool) -> Option<String> {
     let value: serde_json::Value = serde_json::from_str(package_json).ok()?;
     let scripts = value.get("scripts")?;
-    let name = ["dev", "start"]
-        .into_iter()
-        .find(|name| scripts.get(*name).is_some_and(|script| script.is_string()))?;
-    Some(format!(
-        "{} run {name}",
-        if uses_bun { "bun" } else { "npm" }
-    ))
+    let (name, script) = ["dev", "start"].into_iter().find_map(|name| {
+        scripts
+            .get(name)
+            .and_then(|script| script.as_str())
+            .map(|script| (name, script))
+    })?;
+    let runner = if uses_bun { "bun run" } else { "npm run" };
+    // `npm run x -- --port` repassa o argumento; `bun run x --port` também.
+    let pass = if uses_bun { "" } else { "-- " };
+    if script.contains("vite") {
+        return Some(format!("{runner} {name} {pass}--port {PORT_PLACEHOLDER}"));
+    }
+    Some(format!("{runner} {name}"))
 }
 
 /// Registra que o usuário confirmou este texto exato para o workspace.
@@ -169,6 +187,14 @@ mod tests {
     use crate::db::test_support::TempDatabase;
 
     const FILE: &str = "schema = 1\n[preview]\nrun = \"bun run dev\"\nport = 5173\n";
+
+    #[test]
+    fn the_port_marker_is_the_only_placeholder_accepted() {
+        let with = |run: &str| format!("schema = 1\n[preview]\nrun = \"{run}\"\n");
+        assert!(parse(&with("vite --port {port}")).is_ok());
+        assert!(parse(&with("vite --port {outra}")).is_err());
+        assert!(parse(&with("echo }")).is_err());
+    }
 
     #[test]
     fn parses_a_valid_profile() {
@@ -209,6 +235,15 @@ mod tests {
         assert_eq!(
             suggest(r#"{"scripts":{"start":"x"}}"#, false).as_deref(),
             Some("npm run start")
+        );
+        let vite = r#"{"scripts":{"dev":"bunx --bun vite --host 127.0.0.1"}}"#;
+        assert_eq!(
+            suggest(vite, true).as_deref(),
+            Some("bun run dev --port {port}")
+        );
+        assert_eq!(
+            suggest(vite, false).as_deref(),
+            Some("npm run dev -- --port {port}")
         );
         assert_eq!(suggest(r#"{"scripts":{"test":"x"}}"#, true), None);
         assert_eq!(suggest("lixo", true), None);

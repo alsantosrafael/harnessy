@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import type { PreviewInfo } from "../src/lib/desktop.ts";
-import { appendLog, isLive, previewLabel, upsertPreview } from "../src/lib/preview.ts";
+import { appendLog, hintFor, isLive, previewLabel, upsertPreview } from "../src/lib/preview.ts";
 
 const info = (extra: Partial<PreviewInfo>): PreviewInfo => ({
   runId: 1,
@@ -35,4 +35,17 @@ test("the log keeps the latest lines and states replace by run", () => {
   const next = upsertPreview({ 1: info({ state: "starting" }), 2: info({ runId: 2 }) }, info({}));
   assert.equal(next[1].state, "running");
   assert.equal(next[2].runId, 2);
+});
+
+test("a port clash on a failed environment gets a hint about the {port} marker", () => {
+  const failed = info({ state: "failed", exitCode: 1 });
+  const log = ["$ vite", "error when starting dev server:", "Error: Port 1420 is already in use"];
+  assert.match(String(hintFor(failed, log)), /\{port\}/);
+  assert.match(
+    String(hintFor(failed, ["Error: listen EADDRINUSE: address already in use :::3000"])),
+    /ocupada/,
+  );
+  assert.equal(hintFor(failed, ["erro qualquer"]), null);
+  assert.equal(hintFor(info({}), log), null, "só quando o ambiente caiu");
+  assert.equal(hintFor(null, log), null);
 });

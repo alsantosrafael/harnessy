@@ -8,7 +8,7 @@
 use std::{
     collections::{HashMap, VecDeque},
     io::{BufRead, BufReader},
-    net::{SocketAddr, TcpStream},
+    net::{SocketAddr, TcpListener, TcpStream},
     os::unix::process::CommandExt,
     path::PathBuf,
     process::{Command, Stdio},
@@ -372,6 +372,26 @@ impl Previews {
     }
 }
 
+/// Alguém já escuta nesta porta (IPv4 ou IPv6 local).
+pub fn port_in_use(port: u16) -> bool {
+    [
+        SocketAddr::from(([127, 0, 0, 1], port)),
+        SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], port)),
+    ]
+    .iter()
+    .any(|addr| TcpStream::connect_timeout(addr, Duration::from_millis(200)).is_ok())
+}
+
+/// Uma porta livre: a preferida, se estiver livre, senão uma escolhida pelo sistema.
+pub fn free_port(preferred: Option<u16>) -> Option<u16> {
+    if let Some(port) = preferred.filter(|port| *port >= 1024 && !port_in_use(*port)) {
+        return Some(port);
+    }
+    // Porta 0: o sistema operacional entrega uma que ninguém está usando.
+    let listener = TcpListener::bind(("127.0.0.1", 0)).ok()?;
+    listener.local_addr().ok().map(|addr| addr.port())
+}
+
 fn is_local(url: &str) -> bool {
     url.strip_prefix("http://localhost:")
         .is_some_and(|port| !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()))
@@ -599,5 +619,21 @@ mod tests {
             .log(1)
             .iter()
             .any(|l| l.contains("nao-deveria-rodar")));
+    }
+
+    #[test]
+    fn a_free_port_is_offered_and_a_busy_preferred_one_is_skipped() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let busy = listener.local_addr().unwrap().port();
+        assert!(port_in_use(busy));
+        let other = free_port(Some(busy)).unwrap();
+        assert_ne!(other, busy, "a porta preferida estava ocupada");
+        assert!(!port_in_use(other));
+        let any = free_port(None).unwrap();
+        assert!(any >= 1024);
+        drop(listener);
+        assert!(!port_in_use(busy));
+        assert_eq!(free_port(Some(busy)), Some(busy), "livre, vale a preferida");
+        assert_ne!(free_port(Some(80)), Some(80), "porta baixa não é aceita");
     }
 }

@@ -10,7 +10,7 @@ use crate::{
     process, profile,
     run::{
         self, guard,
-        preview::{Hooks, Spec},
+        preview::{self, Hooks, Spec},
         worktree,
     },
     workspace,
@@ -119,6 +119,37 @@ pub fn plan_for(
         .ok_or(AppError::Validation(
             "Esta run não deixou uma cópia para rodar.",
         ))?;
+    // Porta: com `{port}` no comando o Harnessy escolhe uma livre; sem ele, a declarada tem
+    // de estar livre (e isso é conferido antes de gastar minutos recriando a cópia).
+    let declared = loaded.profile.preview.port;
+    let auto = loaded
+        .profile
+        .preview
+        .run
+        .contains(profile::PORT_PLACEHOLDER);
+    if !auto {
+        if let Some(port) = declared.filter(|port| preview::port_in_use(*port)) {
+            return Err(AppError::Delivery(format!(
+                "A porta {port} já está em uso por outro programa. Escreva {} no comando, no lugar do número, e o Harnessy escolhe uma livre.",
+                profile::PORT_PLACEHOLDER
+            )));
+        }
+    }
+    let port = if auto {
+        Some(preview::free_port(declared).ok_or(AppError::Validation(
+            "Não encontrei uma porta livre neste computador.",
+        ))?)
+    } else {
+        declared
+    };
+    let command = match port {
+        Some(port) if auto => loaded
+            .profile
+            .preview
+            .run
+            .replace(profile::PORT_PLACEHOLDER, &port.to_string()),
+        _ => loaded.profile.preview.run.clone(),
+    };
     let hooks = if dir.is_dir() {
         Hooks::default()
     } else {
@@ -126,10 +157,10 @@ pub fn plan_for(
     };
     let spec = Spec {
         run_id,
-        command: loaded.profile.preview.run,
+        command,
         cwd: dir,
         env: guard::env(dirs, cargo_target, |name| std::env::var(name).ok()),
-        port: loaded.profile.preview.port,
+        port,
         ready: loaded.profile.preview.ready,
     };
     Ok((spec, hooks))
