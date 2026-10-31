@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { accessLabel, extraActions, originLabel, unavailableReason } from "../lib/actions";
 import { type AgentChoice, agentOf, modelName } from "../lib/agents";
 import { blockHelp, blockTitle } from "../lib/runs";
@@ -92,6 +92,28 @@ export function TaskDetail({
   const primary = actions.find((action) => action.id === IMPLEMENT_ACTION);
   const done = task.status === "done";
   const primaryReason = primary ? unavailableReason(primary) : null;
+  // Quando a tarefa muda por fora (ex.: "Aplicar à tarefa" do Refinar) e a pessoa não editou nada,
+  // o formulário acompanha; sem isso ele ficaria com o texto antigo e acusaria "alterações não salvas".
+  const lastSaved = useRef({
+    title: task.title,
+    description: task.description,
+    criteria: task.criteria,
+  });
+  useEffect(() => {
+    const before = lastSaved.current;
+    lastSaved.current = {
+      title: task.title,
+      description: task.description,
+      criteria: task.criteria,
+    };
+    setForm((current) =>
+      current.title === before.title &&
+      current.description === before.description &&
+      current.criteria === before.criteria
+        ? lastSaved.current
+        : current,
+    );
+  }, [task.title, task.description, task.criteria]);
   const dirty =
     form.title !== task.title ||
     form.description !== task.description ||
