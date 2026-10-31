@@ -58,6 +58,18 @@ Acima do quadro há três filtros: **Todas**, **Precisa de você** e **Com os ag
 
 Uma tarefa grande demais costuma dar resultados piores. No detalhe da tarefa (embaixo do quadro), abra **Mais ações** e escolha **Dividir em passos**: o agente propõe tarefas menores, encadeadas, que continuam uma da outra. Você revisa a proposta antes de criar os passos.
 
+## Refinar uma tarefa antes de implementar
+
+Quando a tarefa ainda está vaga, use **Refinar** nos comandos rápidos. O agente só lê o projeto: ele faz até 6 perguntas, cada uma com a resposta que recomenda, e propõe uma descrição e critérios de aceitação. O resultado aparece no Chat, em **Refinamento proposto**:
+
+1. Responda às perguntas (a recomendação já vem preenchida; deixe como está para aceitá-la) e edite o rascunho.
+2. **Refinar de novo** envia suas respostas e gera outra rodada, até não restarem perguntas.
+3. **Aplicar à tarefa** substitui a descrição e os critérios atuais pelo rascunho e registra, na descrição, uma seção "Decisões" com as suas respostas.
+
+As perguntas são fechadas (sim/não ou opções) e vêm com um exemplo; os critérios são cenários que dá para conferir na tela ou em um teste. Quando aparece **Pronta para implementar**, nenhuma pergunta em aberto mudaria o rascunho. Cada conversa permite até 2 rodadas. Se você editou a tarefa depois que o rascunho apareceu, **Aplicar à tarefa** recusa em vez de sobrescrever.
+
+Refinar não move o card nem altera o projeto. O botão fica indisponível com edições não salvas, com uma run em andamento e com a tarefa concluída.
+
 ## Atalhos de teclado
 
 | Ação | Atalho |

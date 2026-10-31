@@ -22,9 +22,97 @@ use crate::{
 const MAX_ANSWER_BYTES: usize = 16_000;
 const NO_ANSWER: &str = "O agente não respondeu.";
 const MAX_STEPS: usize = 5;
+const MAX_QUESTIONS: usize = 6;
+const MAX_CRITERIA: usize = 12;
+const MAX_REFINED_BYTES: usize = 8_000;
 
 /// Formato pedido a "Dividir em passos" (`saida = "passos"`).
 pub const STEPS_SCHEMA: &str = r#"{"type":"object","additionalProperties":false,"required":["passos"],"properties":{"passos":{"type":"array","minItems":1,"maxItems":5,"items":{"type":"object","additionalProperties":false,"required":["titulo","criterios"],"properties":{"titulo":{"type":"string"},"criterios":{"type":"array","minItems":1,"maxItems":4,"items":{"type":"string"}}}}}}}"#;
+
+/// Formato pedido a "Refinar" (`saida = "refinamento"`).
+pub const REFINE_SCHEMA: &str = r#"{"type":"object","additionalProperties":false,"required":["pronta","perguntas","descricao","criterios"],"properties":{"pronta":{"type":"boolean"},"perguntas":{"type":"array","maxItems":6,"items":{"type":"object","additionalProperties":false,"required":["pergunta","recomendada"],"properties":{"pergunta":{"type":"string"},"recomendada":{"type":"string"}}}},"descricao":{"type":"string"},"criterios":{"type":"array","maxItems":12,"items":{"type":"string"}}}}"#;
+
+#[derive(Deserialize)]
+struct RawRefinement {
+    #[serde(default)]
+    pronta: bool,
+    #[serde(default)]
+    perguntas: Vec<RawQuestion>,
+    #[serde(default)]
+    descricao: String,
+    #[serde(default)]
+    criterios: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct RawQuestion {
+    pergunta: String,
+    #[serde(default)]
+    recomendada: String,
+}
+
+/// Pergunta em aberto, com a resposta que o agente recomenda.
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct Question {
+    question: String,
+    recommended: String,
+}
+
+/// Rascunho de refinamento, no formato que a interface edita. Os critérios já
+/// vêm como linhas `- item`, a convenção dos critérios da tarefa.
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct Refinement {
+    /// Nenhuma pergunta em aberto mudaria o rascunho.
+    ready: bool,
+    questions: Vec<Question>,
+    description: String,
+    criteria: String,
+}
+
+/// Refinamento da saída estruturada (ou do primeiro objeto JSON do texto).
+/// `None` quando nada aproveitável veio.
+pub(super) fn refinement(structured: Option<&str>, text: &str) -> Option<Refinement> {
+    let raw = structured
+        .and_then(|json| serde_json::from_str::<RawRefinement>(json).ok())
+        .or_else(|| {
+            let start = text.find('{')?;
+            let end = text.rfind('}')?;
+            serde_json::from_str::<RawRefinement>(text.get(start..=end)?).ok()
+        })?;
+    let questions: Vec<Question> = raw
+        .perguntas
+        .into_iter()
+        .filter(|q| !q.pergunta.trim().is_empty())
+        .take(MAX_QUESTIONS)
+        .map(|q| Question {
+            question: q.pergunta.trim().to_owned(),
+            recommended: q.recomendada.trim().to_owned(),
+        })
+        .collect();
+    let description = clip_to(raw.descricao.trim(), MAX_REFINED_BYTES);
+    let criteria = clip_to(
+        &raw.criterios
+            .iter()
+            .filter(|c| !c.trim().is_empty())
+            .take(MAX_CRITERIA)
+            .map(|c| format!("- {}", c.trim()))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        MAX_REFINED_BYTES,
+    );
+    // "Pronta" com perguntas pendentes é contraditório: vale o que falta decidir.
+    let ready = raw.pronta && questions.is_empty();
+    (!questions.is_empty() || !description.is_empty() || !criteria.is_empty()).then_some(
+        Refinement {
+            ready,
+            questions,
+            description,
+            criteria,
+        },
+    )
+}
 
 #[derive(Deserialize)]
 struct RawSteps {
@@ -133,6 +221,32 @@ pub fn execute(job: Job, registry: &Registry, sink: &dyn Sink, runtime: &dyn Run
     );
     registry.unregister(id);
 
+    if job.output_schema == Some(REFINE_SCHEMA) {
+        if let Exit::Success(text) = &exit {
+            let structured = finish_event
+                .as_ref()
+                .and_then(|done| done.structured.as_deref());
+            let summary = match refinement(structured, text) {
+                Some(draft) => {
+                    if let Ok(json) = serde_json::to_string(&draft) {
+                        sink.event(id, "refinement", &json);
+                    }
+                    if draft.ready {
+                        "Tarefa pronta para implementar. Revise o rascunho e aplique à tarefa."
+                            .to_owned()
+                    } else {
+                        format!(
+                            "{} pergunta(s) em aberto. Revise o rascunho, responda e refine de novo ou aplique à tarefa.",
+                            draft.questions.len()
+                        )
+                    }
+                }
+                None => "O agente não devolveu o formato esperado.".to_owned(),
+            };
+            sink.state(id, run::COMPLETED, Some(&summary));
+            return;
+        }
+    }
     if job.output_schema.is_some() {
         if let Exit::Success(text) = &exit {
             let structured = finish_event
@@ -172,7 +286,11 @@ pub fn execute(job: Job, registry: &Registry, sink: &dyn Sink, runtime: &dyn Run
 }
 
 fn clip(text: &str) -> String {
-    let mut end = text.len().min(MAX_ANSWER_BYTES);
+    clip_to(text, MAX_ANSWER_BYTES)
+}
+
+fn clip_to(text: &str, max: usize) -> String {
+    let mut end = text.len().min(max);
     while !text.is_char_boundary(end) {
         end -= 1;
     }
@@ -298,6 +416,64 @@ mod tests {
         let text = format!(r#"Aqui: {{"passos":[{}]}}"#, many.join(","));
         assert_eq!(proposals(None, &text).unwrap().len(), MAX_STEPS);
         let _: serde_json::Value = serde_json::from_str(STEPS_SCHEMA).unwrap();
+    }
+
+    #[test]
+    fn refinement_comes_from_structured_output_and_is_capped() {
+        let json = r#"{"perguntas":[{"pergunta":" Quem usa? ","recomendada":" Qualquer pessoa "},{"pergunta":"  ","recomendada":"x"}],"descricao":" Objetivo claro ","criterios":["abre a tela","","salva"]}"#;
+        let draft = refinement(Some(json), "").unwrap();
+        assert_eq!(
+            draft,
+            Refinement {
+                ready: false,
+                questions: vec![Question {
+                    question: "Quem usa?".into(),
+                    recommended: "Qualquer pessoa".into()
+                }],
+                description: "Objetivo claro".into(),
+                criteria: "- abre a tela\n- salva".into(),
+            }
+        );
+        assert!(refinement(None, "nada").is_none());
+        // "Pronta" com pergunta pendente não vale como pronta.
+        let both = r#"{"pronta":true,"perguntas":[{"pergunta":"Q?","recomendada":"Sim"}],"descricao":"D","criterios":[]}"#;
+        assert!(!refinement(Some(both), "").unwrap().ready);
+        let ready = r#"{"pronta":true,"perguntas":[],"descricao":"D","criterios":["c"]}"#;
+        assert!(refinement(Some(ready), "").unwrap().ready);
+        assert!(refinement(
+            Some(r#"{"perguntas":[],"descricao":"","criterios":[]}"#),
+            ""
+        )
+        .is_none());
+        let many: Vec<String> = (0..9)
+            .map(|i| format!(r#"{{"pergunta":"p{i}","recomendada":"r"}}"#))
+            .collect();
+        let text = format!(r#"Aqui: {{"perguntas":[{}]}}"#, many.join(","));
+        assert_eq!(
+            refinement(None, &text).unwrap().questions.len(),
+            MAX_QUESTIONS
+        );
+        let _: serde_json::Value = serde_json::from_str(REFINE_SCHEMA).unwrap();
+    }
+
+    #[test]
+    fn refinement_run_emits_the_draft_and_never_blocks_or_moves_anything() {
+        let agent = ReadAgent {
+            access: Cell::new(None),
+            answer: r#"{"pronta":false,"perguntas":[{"pergunta":"Para quem?","recomendada":"Todos"}],"descricao":"D","criterios":["c"]}"#,
+        };
+        let sink = Recorder::default();
+        let registry = Registry::default();
+        registry.register(7);
+        let mut refine = job(std::path::Path::new("/tmp"));
+        refine.output_schema = Some(REFINE_SCHEMA);
+        execute(refine, &registry, &sink, &agent);
+
+        assert_eq!(agent.access.get(), Some(Access::Read));
+        let states = sink.states.borrow();
+        let (last, summary) = states.last().unwrap();
+        assert_eq!(last, run::COMPLETED);
+        assert!(summary.as_deref().unwrap().starts_with("1 pergunta(s)"));
     }
 
     #[test]

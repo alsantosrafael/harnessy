@@ -16,6 +16,11 @@ import {
   proofLabel,
   reviewable,
   threadOf,
+  decisionsOf,
+  refineInstruction,
+  refineRounds,
+  withDecisions,
+  refinementFrom,
   reviewLabel,
   timeAgo,
   stateLabel,
@@ -244,4 +249,92 @@ test("trimming a long log never drops what the user asked", () => {
   assert.equal(merged[merged.length - 1].seq, 2_501);
   // Repetir o mesmo lote não duplica nada.
   assert.equal(mergeEvents(merged, long).length, 2_001);
+});
+
+test("refinement comes from the last valid refinement event", () => {
+  const draft = (seq: number, text: string): RunEvent => ({
+    runId: 1,
+    seq,
+    kind: "refinement",
+    text,
+  });
+  assert.equal(refinementFrom([event(1)]), null);
+  assert.equal(refinementFrom([draft(1, "não é json")]), null);
+  assert.deepEqual(
+    refinementFrom([
+      draft(
+        1,
+        '{"questions":[{"question":"Q?","recommended":"R"},{"x":1}],"description":"D","criteria":"- c"}',
+      ),
+    ]),
+    {
+      ready: false,
+      questions: [{ question: "Q?", recommended: "R" }],
+      description: "D",
+      criteria: "- c",
+    },
+  );
+});
+
+test("the next refinement round carries answers first and falls back to the recommendation", () => {
+  const text = refineInstruction(
+    [
+      { question: "Quem usa?", recommended: "Todos" },
+      { question: "Offline?", recommended: "Não" },
+    ],
+    ["Só admins", "  "],
+    "D",
+    "- c",
+  );
+  assert.ok(text.startsWith("Respostas às suas perguntas:"));
+  assert.match(text, /Resposta: Só admins/);
+  assert.match(text, /Resposta: Não/);
+  assert.ok(text.indexOf("Respostas") < text.indexOf("Rascunho atual"));
+  assert.ok(refineInstruction([], [], "x".repeat(9000), "").length <= 3900);
+});
+
+test("a draft is ready only when it says so and has no open question", () => {
+  const draft = (text: string): RunEvent => ({ runId: 1, seq: 1, kind: "refinement", text });
+  const ready = refinementFrom([
+    draft('{"ready":true,"questions":[],"description":"D","criteria":"- c"}'),
+  ]);
+  assert.equal(ready?.ready, true);
+  const contradictory = refinementFrom([
+    draft(
+      '{"ready":true,"questions":[{"question":"Q?","recommended":"R"}],"description":"D","criteria":""}',
+    ),
+  ]);
+  assert.equal(contradictory?.ready, false);
+});
+
+test("decisions are built by the app and replace any block the agent wrote", () => {
+  const decisions = decisionsOf(
+    [
+      { question: "Ignora acento?", recommended: "Sim" },
+      { question: "Salva o filtro?", recommended: "Não" },
+    ],
+    ["", "Sim, por tarefa"],
+  );
+  assert.deepEqual(decisions, [
+    { question: "Ignora acento?", answer: "Sim" },
+    { question: "Salva o filtro?", answer: "Sim, por tarefa" },
+  ]);
+  const text = withDecisions("Objetivo.\n\n## Decisões\n- velho → velho", decisions);
+  assert.equal(
+    text,
+    "Objetivo.\n\n## Decisões\n- Ignora acento? → Sim\n- Salva o filtro? → Sim, por tarefa",
+  );
+  assert.equal(withDecisions("Objetivo.", []), "Objetivo.");
+});
+
+test("refinement rounds count the runs of the thread that returned a draft", () => {
+  const draft = (runId: number): RunEvent => ({
+    runId,
+    seq: 1,
+    kind: "refinement",
+    text: '{"ready":false,"questions":[],"description":"D","criteria":""}',
+  });
+  const thread = [run(1, "completed"), run(2, "completed"), run(3, "failed")];
+  assert.equal(refineRounds(thread, { 1: [draft(1)], 2: [draft(2)], 3: [] }), 2);
+  assert.equal(refineRounds([], {}), 0);
 });

@@ -1,4 +1,11 @@
-import type { LocalTask, Run, RunEvent, StepProposal } from "./desktop";
+import type {
+  LocalTask,
+  Refinement,
+  RefinementQuestion,
+  Run,
+  RunEvent,
+  StepProposal,
+} from "./desktop";
 
 const labels: Record<string, string> = {
   preparing: "Preparando",
@@ -121,6 +128,97 @@ export function stepsFrom(events: readonly RunEvent[]): StepProposal[] | null {
   } catch {
     return null;
   }
+}
+
+/** Rascunho da run de "Refinar": o último evento `refinement`, ou `null`. */
+export function refinementFrom(events: readonly RunEvent[]): Refinement | null {
+  const last = [...events].reverse().find((event) => event.kind === "refinement");
+  if (!last) return null;
+  try {
+    const parsed: unknown = JSON.parse(last.text);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const draft = parsed as Partial<Refinement>;
+    if (typeof draft.description !== "string" || typeof draft.criteria !== "string") return null;
+    const questions = Array.isArray(draft.questions)
+      ? draft.questions.filter(
+          (item): item is RefinementQuestion =>
+            typeof item?.question === "string" && typeof item?.recommended === "string",
+        )
+      : [];
+    return {
+      ready: draft.ready === true && questions.length === 0,
+      questions,
+      description: draft.description,
+      criteria: draft.criteria,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Máximo de rodadas de refinamento por conversa: depois disso, ajuste à mão. */
+export const MAX_REFINE_ROUNDS = 2;
+
+/** Rodadas já feitas: runs da conversa que devolveram um rascunho. */
+export function refineRounds(
+  thread: readonly Run[],
+  eventsByRun: Readonly<Record<number, readonly RunEvent[]>>,
+): number {
+  return thread.filter((item) => refinementFrom(eventsByRun[item.id] ?? []) !== null).length;
+}
+
+/** Uma decisão tomada: a pergunta e a resposta final (a da pessoa, ou a recomendada). */
+export interface Decision {
+  question: string;
+  answer: string;
+}
+
+export function decisionsOf(
+  questions: readonly RefinementQuestion[],
+  answers: readonly string[],
+): Decision[] {
+  return questions.map((item, at) => ({
+    question: item.question,
+    answer: answers[at]?.trim() || item.recommended,
+  }));
+}
+
+/**
+ * Descrição final: o texto do rascunho mais o bloco "Decisões", montado aqui e não pelo
+ * modelo, para nenhuma resposta se perder nem contradizer a especificação. Um bloco
+ * "Decisões" que o agente tenha escrito é trocado, não duplicado.
+ */
+export function withDecisions(description: string, decisions: readonly Decision[]): string {
+  const base = description.replace(/\n*## Decisões[\s\S]*?(?=\n## |$)/, "").trim();
+  if (decisions.length === 0) return base;
+  const lines = decisions.map((item) => `- ${item.question} → ${item.answer}`);
+  return `${base}\n\n## Decisões\n${lines.join("\n")}`.trim();
+}
+
+/** O núcleo corta o ajuste pedido em 4.000 caracteres; ficamos abaixo disso. */
+const MAX_INSTRUCTION = 3_900;
+
+/**
+ * Ajuste que leva as respostas e o rascunho editado para a próxima rodada. As respostas
+ * vêm primeiro: se o texto for cortado, é o rascunho que perde o final.
+ */
+export function refineInstruction(
+  questions: readonly RefinementQuestion[],
+  answers: readonly string[],
+  description: string,
+  criteria: string,
+): string {
+  const lines = questions.map(
+    (item, at) =>
+      `${at + 1}. ${item.question}\n   Resposta: ${answers[at]?.trim() || item.recommended}`,
+  );
+  const text = [
+    lines.length > 0 ? `Respostas às suas perguntas:\n${lines.join("\n")}` : "",
+    `Rascunho atual (já editado por mim):\nDescrição:\n${description.trim()}\nCritérios:\n${criteria.trim()}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  return text.slice(0, MAX_INSTRUCTION);
 }
 
 /** Run de onde um passo encadeado continua: a última run concluída, com branch, do passo anterior. */

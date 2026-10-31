@@ -2,6 +2,32 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.30.1] — 2026-10-31
+
+Refinar v2, a partir de papers sobre esclarecimento de requisitos por LLMs:
+
+- **Pronta para implementar.** Quando nenhuma pergunta em aberto mudaria o rascunho, o refinamento diz isso e some o **Refinar de novo**.
+- **Decisões registradas pelo Harnessy.** Ao aplicar, a descrição ganha uma seção "Decisões" com suas respostas (a sua, ou a recomendada). O texto vem do app, não do modelo, e a lista aparece antes de aplicar.
+- **Limite de 2 rodadas** por conversa.
+- **Aplicar não sobrescreve edições suas:** o salvamento usa a revisão da tarefa de quando o rascunho apareceu e recusa se ela mudou.
+
+## Back [0.27.2] — 2026-10-31
+
+- **Ajustes no prompt de `refinar`** a partir do QA cego (v2 ganhou 4 a 0 da v1, nota 52 contra 20): usar literalmente os rótulos da interface, tarefa que já existe vira `pronta` na primeira frase, `recomendada` começa com "Sim:", tarefa vaga recebe só a pergunta de direção, critério nunca é condicional e resposta que contraria o rascunho corrige o rascunho.
+
+## Back [0.27.1] — 2026-10-31
+
+- **Prompt da Ação `refinar` reescrito:** perguntas fechadas com exemplo concreto, só decisões de produto (fatos são do agente), critérios como cenários observáveis, sem critérios de processo, descrição curta e campo `pronta` na saída (contraditório com perguntas pendentes vale como não pronta).
+- **Refinar não recebe as regras de entrega do projeto** (`AGENTS.md` etc.), que vazavam para os critérios.
+
+## Front [0.30.0] — 2026-10-31
+
+- **Novo comando rápido Refinar.** Antes de implementar, o agente (só leitura) faz perguntas como um product manager, cada uma com a resposta recomendada, e propõe uma descrição e critérios de aceitação. No Chat, o **Refinamento proposto** deixa você responder, editar o rascunho, usar **Refinar de novo** para outra rodada ou **Aplicar à tarefa**, que substitui descrição e critérios. O botão fica indisponível com edições não salvas, com run em andamento e com a tarefa concluída.
+
+## Back [0.27.0] — 2026-10-31
+
+- **Nova Ação embutida `refinar`** (leitura) com a saída `refinamento`: perguntas (até 6) com resposta recomendada, descrição e critérios propostos, validados e limitados em tamanho. A run emite o evento `refinement`, termina em `completed` e não move o card. Sem IPC nem migração novos.
+
 ## Front [0.29.2] — 2026-10-31
 
 - **Tarefa concluída trava as ações que mexem no trabalho.** Implementar, Revisar, Rodar localmente, Publicar PR e Fazer merge ficam indisponíveis com o motivo "Tarefa concluída. Reabra para continuar."; o botão de implementar do detalhe também. Reabrir tarefa, Abrir conversa e Copiar branch continuam disponíveis.

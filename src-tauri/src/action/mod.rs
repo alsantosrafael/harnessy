@@ -38,11 +38,13 @@ pub const IMPLEMENT: &str = "implementar";
 pub const EXPLAIN: &str = "explicar";
 pub const REVIEW: &str = "revisar";
 pub const SPLIT: &str = "dividir-em-passos";
-const BUILTIN: [(&str, &str); 4] = [
+pub const REFINE: &str = "refinar";
+const BUILTIN: [(&str, &str); 5] = [
     (IMPLEMENT, include_str!("embutidas/implementar.toml")),
     (EXPLAIN, include_str!("embutidas/explicar.toml")),
     (REVIEW, include_str!("embutidas/revisar.toml")),
     (SPLIT, include_str!("embutidas/dividir-em-passos.toml")),
+    (REFINE, include_str!("embutidas/refinar.toml")),
 ];
 /// Diff entregue a uma Ação sobre Run; o resto é cortado com aviso.
 const MAX_DIFF_BYTES: usize = 16 * 1024;
@@ -71,6 +73,7 @@ pub(crate) enum Saida {
     Texto,
     Revisao,
     Passos,
+    Refinamento,
 }
 
 /// Quando uma Ação sobre Run roda: com sinal de risco, sempre, ou nunca sozinha.
@@ -256,7 +259,7 @@ pub(crate) fn parse(text: &str) -> Result<Action> {
     let saida = raw.saida.unwrap_or_default();
     if saida != Saida::Texto && raw.acesso != Acesso::Leitura {
         return Err(AppError::Validation(
-            "Saída estruturada (revisao, passos) só vale para Ação de leitura.",
+            "Saída estruturada (revisao, passos, refinamento) só vale para Ação de leitura.",
         ));
     }
     if alvo == Alvo::Run && raw.acesso != Acesso::Leitura {
@@ -433,6 +436,7 @@ pub(crate) struct Resumo {
     /// `run`: roda sobre o resultado de uma Run, não aparece como botão da Tarefa.
     alvo: Option<Alvo>,
     /// `passos`: a resposta vira proposta de tarefas encadeadas.
+    /// `refinamento`: a resposta vira perguntas e rascunho de descrição e critérios.
     saida: Option<Saida>,
     origem: Origem,
     /// Ação do repositório que precisa de confirmação local antes de rodar.
@@ -739,7 +743,13 @@ mod tests {
         let ids: Vec<&str> = entradas.iter().map(|e| e.id.as_str()).collect();
         assert_eq!(
             ids,
-            ["implementar", "explicar", "revisar", "dividir-em-passos"]
+            [
+                "implementar",
+                "explicar",
+                "revisar",
+                "dividir-em-passos",
+                "refinar"
+            ]
         );
         let implementar = entradas[0].acao.as_ref().unwrap();
         assert_eq!(implementar.acesso, Acesso::Escrita);
@@ -948,6 +958,7 @@ mod tests {
                 "explicar",
                 "revisar",
                 "dividir-em-passos",
+                "refinar",
                 "implementar",
                 "quebrada"
             ]

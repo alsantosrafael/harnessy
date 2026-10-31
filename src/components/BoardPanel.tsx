@@ -439,7 +439,7 @@ export function BoardPanel({
   // Iniciar uma run mantém o usuário no quadro: o painel da tarefa mostra o que o agente faz.
   async function start(taskId: number, action?: string, continueFrom: number | null = null) {
     setError("");
-    await runsState.start(taskId, choice, action, continueFrom);
+    return runsState.start(taskId, choice, action, continueFrom);
   }
 
   async function resolve(runId: number) {
@@ -455,6 +455,9 @@ export function BoardPanel({
     if (!selected) return;
     const last = runs.find((run) => run.taskId === selected.id) ?? null;
     switch (id) {
+      case "refine":
+        void start(selected.id, "refinar").then((run) => run && onOpenRun());
+        break;
       case "implement": {
         const base = chainBase(selected, runs);
         void start(selected.id, undefined, base && useChain ? base.id : null);

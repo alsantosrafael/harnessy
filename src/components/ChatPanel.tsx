@@ -28,6 +28,8 @@ interface Props {
   onCreated: (started: boolean) => void;
   /** Passos confirmados viraram tarefas. */
   onStepsCreated: (tasks: LocalTask[]) => void;
+  /** Um refinamento foi aplicado à tarefa: o quadro recarrega. */
+  onTaskChanged: () => void;
   onError: (text: string) => void;
 }
 
@@ -44,6 +46,7 @@ export function ChatPanel({
   runs: runsState,
   onCreated,
   onStepsCreated,
+  onTaskChanged,
   onError,
 }: Props) {
   const { text: draft, status: saveState } = useSyncExternalStore(
@@ -144,6 +147,10 @@ export function ChatPanel({
               eventsByRun={eventsByRun}
               onError={onError}
               onStepsCreated={onStepsCreated}
+              onTaskChanged={onTaskChanged}
+              onRefine={async (taskId, instruction) => {
+                await runsState.start(taskId, choice, "refinar", null, instruction);
+              }}
               choice={choice}
               canReview={canStartRun(agentReady, runs)}
               onReview={async (runId) => {

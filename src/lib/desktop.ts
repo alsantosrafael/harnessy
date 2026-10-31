@@ -209,6 +209,18 @@ export interface StepProposal {
   title: string;
   criteria: string;
 }
+export interface RefinementQuestion {
+  question: string;
+  recommended: string;
+}
+/** Rascunho da Ação "Refinar": perguntas em aberto e proposta de descrição e critérios. */
+export interface Refinement {
+  /** Nenhuma pergunta em aberto mudaria o rascunho. */
+  ready: boolean;
+  questions: RefinementQuestion[];
+  description: string;
+  criteria: string;
+}
 /** Cria os passos confirmados como tarefas encadeadas da tarefa de origem. */
 export const createSteps = (workspaceId: number, parentId: number, steps: StepProposal[]) =>
   localCall<LocalTask[]>("create_steps", { workspaceId, parentId, steps });

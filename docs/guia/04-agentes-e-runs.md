@@ -74,6 +74,7 @@ No detalhe da tarefa, **Mais ações** reúne outras formas de usar o agente:
 |---|---|
 | **Explicar** | O agente só **lê** o projeto e responde sobre a tarefa. Não muda nada |
 | **Dividir em passos** | Propõe tarefas menores e encadeadas |
+| **Refinar** | Faz perguntas e propõe descrição e critérios melhores, antes de implementar |
 | **Nova Ação** | Crie a sua: um pedido reutilizável (nome, o que pedir, só ler ou também escrever, modelo) |
 
 Projetos podem trazer ações próprias em `.harnessy/actions/`. Antes de a primeira ser usada, o Harnessy mostra **Confirmar Ação do repositório**; se o arquivo mudar depois, pede de novo.

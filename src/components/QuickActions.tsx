@@ -6,6 +6,7 @@ import {
   MonitorPlay,
   MessageSquare,
   Play,
+  Sparkles,
   RotateCcw,
   SearchCheck,
   Trash2,
@@ -15,6 +16,7 @@ import type { Progress } from "../lib/progress";
 import type { NextAction, QuickId, QuickState } from "../lib/quick";
 
 const icons: Record<QuickId, LucideIcon> = {
+  refine: Sparkles,
   implement: Play,
   review: SearchCheck,
   preview: MonitorPlay,

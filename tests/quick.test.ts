@@ -205,3 +205,16 @@ test("a run that delivered nothing asks to try again", () => {
   assert.equal(action?.id, "implement");
   assert.equal(action?.label, "Tentar de novo");
 });
+
+test("refining is blocked by unsaved edits, active runs and a finished task", () => {
+  const free = by(quickStates({ task: task("todo"), lastRun: null, ...base }));
+  assert.equal(free.refine, null);
+  const dirty = by(quickStates({ task: task("todo"), lastRun: null, ...base, dirty: true }));
+  assert.match(String(dirty.refine), /Salve a tarefa/);
+  const running = by(
+    quickStates({ task: task("doing"), lastRun: run({ state: "implementing" }), ...base }),
+  );
+  assert.match(String(running.refine), /em andamento/);
+  const done = by(quickStates({ task: task("done"), lastRun: null, ...base }));
+  assert.match(String(done.refine), /Tarefa concluída/);
+});

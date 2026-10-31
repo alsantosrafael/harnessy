@@ -68,6 +68,10 @@ _Avoid_: Provider, motor
 Ação de leitura sobre o resultado de uma Run verde, com modelo acima do implementador e sem a conversa dele. Opina; achados só viram correção depois do filtro contra as linhas alteradas do diff.
 _Avoid_: Reviewer, juiz
 
+**Refinamento**:
+Run de leitura da Ação "Refinar": devolve perguntas com resposta recomendada e um rascunho de descrição e critérios (evento `refinement`). Só vira texto da Tarefa quando a pessoa aplica.
+_Avoid_: Spec, planejamento
+
 **Passo**:
 Tarefa criada por "Dividir em passos", ligada à tarefa de origem e ao passo anterior; a Run de um passo pode partir da branch do anterior.
 _Avoid_: Subtarefa, etapa
