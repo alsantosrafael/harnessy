@@ -18,6 +18,7 @@ Palavras que aparecem no Harnessy, explicadas sem jargão. Em ordem alfabética.
 | **Conexões** | A tela que mostra se Claude Code, GitHub e Codex estão prontos para uso |
 | **Contraprova** | Verificação de que os testes novos realmente pegam a mudança (falham sem ela) |
 | **Critérios de aceite** | A lista do que precisa ser verdade para a tarefa estar pronta |
+| **Dispensar aviso** | Botão de uma tarefa **Bloqueada**: tira o aviso de bloqueio sem mudar a coluna da tarefa |
 | **Draft** | Um PR "rascunho". Avisa que ainda não está para valer |
 | **Entrega** | O caminho da mudança até o projeto principal: só local, PR, checks, revisão, merge |
 | **Estágio** | O ponto da entrega em que a tarefa está (o selo no card) |
