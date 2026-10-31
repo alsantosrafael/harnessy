@@ -60,10 +60,10 @@ Esperado: tela sem erro; o filtro só aparece quando há tarefas.
 
 Use uma tarefa **só de documentação**: segura e fácil de revisar.
 
-- **Título:** `Atualizar o guia de uso para refletir o que o app faz hoje`
+- **Título:** `Acrescentar "Dispensar aviso" ao glossário do guia`
 - Clique em **+ Descrição e critérios** e preencha:
-  - **Descrição:** `O docs/user-guide.md ainda se apresenta como "fundação 0.1.0" e diz que o app não executa tarefas. Reescreva só o título e a introdução (o parágrafo antes de "Conheça a interface").`
-  - **Critérios:** `- O título não menciona 0.1.0.` / `- A introdução diz que o app executa tarefas em worktrees e entrega por PR.` / `- Nenhum outro arquivo é alterado.`
+  - **Descrição:** `O docs/guia/glossario.md explica as palavras do Harnessy, mas não tem o botão "Dispensar aviso", que aparece numa tarefa Bloqueada. Acrescente uma linha na tabela, no mesmo estilo das outras e em ordem alfabética.`
+  - **Critérios:** `- Existe uma linha "Dispensar aviso" entre "Critérios de aceite" e "Draft".` / `- A explicação diz que ela tira o aviso de bloqueio sem mudar a coluna da tarefa.` / `- Nenhum outro arquivo é alterado.`
 
 Esperado: a tarefa aparece em **A fazer**. Tecle `n` em outra tela do quadro: o foco deve ir ao campo de título.
 
@@ -98,7 +98,7 @@ Esperado: card em **Revisão**. Anote quanto tempo a run levou e se algo pareceu
 1. Abra **Alterações da run**.
 2. Confira:
    - [ ] Resumo (`N arquivos · +X −Y`) coerente com o que a tarefa pediu.
-   - [ ] **Só** `docs/user-guide.md` foi alterado. Se mais arquivos mudaram, o critério 3 foi violado: anote.
+   - [ ] **Só** `docs/guia/glossario.md` foi alterado. Se mais arquivos mudaram, o critério 3 foi violado: anote.
    - [ ] **Nenhum bump de versão** nem entrada de CHANGELOG (a regra de versionamento diz que "só docs" não bumpa). Isso mostra se o harness do projeto foi respeitado.
    - [ ] Números de linha dos dois lados e `+`/`−` legíveis; o patch rola por teclado.
 3. Se a revisão do staff rodou, os achados aparecem **na linha**, com "Bloqueia" ou "Sugere". Os achados são úteis ou ruído? São sobre simplicidade, padrões e manutenção (staff), e não sobre bugs? Anote exemplos bons e ruins.

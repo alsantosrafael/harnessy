@@ -1,6 +1,6 @@
 # Solução de problemas
 
-[← README](../README.md) · [Instalação](getting-started.md) · [Guia de uso](user-guide.md)
+[← README](../README.md) · [Instalação](getting-started.md) · [Guia do Harnessy](user-guide.md)
 
 Execute comandos abaixo na raiz do projeto, onde ficam `package.json` e `src-tauri/`, salvo indicação diferente.
 
@@ -101,6 +101,30 @@ O app abriu com um Node antigo no `PATH`. Desde o 0.4.1 o Harnessy lê o `PATH` 
 ## O botão Iniciar está desabilitado
 
 O texto logo abaixo do campo diz o que falta: criar um workspace (em **Tarefas**), escrever a tarefa, ou instalar o Claude Code e o git (**Conexões** mostra o estado). O Codex não é necessário. Se o Codex aparece desabilitado na lista de agentes, é porque ele ainda não tem adaptador de execução.
+
+## O app diz que o banco foi criado por uma versão mais recente
+
+Você abriu uma versão antiga do Harnessy sobre dados que uma versão nova já atualizou. As atualizações do banco não voltam atrás. Abra a versão mais recente, ou restaure um backup da pasta `~/Library/Application Support/app.harnessy.desktop` feito antes da atualização. **Faça uma cópia dessa pasta antes de testar uma versão nova.**
+
+## "GitHub CLI (gh) não encontrado" ou o PR não é criado
+
+Instale o GitHub CLI (`brew install gh`), faça `gh auth login --web` no Terminal e confira em **Conexões** que está **Conectado**. Se o erro citar permissão, o login do `gh` pode não ter acesso ao repositório. Veja o passo a passo em [Publicar e fazer merge](guia/07-publicar-e-merge.md#se-algo-der-errado).
+
+## O PR mostra mais mudanças do que a tarefa fez
+
+A branch base do seu workspace (a que está ativa na pasta) tem commits que ainda não estão no GitHub. O PR é aberto contra a branch padrão do repositório, então esses commits aparecem junto. Publique-os antes ou aceite o ruído; **o merge incluiria tudo**.
+
+## O ambiente de teste fica em "Subindo…" ou "Caiu"
+
+Abra o painel **Ambiente de teste** e leia o final do log. As causas mais comuns são porta já em uso (outro programa, ou o próprio Harnessy em modo de desenvolvimento ocupa a 1420) e dependências não instaladas. Detalhes em [Testar localmente](guia/06-testar-localmente.md#se-algo-der-errado). Para liberar uma porta, descubra quem a usa com `lsof -nP -iTCP:PORTA -sTCP:LISTEN` antes de encerrar qualquer processo.
+
+## Não aparecem notificações nem o número no ícone H
+
+O número no **H** só conta pendências do workspace aberto. Para notificações, abra **Ajustes do Sistema → Notificações → Harnessy** e permita. Em modo de desenvolvimento (`bun run start`), o macOS pode atribuir a notificação ao Terminal; um build gerado com `bun run desktop:build` se comporta como o app normal. Veja [Atenção e notificações](guia/08-atencao-e-notificacoes.md).
+
+## O botão "Próximo passo" não aparece
+
+Ele some enquanto o agente trabalha (o painel avisa que você será avisado) e quando a tarefa está **Concluída**. Fora isso, abra **Mais ações** para ver todas as ações e o motivo de cada indisponibilidade.
 
 ## O cabeçalho mostra “Prévia da interface”
 

@@ -71,3 +71,39 @@ _Avoid_: Reviewer, juiz
 **Passo**:
 Tarefa criada por "Dividir em passos", ligada à tarefa de origem e ao passo anterior; a Run de um passo pode partir da branch do anterior.
 _Avoid_: Subtarefa, etapa
+
+**Entrega**:
+Caminho de uma Tarefa até o projeto principal, a partir da branch de uma Run: só local, PR em draft, checks, revisão aprovada, merge. Uma Run publicada tem no máximo um PR; publicar de novo adota o que existe.
+_Avoid_: Deploy (deploy publica uma versão em ambiente; Entrega termina no merge)
+
+**Estágio**:
+Ponto da Entrega em que a Tarefa está (`local`, `draft`, `checks-failing`, `ready`, `merged`…), deduzido de fatos (Run, PR, checks, revisão, SHA), nunca gravado. Define o Próximo passo.
+_Avoid_: Estado (Estado é a raia do quadro)
+
+**Próximo passo**:
+A única ação principal oferecida numa Tarefa, deduzida do Estágio. As demais ficam em "Mais ações".
+_Avoid_: Fluxo, workflow
+
+**Ambiente de teste**:
+O projeto ligado na máquina do usuário, no worktree de uma Run, para ver a mudança funcionando. É o primeiro alvo de ambiente; um deploy em QA entra no mesmo lugar. Um por vez.
+_Avoid_: Preview (termo do código), sandbox
+
+**Perfil do workspace**:
+Arquivo `.harnessy/workspace.toml` do repositório com o comando que sobe o projeto. Só roda depois de o usuário confirmar o texto exato (sha256).
+_Avoid_: Configuração
+
+**Atenção**:
+O que espera uma decisão do humano (bloqueio, checks falhando, pronto para merge…). Alimenta o filtro "Precisa de você", o contador da bandeja e as notificações. Concluída, em andamento com agente e "checks rodando" nunca pedem atenção.
+_Avoid_: Pendência, alerta
+
+**Harness do núcleo / do projeto**:
+Duas camadas de regras. O do núcleo (prefixo do prompt, Ações embutidas, `json_schema`, permissões geradas em Rust) manda e vive no executável. O do projeto (AGENTS.md, CLAUDE.md, `.claude/rules`, ADRs) informa convenções e entra como dado delimitado, lido do commit base. Ver [ADR 0004](docs/adr/0004-duas-camadas-de-harness.md).
+_Avoid_: Instruções, system prompt
+
+**Revisão (staff)**:
+Papel do revisor: avalia simplicidade, padrões do projeto, testabilidade e manutenção sobre o diff. Bugs e casos de borda são do QA, papel separado ainda não implementado.
+_Avoid_: Code review genérico, teste
+
+**Modo (de automação)**:
+Quanto o humano delega numa etapa do ciclo (iniciar, revisão, QA, ambiente, publicar, merge): `manual` (eu conduzo), `assisted` (o Harnessy prepara e pede o OK) ou `auto` (executa se as travas passam). O merge nunca é `auto`. É escolha pessoal e local; o repositório só pode apertar as travas.
+_Avoid_: Permissão, nível
