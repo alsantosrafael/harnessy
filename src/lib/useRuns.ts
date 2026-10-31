@@ -23,6 +23,8 @@ export interface RunsState {
   eventsByRun: Record<number, RunEvent[]>;
   starting: boolean;
   open: (id: number | null) => void;
+  /** Traz o log de uma run ainda não carregado (por exemplo, para ancorar achados no diff). */
+  ensureEvents: (runId: number) => void;
   /** Esquece as runs de uma tarefa excluída. */
   forgetTask: (taskId: number) => void;
   /** Inicia uma run e a abre; devolve `null` (e chama `onError`) se falhar. */
@@ -169,5 +171,26 @@ export function useRuns(
     setRuns((current) => current.filter((run) => run.taskId !== taskId));
   }, []);
 
-  return { runs, openRun, thread, eventsByRun, starting, open: setOpenRun, forgetTask, start };
+  const ensureEvents = useCallback(
+    (runId: number) => {
+      if (loaded.current.has(runId)) return;
+      loaded.current.add(runId);
+      listRunEvents(runId, 0)
+        .then((rows) => addEvents(runId, rows))
+        .catch(() => loaded.current.delete(runId));
+    },
+    [addEvents],
+  );
+
+  return {
+    runs,
+    openRun,
+    thread,
+    eventsByRun,
+    starting,
+    open: setOpenRun,
+    ensureEvents,
+    forgetTask,
+    start,
+  };
 }

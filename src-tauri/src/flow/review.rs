@@ -42,6 +42,17 @@ pub struct Reviewer {
     pub tarefa: String,
     pub descricao: String,
     pub criterios: String,
+    /// Esforço pedido ao revisor pelo usuário; vence o da Ação.
+    pub effort: Option<String>,
+    /// O usuário deixou o modelo do revisor em Automático (e a Ação não fixa um): o núcleo
+    /// escolhe pelo tamanho do diff. Escolha explícita nunca é alterada.
+    pub auto_model: bool,
+    /// Nenhum esforço foi escolhido nem declarado: mudança pequena usa esforço baixo.
+    pub auto_effort: bool,
+    /// Modelo de quem implementou; base para a revisão de uma mudança pequena.
+    pub implementer_model: String,
+    /// Bloco do harness do projeto (já lido do commit base); vazio se o projeto não tem.
+    pub harness: String,
     /// Runtime próprio do revisor (o Codex); `None` usa o do implementador.
     pub runtime: Option<Box<dyn Runtime + Send>>,
 }
@@ -130,29 +141,95 @@ impl Outcome {
     }
 }
 
+/// Mudança com até estas linhas (e sem caminho sensível) conta como pequena.
+const SMALL_DIFF_LINES: usize = 80;
+/// Extensões que são só texto para leitura: uma mudança só nelas não é código.
+const DOC_EXTENSIONS: [&str; 5] = ["md", "mdx", "txt", "rst", "adoc"];
+
+/// Peso de uma mudança para decidir se revisa e com quanto custo.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct Weight {
+    pub(super) lines: usize,
+    /// Todos os arquivos alterados são documentação.
+    pub(super) docs_only: bool,
+    /// Toca caminhos sensíveis (dependências, migrações, CI, `.harnessy`).
+    pub(super) sensitive: bool,
+}
+
+impl Weight {
+    pub(super) fn small(&self) -> bool {
+        self.lines <= SMALL_DIFF_LINES && !self.sensitive
+    }
+}
+
+fn is_doc(path: &str) -> bool {
+    path.rsplit_once('.')
+        .is_some_and(|(_, ext)| DOC_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()))
+}
+
+/// Pesa o diff: linhas, se é só documentação e se toca caminhos sensíveis.
+pub(super) fn weigh(diff: &str, sensitive: &[String]) -> Weight {
+    let files: Vec<String> = super::delivery::changed_files(diff)
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    Weight {
+        lines: diff_size(diff),
+        docs_only: !files.is_empty() && files.iter().all(|file| is_doc(file)),
+        sensitive: !crate::automation::decide::touched_sensitive(&files, sensitive).is_empty(),
+    }
+}
+
+impl Reviewer {
+    /// Modelo e esforço desta revisão. O que o usuário escolheu vale sempre; só o que ficou
+    /// em Automático acompanha o diff: mudança pequena revisa com o modelo de quem implementou
+    /// (no mínimo Sonnet) e esforço baixo, e o resto usa o modelo acima e o esforço padrão.
+    pub(super) fn plan_for(&self, weight: &Weight) -> (String, Option<String>) {
+        let small = weight.small();
+        let model = if self.auto_model && small {
+            match self.implementer_model.as_str() {
+                "" | "haiku" => "sonnet".to_owned(),
+                other => other.to_owned(),
+            }
+        } else {
+            self.model.clone()
+        };
+        let effort = self
+            .effort
+            .clone()
+            .or_else(|| self.action.esforco.clone())
+            .or_else(|| (self.auto_effort && small).then(|| "low".to_owned()));
+        (model, effort)
+    }
+}
+
 /// O revisor roda? Só com run verde (quem chama garante) e conforme `quando`.
-pub(super) fn is_due(quando: Quando, proof: Verdict, diff_lines: usize) -> bool {
+pub(super) fn is_due(quando: Quando, proof: Verdict, weight: &Weight) -> bool {
     match quando {
         Quando::Manual => false,
         Quando::Sempre => true,
+        // Risco: mudança grande, caminho sensível ou código sem prova. Documentação não tem
+        // testes, então "sem testes" só pesa quando algum arquivo não é documentação.
         Quando::Risco => {
-            matches!(
+            let unproven = matches!(
                 proof,
                 Verdict::NotProved | Verdict::NoTests | Verdict::Inconclusive
-            ) || diff_lines > RISKY_DIFF_LINES
+            );
+            weight.sensitive || weight.lines > RISKY_DIFF_LINES || (unproven && !weight.docs_only)
         }
     }
 }
 
 /// Por que a revisão automática foi dispensada, dito conforme a contraprova: só
 /// "comprovada" quando a contraprova de fato comprovou a mudança.
-pub(super) fn skipped_message(proof: Verdict) -> String {
+pub(super) fn skipped_message(proof: Verdict, weight: &Weight) -> String {
     let why = match proof {
+        _ if weight.docs_only => "a mudança é só de documentação e o diff é pequeno",
         Verdict::Proved => "a mudança foi comprovada por testes e o diff é pequeno",
         Verdict::Skipped => "o diff é pequeno e a contraprova não rodou",
         _ => "o diff é pequeno e não há sinal de risco",
     };
-    format!("Revisão dispensada: {why}. Escolha revisar \"Sempre\" para revisar toda run.")
+    format!("Revisão dispensada: {why}. Escolha revisar \"Sempre\" para revisar toda run ou use \"Revisar agora\".")
 }
 
 /// Linhas adicionadas e removidas num diff unificado.
@@ -291,7 +368,12 @@ pub(super) fn prompt_for(reviewer: &Reviewer, diff: &str, checks: &str, proof: &
         contraprova: proof,
         ..Default::default()
     };
-    prompt::compose(Access::Read, &reviewer.action.render(&ctx), &[])
+    prompt::compose(
+        Access::Read,
+        &reviewer.action.render(&ctx),
+        &[],
+        &reviewer.harness,
+    )
 }
 
 #[cfg(test)]
@@ -300,11 +382,22 @@ mod tests {
 
     #[test]
     fn the_skipped_review_note_only_says_proved_when_it_was() {
-        assert!(skipped_message(Verdict::Proved).contains("comprovada por testes"));
-        let skipped = skipped_message(Verdict::Skipped);
+        let code = Weight {
+            lines: 10,
+            docs_only: false,
+            sensitive: false,
+        };
+        assert!(skipped_message(Verdict::Proved, &code).contains("comprovada por testes"));
+        let skipped = skipped_message(Verdict::Skipped, &code);
         assert!(!skipped.contains("comprovada"), "{skipped}");
         assert!(skipped.contains("contraprova não rodou"));
-        assert!(skipped_message(Verdict::Skipped).contains("Sempre"));
+        assert!(skipped_message(Verdict::Skipped, &code).contains("Sempre"));
+        let docs = Weight {
+            lines: 3,
+            docs_only: true,
+            sensitive: false,
+        };
+        assert!(skipped_message(Verdict::NoTests, &docs).contains("só de documentação"));
     }
 
     const DIFF_U0: &str = "diff --git a/src/a.ts b/src/a.ts
@@ -384,14 +477,132 @@ deleted file mode 100644
         );
     }
 
+    fn weight(lines: usize, docs_only: bool, sensitive: bool) -> Weight {
+        Weight {
+            lines,
+            docs_only,
+            sensitive,
+        }
+    }
+
     #[test]
     fn review_runs_only_with_risk_unless_configured() {
-        assert!(!is_due(Quando::Risco, Verdict::Proved, 10));
-        assert!(is_due(Quando::Risco, Verdict::NotProved, 10));
-        assert!(is_due(Quando::Risco, Verdict::NoTests, 10));
-        assert!(is_due(Quando::Risco, Verdict::Proved, 301));
-        assert!(is_due(Quando::Sempre, Verdict::Proved, 1));
-        assert!(!is_due(Quando::Manual, Verdict::NotProved, 999));
+        let small = weight(10, false, false);
+        assert!(!is_due(Quando::Risco, Verdict::Proved, &small));
+        assert!(is_due(Quando::Risco, Verdict::NotProved, &small));
+        assert!(is_due(Quando::Risco, Verdict::NoTests, &small));
+        assert!(is_due(
+            Quando::Risco,
+            Verdict::Proved,
+            &weight(301, false, false)
+        ));
+        assert!(is_due(
+            Quando::Sempre,
+            Verdict::Proved,
+            &weight(1, true, false)
+        ));
+        assert!(!is_due(
+            Quando::Manual,
+            Verdict::NotProved,
+            &weight(999, false, true)
+        ));
+    }
+
+    #[test]
+    fn documentation_has_no_tests_so_it_is_not_risky_by_that_alone() {
+        let docs = weight(5, true, false);
+        assert!(!is_due(Quando::Risco, Verdict::NoTests, &docs));
+        assert!(is_due(
+            Quando::Risco,
+            Verdict::NoTests,
+            &weight(5, false, false)
+        ));
+        assert!(
+            is_due(Quando::Risco, Verdict::NoTests, &weight(400, true, false)),
+            "grande demais"
+        );
+        assert!(
+            is_due(Quando::Risco, Verdict::Proved, &weight(5, true, true)),
+            "caminho sensível"
+        );
+    }
+
+    #[test]
+    fn weighing_a_diff_reads_files_lines_and_sensitive_paths() {
+        let sensitive = vec!["package.json".to_owned(), ".github/".to_owned()];
+        let docs = "diff --git a/docs/a.md b/docs/a.md\n@@ -1 +1 @@\n-a\n+b\ndiff --git a/README.MD b/README.MD\n@@ -1 +1 @@\n-a\n+b\n";
+        assert_eq!(weigh(docs, &sensitive), weight(4, true, false));
+        let code = "diff --git a/src/a.ts b/src/a.ts\n@@ -1 +1 @@\n-a\n+b\ndiff --git a/docs/a.md b/docs/a.md\n@@ -1 +1 @@\n-a\n+b\n";
+        assert!(
+            !weigh(code, &sensitive).docs_only,
+            "um arquivo de código basta"
+        );
+        let deps = "diff --git a/package.json b/package.json\n@@ -1 +1 @@\n-a\n+b\n";
+        assert!(weigh(deps, &sensitive).sensitive);
+        assert!(
+            !weigh("", &sensitive).docs_only,
+            "sem arquivos não é só documentação"
+        );
+    }
+
+    fn reviewer(
+        auto_model: bool,
+        auto_effort: bool,
+        effort: Option<&str>,
+        model: &str,
+    ) -> Reviewer {
+        let temp = std::env::temp_dir();
+        let action = crate::flow::actions::find(&temp, None, "revisar").unwrap();
+        Reviewer {
+            action,
+            model: model.into(),
+            tarefa: String::new(),
+            descricao: String::new(),
+            criterios: String::new(),
+            effort: effort.map(str::to_owned),
+            auto_model,
+            auto_effort,
+            implementer_model: "sonnet".into(),
+            harness: String::new(),
+            runtime: None,
+        }
+    }
+
+    #[test]
+    fn automatic_choices_follow_the_diff_and_explicit_ones_never_change() {
+        let small = weight(20, true, false);
+        let big = weight(500, false, false);
+        let sensitive = weight(10, false, true);
+        let auto = reviewer(true, true, None, "opus");
+        assert_eq!(
+            auto.plan_for(&small),
+            ("sonnet".to_owned(), Some("low".to_owned()))
+        );
+        assert_eq!(auto.plan_for(&big), ("opus".to_owned(), None));
+        assert_eq!(
+            auto.plan_for(&sensitive),
+            ("opus".to_owned(), None),
+            "caminho sensível não é pequeno"
+        );
+        // Escolhas do usuário: modelo fixo e esforço fixo valem sempre, pequeno ou não.
+        let chosen = reviewer(false, false, Some("high"), "opus");
+        assert_eq!(
+            chosen.plan_for(&small),
+            ("opus".to_owned(), Some("high".to_owned()))
+        );
+        // Modelo automático com esforço escolhido: o esforço do usuário vence.
+        let mixed = reviewer(true, false, Some("max"), "opus");
+        assert_eq!(
+            mixed.plan_for(&small),
+            ("sonnet".to_owned(), Some("max".to_owned()))
+        );
+    }
+
+    #[test]
+    fn a_haiku_implementer_is_not_reviewed_by_haiku() {
+        let mut auto = reviewer(true, true, None, "sonnet");
+        auto.implementer_model = "haiku".into();
+        assert_eq!(auto.plan_for(&weight(5, true, false)).0, "sonnet");
     }
 
     #[test]

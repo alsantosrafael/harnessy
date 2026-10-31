@@ -8,6 +8,7 @@ Harnessy is a local-first macOS desktop application built with Tauri 2, Rust, Re
 - Install with `bun install --frozen-lockfile` (Bun 1.4.3; Node 22+ for Vitest).
 - Run `bun run check:quick` for frontend edits; `bun run verify` adds the production build. Native edits require `bun run verify:rust` and desktop smoke checks when IPC/lifecycle changes.
 - Keep privileged operations in Rust and IPC narrow. Local tasks (state, history, blocks), runs and card state deduced from run results are real (the agent never touches cards); Codex as reviewer of write runs is real (read-only `codex exec`; it does not implement); publishing (push/PR) is not. Read `docs/development.md` before persistence, IPC or lifecycle changes.
+- User docs live in `docs/guia/` (plain language, one page per topic; hub in `docs/user-guide.md`). When a change alters what a person sees or does, update the matching page in the same change. Keep UI labels exactly as they appear on screen.
 - Reuse existing `.claude/skills` procedures. Codex reads this file and subtree `AGENTS.md`; OpenCode can use the same context.
 - Repository harness work: read `docs/harness.md` for scope, checks and limitations. This tooling is distinct from app orchestration planned in `SPEC.md`.
 - Versioning: every change evaluates front (`package.json`) and back (`src-tauri/Cargo.toml`) independently and bumps the affected side(s) plus `CHANGELOG.md`, without asking. See `.claude/rules/versionamento.md`.

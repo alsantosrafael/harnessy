@@ -293,6 +293,7 @@ fn economico() {
                             ..Default::default()
                         },
                         &[],
+                        "",
                     );
                     let run_id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
                     registry.register(run_id);
@@ -316,6 +317,11 @@ fn economico() {
                             tarefa: task.title.clone(),
                             descricao: task.body.clone(),
                             criterios: task.criteria.clone(),
+                            harness: String::new(),
+                            effort: None,
+                            auto_model: false,
+                            auto_effort: false,
+                            implementer_model: String::new(),
                             runtime: None,
                         }),
                         base_ref: None,

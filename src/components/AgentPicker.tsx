@@ -4,6 +4,8 @@ import {
   agentOf,
   agents,
   choiceSummary,
+  effortsOf,
+  validEffort,
   type ReviewWhen,
   reviewWhens,
 } from "../lib/agents";
@@ -15,19 +17,23 @@ interface Props {
   onChange: (choice: AgentChoice) => void;
   /** Esconde o bloco de revisão (ex.: quando a Ação só lê). */
   compact?: boolean;
+  /** Já aberto ao montar: no detalhe da tarefa, escolher quem faz o quê é parte do trabalho. */
+  defaultOpen?: boolean;
 }
 
 interface AgentFieldsProps {
   id: string;
   runtime: Runtime;
   model: string;
+  effort: string;
   /** Modelo "automático" (vazio) permitido: só o revisor Claude. */
   auto?: boolean;
   onChange: (runtime: Runtime, model: string) => void;
+  onEffort: (effort: string) => void;
 }
 
 /** Agente + modelo: lista para o Claude Code; lista com id livre para o Codex. */
-function AgentFields({ id, runtime, model, auto, onChange }: AgentFieldsProps) {
+function AgentFields({ id, runtime, model, effort, auto, onChange, onEffort }: AgentFieldsProps) {
   const agent = agentOf(runtime);
   return (
     <>
@@ -79,7 +85,7 @@ function AgentFields({ id, runtime, model, auto, onChange }: AgentFieldsProps) {
             value={model}
             onChange={(event) => onChange(runtime, event.target.value)}
           >
-            {auto && <option value="">Automático (um acima)</option>}
+            {auto && <option value="">Automático</option>}
             {agent?.models.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.label}
@@ -87,6 +93,21 @@ function AgentFields({ id, runtime, model, auto, onChange }: AgentFieldsProps) {
             ))}
           </select>
         )}
+      </label>
+      <label htmlFor={`${id}-effort`}>
+        Esforço
+        <select
+          id={`${id}-effort`}
+          value={effort}
+          onChange={(event) => onEffort(event.target.value)}
+        >
+          <option value="">{auto ? "Automático" : "Padrão"}</option>
+          {effortsOf(runtime).map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
+            </option>
+          ))}
+        </select>
       </label>
     </>
   );
@@ -96,10 +117,10 @@ function AgentFields({ id, runtime, model, auto, onChange }: AgentFieldsProps) {
  * Configuração da run num bloco recolhível: o resumo mostra quem implementa e quem
  * revisa; aberto, deixa escolher agente e modelo de cada um e quando revisar.
  */
-export function AgentPicker({ choice, onChange, compact }: Props) {
+export function AgentPicker({ choice, onChange, compact, defaultOpen = false }: Props) {
   const id = useId();
   return (
-    <details className="agent-picker">
+    <details className="agent-picker" open={defaultOpen || undefined}>
       <summary>
         {compact ? choiceSummary({ ...choice, reviewWhen: "never" }) : choiceSummary(choice)}
       </summary>
@@ -109,8 +130,13 @@ export function AgentPicker({ choice, onChange, compact }: Props) {
           id={`${id}-impl`}
           runtime={choice.runtime}
           model={choice.model}
-          onChange={(runtime, model) => onChange({ ...choice, runtime, model })}
+          effort={choice.effort}
+          onChange={(runtime, model) =>
+            onChange({ ...choice, runtime, model, effort: validEffort(runtime, choice.effort) })
+          }
+          onEffort={(effort) => onChange({ ...choice, effort })}
         />
+        <p className="picker-help">Mais esforço pensa mais, custa mais e demora mais.</p>
       </fieldset>
       {!compact && (
         <fieldset>
@@ -136,12 +162,26 @@ export function AgentPicker({ choice, onChange, compact }: Props) {
               id={`${id}-rev`}
               runtime={choice.reviewer}
               model={choice.reviewerModel}
+              effort={choice.reviewerEffort}
               auto
               onChange={(reviewer, reviewerModel) =>
-                onChange({ ...choice, reviewer, reviewerModel })
+                onChange({
+                  ...choice,
+                  reviewer,
+                  reviewerModel,
+                  reviewerEffort: validEffort(reviewer, choice.reviewerEffort),
+                })
               }
+              onEffort={(reviewerEffort) => onChange({ ...choice, reviewerEffort })}
             />
           )}
+          <p className="picker-help">
+            {choice.reviewWhen === "auto"
+              ? "Proporcional (recomendado): pula mudança pequena e sem risco, como só documentação. Em Automático, o modelo e o esforço seguem o tamanho da mudança: menores nas pequenas, maiores nas grandes ou delicadas."
+              : choice.reviewWhen === "always"
+                ? "Revisa toda run, mesmo uma linha de texto."
+                : "Não revisa sozinho; use Revisar agora quando quiser."}
+          </p>
         </fieldset>
       )}
     </details>

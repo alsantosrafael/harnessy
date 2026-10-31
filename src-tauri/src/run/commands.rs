@@ -10,12 +10,12 @@ use crate::{
 };
 
 #[tauri::command]
-pub fn list_runs(store: State<'_, Database>, workspace_id: i64) -> Result<Vec<Run>> {
+pub async fn list_runs(store: State<'_, Database>, workspace_id: i64) -> Result<Vec<Run>> {
     super::list(&*store.connection()?, workspace_id)
 }
 
 #[tauri::command]
-pub fn list_run_events(
+pub async fn list_run_events(
     store: State<'_, Database>,
     run_id: i64,
     after_seq: i64,
@@ -25,7 +25,7 @@ pub fn list_run_events(
 
 /// Encerra o processo do agente; o pipeline em `flow` registra o estado final.
 #[tauri::command]
-pub fn cancel_run(registry: State<'_, Registry>, run_id: i64) -> Result<()> {
+pub async fn cancel_run(registry: State<'_, Registry>, run_id: i64) -> Result<()> {
     if registry.cancel(run_id) {
         Ok(())
     } else {

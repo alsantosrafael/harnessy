@@ -495,7 +495,7 @@ mod tests {
         let store = temp.open();
         let db = store.connection().unwrap();
         let (task_id, run) = fixture(&db);
-        run::set_review_choice(&db, run.id, "claude", "", "auto").unwrap();
+        run::set_review_choice(&db, run.id, "claude", "", "auto", None).unwrap();
         reconcile(&db, &finish(&db, &run, run::IMPLEMENTING, "", &[])).unwrap();
         assert_eq!(status(&db, task_id), Status::Doing);
 

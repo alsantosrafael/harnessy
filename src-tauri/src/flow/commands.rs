@@ -3,6 +3,7 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    sync::{Mutex, OnceLock},
 };
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -59,10 +60,12 @@ struct ReviewPick {
     runtime: &'static str,
     model: String,
     when: &'static str,
+    /// Esforço escolhido para o revisor; `None` = o padrão da Ação ou da CLI.
+    effort: Option<&'static str>,
 }
 
 impl ReviewPick {
-    fn parse(runtime: &str, model: &str, when: &str) -> Result<Self> {
+    fn parse(runtime: &str, model: &str, when: &str, effort: Option<&str>) -> Result<Self> {
         let runtime = guard::runtime(runtime)?;
         let model = if runtime == "claude" && model.trim().is_empty() {
             String::new()
@@ -73,6 +76,7 @@ impl ReviewPick {
             runtime,
             model,
             when: guard::review_when(when)?,
+            effort: guard::user_effort(runtime, effort)?,
         })
     }
 }
@@ -114,6 +118,7 @@ fn reviewer_for(
     implementer_model: &str,
     pick: &ReviewPick,
     runtime: Box<dyn Runtime + Send>,
+    harness: String,
 ) -> Option<Reviewer> {
     if pick.when == "never" {
         return None;
@@ -132,6 +137,9 @@ fn reviewer_for(
     } else {
         pick.model.clone()
     };
+    // O que ficou em Automático acompanha o tamanho do diff; escolha explícita não muda.
+    let auto_model = pick.model.is_empty() && acao.modelo.is_none();
+    let auto_effort = pick.effort.is_none() && acao.esforco.is_none();
     Some(Reviewer {
         model,
         runtime: Some(runtime),
@@ -139,6 +147,11 @@ fn reviewer_for(
         tarefa: task.title.clone(),
         descricao: task.description.clone(),
         criterios: task.criteria.clone(),
+        effort: pick.effort.map(str::to_owned),
+        auto_model,
+        auto_effort,
+        implementer_model: implementer_model.to_owned(),
+        harness,
     })
 }
 
@@ -146,12 +159,54 @@ fn reviewer_for(
 /// e comandos que o Harnessy já negou ali.
 fn prompt_for(acao: &action::Action, task: &Task, folder: &str, avoid: &[String]) -> String {
     let arquivos = likely::find(Path::new(folder), &task.title, &task.criteria);
-    actions::build_prompt(acao, &contexto(task, &arquivos), avoid)
+    let harness = project_harness(folder, "HEAD");
+    actions::build_prompt(acao, &contexto(task, &arquivos), avoid, &harness)
+}
+
+/// Harness do projeto no commit `rev`, em bloco de dados para o prompt. Lido pelo Rust do
+/// commit base (nunca do worktree da run); sem git ou sem arquivos, vazio.
+fn runtime_of(run: &Run) -> &str {
+    run.runtime.as_str()
+}
+
+fn project_harness(folder: &str, rev: &str) -> String {
+    let dirs = process::search_dirs();
+    let Some(git) = process::find_binary("git", &dirs) else {
+        return String::new();
+    };
+    let repo = Path::new(folder);
+    // O texto só muda quando o commit muda: resolve a revisão e reaproveita o que já foi lido
+    // (são ~10 processos `git`, e a prévia do prompt pede isso a cada tarefa aberta).
+    let sha = worktree::resolve_rev(&git, &dirs, repo, rev).unwrap_or_else(|| rev.to_owned());
+    let key = (folder.to_owned(), sha.clone());
+    if let Some(hit) = harness_cache()
+        .lock()
+        .ok()
+        .and_then(|c| c.get(&key).cloned())
+    {
+        return hit;
+    }
+    let files = run::harness::load(&git, &dirs, repo, &sha);
+    let framed = run::harness::frame(&sha, &files);
+    if let Ok(mut cache) = harness_cache().lock() {
+        if cache.len() >= HARNESS_CACHE_MAX {
+            cache.clear();
+        }
+        cache.insert(key, framed.clone());
+    }
+    framed
+}
+
+const HARNESS_CACHE_MAX: usize = 16;
+
+fn harness_cache() -> &'static Mutex<HashMap<(String, String), String>> {
+    static CACHE: OnceLock<Mutex<HashMap<(String, String), String>>> = OnceLock::new();
+    CACHE.get_or_init(Mutex::default)
 }
 
 /// Texto exato que o agente receberá, para o usuário conferir antes de iniciar.
 #[tauri::command]
-pub fn preview_prompt(
+pub async fn preview_prompt(
     app: AppHandle,
     store: State<'_, Database>,
     workspace_id: i64,
@@ -178,7 +233,7 @@ pub fn preview_prompt(
 /// Ações para o menu da tarefa, com erro quando alguma está inválida. Com
 /// `workspace_id`, confere que o workspace existe.
 #[tauri::command]
-pub fn list_actions(
+pub async fn list_actions(
     app: AppHandle,
     store: State<'_, Database>,
     workspace_id: Option<i64>,
@@ -202,7 +257,7 @@ pub fn list_actions(
 /// Confirma o conteúdo atual de uma Ação do repositório (SPEC §15): só depois
 /// disso ela roda. Alterar o arquivo exige nova confirmação.
 #[tauri::command]
-pub fn approve_action(
+pub async fn approve_action(
     app: AppHandle,
     store: State<'_, Database>,
     workspace_id: i64,
@@ -227,7 +282,7 @@ pub fn approve_action(
 /// Cria uma Ação do usuário a partir do formulário: valida com o mesmo parser
 /// dos arquivos e grava em `<dados do app>/actions/<id>.toml`.
 #[tauri::command]
-pub fn create_action(app: AppHandle, input: action::Nova) -> Result<action::Resumo> {
+pub async fn create_action(app: AppHandle, input: action::Nova) -> Result<action::Resumo> {
     let (text, acao) = action::texto_da_nova(&input)?;
     if let Some(modelo) = acao.modelo.as_deref() {
         guard::model(modelo)?;
@@ -259,10 +314,19 @@ pub fn start_run(
     reviewer_model: String,
     review_when: String,
     instruction: Option<String>,
+    effort: Option<String>,
+    reviewer_effort: Option<String>,
 ) -> Result<Run> {
     let runtime_id = guard::runtime(&runtime)?;
     let model = guard::agent_model(runtime_id, &model)?;
-    let pick = ReviewPick::parse(&reviewer, &reviewer_model, &review_when)?;
+    // O esforço que o usuário escolheu vence o declarado pela Ação.
+    let user_effort = guard::user_effort(runtime_id, effort.as_deref())?;
+    let pick = ReviewPick::parse(
+        &reviewer,
+        &reviewer_model,
+        &review_when,
+        reviewer_effort.as_deref(),
+    )?;
     let (ws, task, avoid) = {
         let db = store.connection()?;
         (
@@ -341,7 +405,7 @@ pub fn start_run(
             role: ROLE,
             runtime: runtime_id,
             model: &model,
-            effort: acao.esforco.as_deref(),
+            effort: user_effort.or(acao.esforco.as_deref()),
             base_run_id: base.as_ref().map(|(id, _)| *id),
         },
     )?;
@@ -352,6 +416,7 @@ pub fn start_run(
             pick.runtime,
             &pick.model,
             pick.when,
+            pick.effort,
         )?;
     }
     registry.register(created.id);
@@ -382,7 +447,7 @@ pub fn start_run(
         run_id: created.id,
         title,
         prompt,
-        repo: ws.folder.into(),
+        repo: ws.folder.clone().into(),
         data_dir,
         model: model.clone(),
         checks,
@@ -393,10 +458,18 @@ pub fn start_run(
         },
         contraprova: acao.contraprova,
         require_proof: acao.exigir_prova,
-        effort: acao.esforco.clone(),
+        effort: user_effort.or(acao.esforco.as_deref()).map(str::to_owned),
         max_turns: actions::max_turns(&acao),
         review: review_runtime.and_then(|runtime| {
-            reviewer_for(&data_dir_review, Some(&repo), &task, &model, &pick, runtime)
+            reviewer_for(
+                &data_dir_review,
+                Some(&repo),
+                &task,
+                &model,
+                &pick,
+                runtime,
+                project_harness(&ws.folder, "HEAD"),
+            )
         }),
         base_ref: base.map(|(_, branch)| branch),
         output_schema: (acao.saida == Saida::Passos).then_some(read::STEPS_SCHEMA),
@@ -422,7 +495,7 @@ pub fn start_run(
 /// Ciclo extra numa run que falhou, com o próximo modelo da lista acima do
 /// último ciclo. A WebView só manda o id; modelo e prompt são decididos aqui.
 #[tauri::command]
-pub fn continue_run(
+pub async fn continue_run(
     app: AppHandle,
     store: State<'_, Database>,
     registry: State<'_, Registry>,
@@ -461,6 +534,7 @@ pub fn continue_run(
         previous.reviewer.as_deref().unwrap_or("claude"),
         previous.reviewer_model.as_deref().unwrap_or(""),
         previous.review_when.as_deref().unwrap_or("auto"),
+        previous.reviewer_effort.as_deref(),
     )?;
     let review_runtime = agent_runtime(pick.runtime, &dirs, &data_dir)?;
     let (reopened, offset) = {
@@ -476,14 +550,16 @@ pub fn continue_run(
         run_id,
         title: reopened.title.clone(),
         prompt: prompt_for(&acao, &task, &ws.folder, &avoid),
-        repo: ws.folder.into(),
+        repo: ws.folder.clone().into(),
         data_dir,
         model: model.into(),
         checks: verify::checks_for(&dir),
         max_corrections: 0,
         contraprova: acao.contraprova,
         require_proof: acao.exigir_prova,
-        effort: acao.esforco.clone(),
+        effort: guard::user_effort(runtime_of(&previous), previous.effort.as_deref())?
+            .or(acao.esforco.as_deref())
+            .map(str::to_owned),
         max_turns: actions::max_turns(&acao),
         review: reviewer_for(
             &app_data(&app)?,
@@ -492,6 +568,7 @@ pub fn continue_run(
             model,
             &pick,
             review_runtime,
+            project_harness(&ws.folder, "HEAD"),
         ),
         base_ref: None,
         output_schema: None,
@@ -512,13 +589,14 @@ pub fn continue_run(
 /// (sempre roda, qualquer que seja o `quando` da Ação). A resposta chega pelos
 /// eventos `run-event` e `run-state`.
 #[tauri::command]
-pub fn review_run(
+pub async fn review_run(
     app: AppHandle,
     store: State<'_, Database>,
     registry: State<'_, Registry>,
     run_id: i64,
     reviewer: String,
     reviewer_model: String,
+    reviewer_effort: Option<String>,
 ) -> Result<Run> {
     let (previous, ws, task, number) = {
         let db = store.connection()?;
@@ -529,7 +607,12 @@ pub fn review_run(
         let number = run::last_cycle(&db, run_id)? + 1;
         (previous, ws, task, number)
     };
-    let pick = ReviewPick::parse(&reviewer, &reviewer_model, "always")?;
+    let pick = ReviewPick::parse(
+        &reviewer,
+        &reviewer_model,
+        "always",
+        reviewer_effort.as_deref(),
+    )?;
     process::wait_for_login_path();
     let dirs = process::search_dirs();
     let data_dir = app_data(&app)?;
@@ -540,10 +623,20 @@ pub fn review_run(
         aprovados: &aprovados,
     };
     let implementer = previous.model.clone().unwrap_or_default();
-    let reviewer = reviewer_for(&data_dir, Some(&repo), &task, &implementer, &pick, runtime)
-        .ok_or(AppError::Validation(
-            "A Ação de revisão não está disponível.",
-        ))?;
+    // A revisão sob demanda lê as regras do commit base da run, não da branch revisada.
+    let base_harness = project_harness(&ws.folder, previous.base_sha.as_deref().unwrap_or("HEAD"));
+    let reviewer = reviewer_for(
+        &data_dir,
+        Some(&repo),
+        &task,
+        &implementer,
+        &pick,
+        runtime,
+        base_harness,
+    )
+    .ok_or(AppError::Validation(
+        "A Ação de revisão não está disponível.",
+    ))?;
     let (base, branch) = (
         previous.base_sha.clone().unwrap_or_default(),
         previous.branch.clone().unwrap_or_default(),
@@ -580,9 +673,21 @@ pub fn review_run(
 
 /// Exclui uma tarefa (e as runs dela) a pedido do usuário.
 #[tauri::command]
-pub fn delete_task(store: State<'_, Database>, workspace_id: i64, task_id: i64) -> Result<()> {
+pub async fn delete_task(
+    store: State<'_, Database>,
+    previews: State<'_, run::preview::Previews>,
+    workspace_id: i64,
+    task_id: i64,
+) -> Result<()> {
     let (folder, worktrees) = {
         let db = store.connection()?;
+        // Um ambiente de teste rodando num worktree que vai sumir seria um servidor órfão.
+        for run in run::list(&db, workspace_id)?
+            .iter()
+            .filter(|run| run.task_id == task_id)
+        {
+            previews.stop(run.id);
+        }
         (
             workspace::get(&db, workspace_id)?.folder,
             run::worktrees_of_task(&db, task_id)?,
@@ -607,7 +712,7 @@ fn remove_leftover_worktrees(repo: &Path, worktrees: &[String]) {
 
 /// O usuário deu o bloqueio de uma run por resolvido (regras em [`sync::resolve`]).
 #[tauri::command]
-pub fn resolve_block(app: AppHandle, store: State<'_, Database>, run_id: i64) -> Result<()> {
+pub async fn resolve_block(app: AppHandle, store: State<'_, Database>, run_id: i64) -> Result<()> {
     let (run, change) = sync::resolve(&*store.connection()?, run_id)?;
     if let Some(change) = &change {
         emit_change(&app, change);
@@ -709,4 +814,223 @@ fn sync_task(app: &AppHandle, run: &Run) {
     if let Ok(Some(change)) = change {
         emit_change(app, &change);
     }
+}
+
+/// Binários e pasta para falar com o GitHub em nome de uma run; falha com a frase certa.
+fn delivery_tools(
+    store: &Database,
+    run_id: i64,
+) -> Result<(PathBuf, PathBuf, Vec<PathBuf>, PathBuf)> {
+    let folder = {
+        let db = store.connection()?;
+        let run = run::get(&db, run_id)?;
+        workspace::get(&db, run.workspace_id)?.folder
+    };
+    process::wait_for_login_path();
+    let dirs = process::search_dirs();
+    let git = process::find_binary("git", &dirs)
+        .ok_or(AppError::Validation("git não encontrado neste computador."))?;
+    let gh = process::find_binary("gh", &dirs).ok_or(AppError::Validation(
+        "GitHub CLI (gh) não encontrado. Veja Conexões.",
+    ))?;
+    Ok((git, gh, dirs, PathBuf::from(folder)))
+}
+
+/// Registra na conversa da run o que o Harnessy fez no GitHub.
+fn note_delivery(app: &AppHandle, run_id: i64, text: &str) {
+    let store = app.state::<Database>();
+    let _ = store
+        .connection()
+        .and_then(|db| run::append_event(&db, run_id, "status", text));
+}
+
+/// Envia a branch da run e abre o PR em draft (ou adota o que já existe).
+#[tauri::command]
+pub async fn publish_run(
+    app: AppHandle,
+    store: State<'_, Database>,
+    run_id: i64,
+) -> Result<crate::delivery::Delivery> {
+    let (git, gh, dirs, repo) = delivery_tools(&store, run_id)?;
+    let tools = run::publish::Tools {
+        git: &git,
+        gh: &gh,
+        dirs: &dirs,
+        repo: &repo,
+    };
+    let result = super::delivery::publish(&store, &tools, &git, run_id)?;
+    note_delivery(
+        &app,
+        run_id,
+        &format!(
+            "PR #{} publicado como draft: {}",
+            result.pr_number, result.pr_url
+        ),
+    );
+    Ok(result)
+}
+
+/// Relê o PR no GitHub (checks, conflitos, merge feito por fora).
+#[tauri::command]
+pub async fn refresh_delivery(
+    app: AppHandle,
+    store: State<'_, Database>,
+    run_id: i64,
+) -> Result<crate::delivery::Delivery> {
+    let (git, gh, dirs, repo) = delivery_tools(&store, run_id)?;
+    let tools = run::publish::Tools {
+        git: &git,
+        gh: &gh,
+        dirs: &dirs,
+        repo: &repo,
+    };
+    let (result, change) = super::delivery::refresh(&store, &tools, run_id)?;
+    if let Some(change) = change {
+        emit_change(&app, &change);
+    }
+    Ok(result)
+}
+
+/// Merge (squash) do PR da run, só com o PR seguro; a tarefa vai para Concluído.
+#[tauri::command]
+pub async fn merge_delivery(
+    app: AppHandle,
+    store: State<'_, Database>,
+    run_id: i64,
+) -> Result<crate::delivery::Delivery> {
+    let (git, gh, dirs, repo) = delivery_tools(&store, run_id)?;
+    let tools = run::publish::Tools {
+        git: &git,
+        gh: &gh,
+        dirs: &dirs,
+        repo: &repo,
+    };
+    let (result, change) = super::delivery::merge(&store, &tools, run_id)?;
+    note_delivery(&app, run_id, &format!("PR #{} mergeado.", result.pr_number));
+    if let Some(change) = change {
+        emit_change(&app, &change);
+    }
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn list_deliveries(
+    store: State<'_, Database>,
+    workspace_id: i64,
+) -> Result<Vec<crate::delivery::Delivery>> {
+    super::delivery::list(&*store.connection()?, workspace_id)
+}
+
+/// Como subir o projeto: o perfil do workspace, se foi confirmado e o que sugerir.
+#[tauri::command]
+pub async fn get_profile(
+    store: State<'_, Database>,
+    workspace_id: i64,
+) -> Result<super::preview::ProfileView> {
+    super::preview::profile_view(&*store.connection()?, workspace_id)
+}
+
+/// Grava `.harnessy/workspace.toml` com o comando escolhido e o confirma.
+#[tauri::command]
+pub async fn save_profile(
+    store: State<'_, Database>,
+    workspace_id: i64,
+    run: String,
+    port: Option<u16>,
+) -> Result<super::preview::ProfileView> {
+    super::preview::save_profile(&*store.connection()?, workspace_id, &run, port)
+}
+
+/// Confirma o comando que o repositório já traz no perfil.
+#[tauri::command]
+pub async fn approve_profile(
+    store: State<'_, Database>,
+    workspace_id: i64,
+) -> Result<super::preview::ProfileView> {
+    super::preview::approve_profile(&*store.connection()?, workspace_id)
+}
+
+fn emit_preview(app: &AppHandle, event: run::preview::Event) {
+    match event {
+        run::preview::Event::State(info) => {
+            let _ = app.emit("preview-state", info);
+        }
+        run::preview::Event::Log { run_id, line } => {
+            let _ = app.emit(
+                "preview-log",
+                serde_json::json!({ "runId": run_id, "line": line }),
+            );
+        }
+    }
+}
+
+/// Sobe o projeto da run no worktree dela, com o comando que o usuário confirmou.
+#[tauri::command]
+pub async fn start_preview(
+    app: AppHandle,
+    store: State<'_, Database>,
+    previews: State<'_, run::preview::Previews>,
+    run_id: i64,
+) -> Result<run::preview::Info> {
+    process::wait_for_login_path();
+    let dirs = process::search_dirs();
+    let target = app_data(&app)?.join("cargo-target");
+    let (spec, hooks) = super::preview::plan_for(&*store.connection()?, run_id, &dirs, &target)?;
+    let handle = app.clone();
+    previews.start(spec, hooks, move |event| emit_preview(&handle, event))
+}
+
+#[tauri::command]
+pub async fn stop_preview(previews: State<'_, run::preview::Previews>, run_id: i64) -> Result<()> {
+    previews.stop(run_id);
+    Ok(())
+}
+
+/// Abre no navegador o endereço local que o ambiente informou.
+#[tauri::command]
+pub async fn open_preview(previews: State<'_, run::preview::Previews>, run_id: i64) -> Result<()> {
+    previews.open(run_id)
+}
+
+/// Estado e últimas linhas do log do ambiente de uma run (a tela chega depois dos eventos).
+#[tauri::command]
+pub async fn preview_snapshot(
+    previews: State<'_, run::preview::Previews>,
+    run_id: i64,
+) -> Result<(Option<run::preview::Info>, Vec<String>)> {
+    Ok((previews.info(run_id), previews.log(run_id)))
+}
+
+/// Ambientes de teste vivos, para o quadro marcar quais tarefas estão no ar.
+#[tauri::command]
+pub async fn list_previews(
+    previews: State<'_, run::preview::Previews>,
+) -> Result<Vec<run::preview::Info>> {
+    Ok(previews.active())
+}
+
+/// Alterações da run (`base..branch`) separadas por arquivo, para o humano ler no app.
+#[tauri::command]
+pub async fn run_diff(store: State<'_, Database>, run_id: i64) -> Result<run::diff::RunDiff> {
+    let (run, folder) = {
+        let db = store.connection()?;
+        let run = run::get(&db, run_id)?;
+        let folder = workspace::get(&db, run.workspace_id)?.folder;
+        (run, folder)
+    };
+    let (Some(base), Some(branch)) = (run.base_sha.as_deref(), run.branch.as_deref()) else {
+        return Err(AppError::Validation("Esta run não deixou uma branch."));
+    };
+    process::wait_for_login_path();
+    let dirs = process::search_dirs();
+    let git = process::find_binary("git", &dirs)
+        .ok_or(AppError::Validation("git não encontrado neste computador."))?;
+    let text =
+        worktree::diff_range(&git, &dirs, Path::new(&folder), base, branch, 3).map_err(|_| {
+            AppError::Validation("Não foi possível ler as alterações; a branch ainda existe?")
+        })?;
+    let mut diff = run::diff::parse(&text);
+    // O git devolve no máximo ~512 KB: se chegou perto, o final pode ter ficado de fora.
+    diff.truncated |= text.len() >= 500 * 1024;
+    Ok(diff)
 }

@@ -14,6 +14,12 @@
   --border: var(--neutral-200); --accent: var(--amber-400); --accent-hover: var(--amber-500); --focus: var(--amber-800);
   --positive: var(--green-600); --in-progress: var(--blue-500); --review: var(--purple-500);
   --critical: #9a3528;
+  /* Terminal (logs): superfície escura quente e cores semânticas, todas com contraste de 6:1 ou mais sobre o fundo. */
+  --log-bg: #24211c; --log-border: #3a362e; --log-bar: #2e2a24;
+  --log-text: #ece7da; --log-dim: #a79f8e; --log-prompt: #c9b27a;
+  --log-error: #ff9b8a; --log-warn: #f0c35c; --log-ok: #9fd6a6; --log-info: #8fc3ee; --log-note: #e9b54b;
+  --log-select: rgba(233, 181, 75, 0.3); --log-scroll: #4a453b;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
   --text-xs: 11px; --text-sm: 12px; --text-base: 13px;
   --duration-fast: 120ms;
   --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

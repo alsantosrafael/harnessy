@@ -93,6 +93,18 @@ Precedência por id: repositório > usuário > embutida. Arquivo inválido apare
 
 Superfície IPC: `list_actions(workspaceId?)`, `approve_action(workspaceId, id)`, `create_action(input)`, `create_steps(workspaceId, parentId, steps)`, `continue_run(runId)` (ciclo com o próximo modelo da lista `haiku → sonnet → opus → fable`) e `start_run`/`preview_prompt` com `action` (e `continueFrom` opcional em `start_run`, para partir da branch de uma run concluída; `start_run` recebe também `reviewer` (`claude` ou `codex`), `reviewerModel` (vazio = automático) e `reviewWhen` (`auto`, `always`, `never`) e `instruction` opcional: texto de ajuste, até 4.000 caracteres, anexado ao fim do prompt para iterar numa run encadeada sem criar tarefa). `delete_task(workspaceId, taskId)` exclui a tarefa, o histórico e as runs dela (recusa se houver run em andamento; as branches ficam no git) e `review_run(runId, reviewer, reviewerModel)` revisa sob demanda uma run concluída com branch, sobre o diff `base..branch`, mesmo sem sinal de risco; o veredito e o ciclo entram na run sem mudar o estado dela nem o card. Não há permissão nova em `capabilities/main.json`, porque são comandos do próprio app.
 
+Atenção: `set_attention_count(count)` escreve o contador no ícone da bandeja e `notify_attention(title, body)` mostra uma notificação do macOS (peça a permissão na primeira vez; recusada, não insiste). O plugin de notificação é usado só no Rust, sem permissão extra em `capabilities/main.json`; os textos vêm do front e são curtos, sem saída de agente nem credenciais.
+
+Preferências e esforço: `get_preference(key)` e `set_preference(key, value)` guardam a escolha de agente no banco (`agent-choice`, objeto JSON de até 4 KB; chaves fora da lista são recusadas), que vale para qualquer janela. `start_run` aceita `effort` e `reviewerEffort` opcionais (`low`, `medium`, `high`, `xhigh`, `max` no Claude Code; `low`, `medium`, `high` no Codex, que os recebe como `-c model_reasoning_effort`), que vencem o esforço declarado pela Ação; `review_run` aceita `reviewerEffort`. O esforço do revisor fica em `runs.reviewer_effort`.
+
+Alterações: `run_diff(runId)` devolve os arquivos de `base..branch` (status, contagens, patch com limites) para a tela de leitura, sem escrever nada.
+
+Automação: `get_automation(workspaceId, taskId?)`, `save_automation(workspaceId, modes, guardrails)`, `apply_automation_preset(workspaceId, preset)`, `set_automation_paused(workspaceId, paused)`, `save_task_automation(taskId, overrides)` e `list_automation_events(workspaceId, taskId?, limit)`. Modos: `manual`, `assisted`, `auto` por etapa (`start`, `review`, `qa`, `preview`, `publish`, `merge`); o núcleo recusa `auto` no merge. A configuração é local e pessoal, e o repositório só aperta as travas.
+
+Ambiente de teste: `get_profile(workspaceId)`, `save_profile(workspaceId, run, port?)` e `approve_profile(workspaceId)` tratam `.harnessy/workspace.toml`; `start_preview(runId)`, `stop_preview(runId)`, `open_preview(runId)`, `preview_snapshot(runId)` e `list_previews()` controlam o processo (`run::preview`), com os eventos `preview-state` e `preview-log`. O comando só roda após confirmação do texto exato do arquivo e `open_preview` só abre `http://localhost:N` anunciado pelo ambiente.
+
+Entrega: `publish_run(runId)` envia a branch e abre o PR em draft (idempotente), `refresh_delivery(runId)` relê checks, conflitos e merge feito por fora, `merge_delivery(runId)` faz squash do PR seguro e leva a tarefa a Concluído, e `list_deliveries(workspaceId)` lista os PRs. `git push` e `gh` rodam em `run::publish`, com o login do usuário, depois de verificar o diff (ADR 0001); o agente continua sem acesso a eles.
+
 ### Instruções do repositório
 
 O prefixo do prompt diz "Siga o AGENTS.md", mas não copia o arquivo. Se o `claude` carrega o `CLAUDE.md` do worktree com os argumentos do Harnessy (`--setting-sources user`) é respondido pelo teste ignorado `instructions_are_loaded_by_the_cli` (`cargo test instructions_are_loaded_by_the_cli -- --ignored --nocapture`, consome um turno do `haiku`). Resultado: ainda não executado; registre aqui quando rodar.
@@ -158,3 +170,14 @@ O agente não sabe que existe card, então gerir cards não custa token. O estad
 8. Fechar janela, reabrir pela bandeja e encerrar explicitamente.
 
 IPC e lifecycle precisam de verificação no Tauri real. Navegador/WebKit ajuda a validar a interface, mas não comprova a integração desktop. Para requisitos e próximos gates, consulte [SPEC.md](../SPEC.md).
+
+## Dogfooding: o Harnessy rodando no próprio Harnessy
+
+Para testar o código desta pasta sem tocar no seu Harnessy do dia a dia, use instâncias de teste. Cada uma tem **identificador próprio**, e é ele que decide onde ficam os dados (`~/Library/Application Support/<identificador>`), as preferências, o armazenamento da WebView e o ícone da barra:
+
+| Comando | O que faz |
+|---|---|
+| `bun run app:dogfood` | Gera e abre **Harnessy Dogfood** (`app.harnessy.desktop.dogfood`) com compilação em `src-tauri/target/dogfood`. `-- --build-only` só gera |
+| `bun run app:preview [porta]` | Roda o Harnessy desta pasta em desenvolvimento (`app.harnessy.desktop.preview`), com o `devUrl` na porta dada (ou `PORT`). É o comando do `.harnessy/workspace.toml` deste repositório, com `{port}` |
+
+Uma instância de teste mostra a faixa **Instância de teste · \<etiqueta\>** e o **H·\<etiqueta\>** na barra de menus (`app::instance_tag`). Branches de runs ganham o prefixo `harnessy-<etiqueta>/`, e um nome já existente recebe `-2`, `-3`… (`worktree::unique_branch`), então duas instâncias no mesmo repositório não disputam `harnessy/run-1-…`. O roteiro completo está em [roteiro-dogfooding.md](roteiro-dogfooding.md).

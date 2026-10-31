@@ -1,8 +1,47 @@
-import { ArrowRight, Pencil, Trash2, TriangleAlert } from "lucide-react";
+import {
+  ArrowRight,
+  CircleCheck,
+  CircleX,
+  GitMerge,
+  GitPullRequest,
+  GitPullRequestClosed,
+  GitPullRequestDraft,
+  HardDrive,
+  LoaderCircle,
+  MonitorPlay,
+  Pencil,
+  Trash2,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 import { memo, useRef, useState } from "react";
 import { type Block, LANES, neighbor, shortcutTarget, statusName } from "../lib/board";
+import { type Stage, type StageId, summarize } from "../lib/delivery";
 import type { LocalTask, TaskStatus } from "../lib/desktop";
 import "../styles/kanban.css";
+
+/** Dados de uma tarefa nova; só o título é obrigatório. */
+export interface NewTaskDraft {
+  title: string;
+  description: string;
+  criteria: string;
+}
+
+/** Ícone por estágio: o estado nunca depende só da cor. */
+const STAGE_ICONS: Record<StageId, LucideIcon> = {
+  local: HardDrive,
+  draft: GitPullRequestDraft,
+  open: GitPullRequest,
+  "checks-running": LoaderCircle,
+  "checks-failing": CircleX,
+  conflict: TriangleAlert,
+  "changes-requested": TriangleAlert,
+  ready: CircleCheck,
+  merged: GitMerge,
+  closed: GitPullRequestClosed,
+};
+
+const EMPTY_DRAFT: NewTaskDraft = { title: "", description: "", criteria: "" };
 
 interface Props {
   groups: Record<TaskStatus, LocalTask[]>;
@@ -11,6 +50,10 @@ interface Props {
   working: ReadonlySet<number>;
   /** Tarefas cuja última run ficou presa, com o motivo. */
   blocked: ReadonlyMap<number, Block>;
+  /** Estágio de entrega (PR, checks, revisão) de cada tarefa que tem algo a mostrar. */
+  stages: ReadonlyMap<number, Stage>;
+  /** Tarefas com o ambiente de teste no ar. */
+  testing: ReadonlySet<number>;
   /** Card recém-movido ou criado, destacado por um instante. */
   flashId: number | null;
   onSelect: (id: number) => void;
@@ -18,7 +61,8 @@ interface Props {
   /** Abre a tarefa com o cursor no título. */
   onEdit: (id: number) => void;
   onDelete: (id: number) => void;
-  onCreate: (title: string) => Promise<void>;
+  /** Resolve `true` só quando a tarefa foi gravada; `false` mantém o rascunho na tela. */
+  onCreate: (draft: NewTaskDraft) => Promise<boolean>;
 }
 
 /** Tarefas do workspace em quatro raias. Mover: botão do card, teclado ou arrastar. */
@@ -27,6 +71,8 @@ export function Kanban({
   selectedId,
   working,
   blocked,
+  stages,
+  testing,
   flashId,
   onSelect,
   onMove,
@@ -64,6 +110,7 @@ export function Kanban({
             {lane.name}
             <span className="lane-count">{groups[lane.status].length}</span>
           </h3>
+          <LaneSummary tasks={groups[lane.status]} stages={stages} />
           {lane.status === "todo" && <Composer onCreate={onCreate} />}
           <ul className="lane-cards">
             {groups[lane.status].map((task) => (
@@ -73,6 +120,8 @@ export function Kanban({
                 selected={selectedId === task.id}
                 working={working.has(task.id)}
                 blocked={blocked.get(task.id)?.reason}
+                stage={stages.get(task.id)}
+                testing={testing.has(task.id)}
                 flash={flashId === task.id}
                 onSelect={onSelect}
                 onMove={onMove}
@@ -91,35 +140,137 @@ export function Kanban({
   );
 }
 
-function Composer({ onCreate }: { onCreate: (title: string) => Promise<void> }) {
-  const [title, setTitle] = useState("");
+/** Nova tarefa: o título basta; descrição e critérios são opcionais e podem vir depois. */
+function Composer({ onCreate }: { onCreate: (draft: NewTaskDraft) => Promise<boolean> }) {
+  const [draft, setDraft] = useState(EMPTY_DRAFT);
+  const [detailed, setDetailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const ready = draft.title.trim() !== "";
+
+  async function submit() {
+    if (!ready || busy) return;
+    setBusy(true);
+    const created = await onCreate({
+      title: draft.title.trim(),
+      description: draft.description.trim(),
+      criteria: draft.criteria.trim(),
+    });
+    // Só limpa após gravar: uma falha mantém o texto para o usuário tentar de novo.
+    if (created) setDraft(EMPTY_DRAFT);
+    setBusy(false);
+  }
+
   return (
     <form
       className="composer-inline"
-      onSubmit={async (event) => {
+      onSubmit={(event) => {
         event.preventDefault();
-        const value = title.trim();
-        if (!value || busy) return;
-        setBusy(true);
-        await onCreate(value);
-        setTitle("");
-        setBusy(false);
+        void submit();
       }}
     >
-      <label className="sr-only" htmlFor="new-task-title">
-        Título da nova tarefa
+      <label className="composer-label" htmlFor="new-task-title">
+        Título
       </label>
       <input
         id="new-task-title"
-        value={title}
+        value={draft.title}
         maxLength={300}
         placeholder="Nova tarefa… (n)"
         autoComplete="off"
         disabled={busy}
-        onChange={(event) => setTitle(event.target.value)}
+        onChange={(event) => setDraft({ ...draft, title: event.target.value })}
       />
+      <button
+        type="button"
+        className="composer-toggle"
+        aria-expanded={detailed}
+        aria-controls="new-task-details"
+        onClick={() => setDetailed(!detailed)}
+      >
+        {detailed ? "Ocultar descrição e critérios" : "+ Descrição e critérios"}
+      </button>
+      {detailed && (
+        <div id="new-task-details" className="composer-details">
+          <label>
+            Descrição
+            <textarea
+              rows={3}
+              maxLength={100000}
+              value={draft.description}
+              disabled={busy}
+              onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                  event.preventDefault();
+                  void submit();
+                }
+              }}
+            />
+          </label>
+          <label>
+            Critérios de aceite
+            <textarea
+              rows={3}
+              maxLength={100000}
+              value={draft.criteria}
+              disabled={busy}
+              onChange={(event) => setDraft({ ...draft, criteria: event.target.value })}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                  event.preventDefault();
+                  void submit();
+                }
+              }}
+            />
+          </label>
+        </div>
+      )}
+      <div className="composer-footer">
+        <span className="composer-hint">
+          Só o título basta. O resto pode vir depois, no painel da tarefa.
+        </span>
+        <button className="button primary" disabled={!ready || busy}>
+          {busy ? "Criando…" : "Criar"}
+        </button>
+      </div>
     </form>
+  );
+}
+
+/** Selo do estágio: ícone + texto, com a frase completa no tooltip e para leitor de tela. */
+function StageChip({ stage }: { stage: Stage }) {
+  const Icon = STAGE_ICONS[stage.id];
+  return (
+    <span className={`chip stage-chip tone-${stage.tone}`} title={stage.hint}>
+      <Icon
+        size={11}
+        aria-hidden="true"
+        className={stage.id === "checks-running" ? "is-spinning" : undefined}
+      />
+      {stage.label}
+      <span className="sr-only">. {stage.hint}</span>
+    </span>
+  );
+}
+
+/** Resumo da raia por estágio, com o que pede ação primeiro. Some quando não há nada. */
+function LaneSummary({
+  tasks,
+  stages,
+}: {
+  tasks: LocalTask[];
+  stages: ReadonlyMap<number, Stage>;
+}) {
+  const found = tasks.flatMap((task) => stages.get(task.id) ?? []);
+  if (found.length === 0) return null;
+  return (
+    <ul className="lane-summary" aria-label="Estágios de entrega">
+      {summarize(found).map((item) => (
+        <li key={item.id} className={`tone-${found.find((f) => f.id === item.id)?.tone}`}>
+          <strong>{item.count}</strong> {item.label}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -128,6 +279,8 @@ interface CardProps {
   selected: boolean;
   working: boolean;
   blocked?: string;
+  stage?: Stage;
+  testing: boolean;
   flash: boolean;
   onSelect: (id: number) => void;
   onMove: (id: number, to: TaskStatus) => void;
@@ -142,6 +295,8 @@ const KanbanCard = memo(function KanbanCard({
   selected,
   working,
   blocked,
+  stage,
+  testing,
   flash,
   onSelect,
   onMove,
@@ -184,6 +339,12 @@ const KanbanCard = memo(function KanbanCard({
           {blocked && (
             <span className="chip is-blocked" title={blocked}>
               <TriangleAlert size={11} aria-hidden="true" /> Bloqueada
+            </span>
+          )}
+          {stage && <StageChip stage={stage} />}
+          {testing && (
+            <span className="chip stage-chip tone-success" title="O ambiente de teste está no ar.">
+              <MonitorPlay size={11} aria-hidden="true" /> No ar
             </span>
           )}
           {working && (

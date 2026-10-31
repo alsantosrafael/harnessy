@@ -4,7 +4,7 @@
 
 Aplicativo desktop feito com **Tauri 2, Rust, React e TypeScript**, usando **Bun, Vite e Vitest** no frontend. Primeira plataforma: **macOS**, validado inicialmente em Apple Silicon.
 
-> **0.2.0 · Em desenvolvimento.** Crie tarefas locais, mova os cards entre A fazer, Em andamento, Revisão e Concluído (com histórico) e mande o Claude Code implementar em um worktree próprio. O card anda sozinho e as runs presas aparecem como bloqueadas. Push e PR ainda são manuais.
+> **Em desenvolvimento.** Crie tarefas, mande o Claude Code implementar numa cópia separada do projeto, leia as alterações, teste no seu Mac, publique um PR em draft e faça o merge, tudo com o Harnessy dizendo qual é o próximo passo e avisando quando precisa de você. O número da versão está no [changelog](CHANGELOG.md).
 
 ## Comece aqui
 
@@ -33,15 +33,15 @@ O comando abre a janela desktop e inicia automaticamente o frontend de desenvolv
 
 ## Primeiro passeio
 
-1. Em **Visão geral → Tarefas**, crie um workspace e digite o título de uma tarefa na raia **A fazer** (`Enter`). Mova o card pela seta, com `]`/`[` ou arrastando.
-2. Clique em **Preparar tarefa** para abrir o Chat com o campo em foco.
-3. Escreva sua ideia. O rascunho é salvo neste dispositivo; sugestões acrescentam texto sem apagar o conteúdo existente.
-4. Abra **Conexões** para verificar as sessões das CLIs `gh`, `codex` e `claude`. Para autenticar, execute o comando indicado no terminal e verifique novamente.
-5. Feche a janela para ocultá-la. Use o menu **H**, na barra superior do macOS, para **Abrir Harnessy** ou **Encerrar Harnessy**.
+1. Abra **Conexões** (`⌘3`) e confira se `claude`, `git` e `gh` estão **Conectados**. Para conectar, rode o comando indicado no cartão no Terminal e clique em **Verificar novamente**.
+2. Em **Tarefas**, crie um workspace (nome e caminho completo da pasta do projeto, que precisa ser um repositório git) e digite um título na coluna **A fazer** (`Enter`).
+3. Selecione a tarefa e clique em **Próximo passo** (ou tecle `A`): o Claude Code implementa numa cópia separada do projeto.
+4. Quando o card for para **Revisão**, abra **Alterações da run**, **Rodar localmente** para testar e depois **Publicar PR** e **Fazer merge**. O botão principal sempre diz qual é o próximo passo.
+5. Feche a janela para ocultá-la: o Harnessy continua avisando pela barra de menus (**H**) e por notificações. Use **H → Encerrar Harnessy** para sair.
 
-No chat, **Iniciar** cria a tarefa e começa a run com o agente e o modelo que você escolher (padrão: Claude Code com Sonnet). Não coloque credenciais no chat: o armazenamento de rascunhos não é um cofre.
+Não coloque credenciais no chat: o armazenamento de rascunhos não é um cofre.
 
-[Guia completo de uso e atalhos →](docs/user-guide.md)
+**Nunca usou?** Comece pelo [Guia do Harnessy](docs/user-guide.md): ele foi escrito para quem não é da área técnica, com uma página por assunto.
 
 ## O que está disponível
 
@@ -52,11 +52,14 @@ No chat, **Iniciar** cria a tarefa e começa a run com o agente e o modelo que v
 | Tarefas (quadro local com estados e histórico) | Disponível |
 | GitHub, Codex e Claude Code | Estado real das sessões das CLIs `gh`, `codex` e `claude`; autenticação pelo terminal |
 | Claude Code implementa em worktree próprio | Disponível: verificações rodadas pelo núcleo, falha estruturada, retomada de sessão, contraprova e ciclo com o próximo modelo |
-| Revisão independente | Revisor escolhido na interface (Claude Code ou Codex, com modelo e "quando revisar"); por padrão, Claude um modelo acima quando há sinal de risco |
+| Revisão independente | Revisor escolhido na interface (Claude Code ou Codex, com modelo e "quando revisar"); por padrão a revisão é proporcional ao tamanho e ao risco da mudança (pula só documentação pequena e usa modelo menor em mudança pequena), como um staff engineer |
 | Ações (Explicar, Dividir em passos, Nova Ação, Ações do repositório) | Disponível |
 | Workspaces e tarefas locais em SQLite | Disponível (aba Tarefas locais) |
 | Configuração `.harnessy/` versionada | Ações em `.harnessy/actions/` com confirmação por hash; perfil de verificações planejado |
-| Deploy, Playwright e fluxo de revisão/correção | Planejados |
+| Ver as alterações, rodar localmente, publicar PR em draft, checks e merge | Disponível |
+| Próximo passo por tarefa, filtro "Precisa de você", contador na barra de menus e notificações | Disponível |
+| Automação por etapa (eu conduzo, assistido, delegado), QA e discovery | Planejados (a base da automação já existe no núcleo) |
+| Deploy e Playwright | Planejados |
 
 As configurações e workflows descritos na SPEC são requisitos futuros, não arquivos que você precise criar para abrir esta versão. Nenhum token ou Docker é necessário para explorar a fundação; as CLIs são opcionais e, quando presentes, sua sessão é apenas verificada.
 
@@ -77,7 +80,10 @@ Este é um build local: não há instalador DMG, atualização automática ou re
 | Preciso de… | Leia |
 | --- | --- |
 | Instalar, executar ou gerar um build | [Primeiros passos](docs/getting-started.md) |
-| Entender telas, atalhos e rascunhos | [Guia de uso](docs/user-guide.md) |
+| Aprender a usar, passo a passo, sem jargão | [Guia do Harnessy](docs/user-guide.md) |
+| Entender uma palavra | [Glossário](docs/guia/glossario.md) |
+| Saber o que é seguro e o que fica no meu Mac | [Segurança e privacidade](docs/guia/09-seguranca-e-privacidade.md) |
+| Testar o ciclo completo no próprio Harnessy | [Roteiro de teste](docs/roteiro-dogfooding.md) |
 | Resolver erro ao abrir, compilar ou salvar | [Solução de problemas](docs/troubleshooting.md) |
 | Trabalhar no código e executar verificações | [Desenvolvimento](docs/development.md) |
 | Usar e diagnosticar o harness de desenvolvimento | [Harness do repositório](docs/harness.md) |
@@ -89,4 +95,4 @@ Este é um build local: não há instalador DMG, atualização automática ou re
 
 ## Versionamento
 
-O produto começa em **0.1.0**, com SemVer desde o início. `package.json` fornece a versão exibida e distribuída; `bun run check` confere esse vínculo. Use `bun run test` para executar os testes Vitest e `bun run test:watch` durante o desenvolvimento. Consulte a política em [Desenvolvimento](docs/development.md#versionamento).
+O produto segue SemVer, com versões independentes para a interface (`package.json`) e para o núcleo Rust (`src-tauri/Cargo.toml`). `package.json` fornece a versão exibida e distribuída; `bun run check` confere esse vínculo. Use `bun run test` para executar os testes Vitest e `bun run test:watch` durante o desenvolvimento. Consulte a política em [Desenvolvimento](docs/development.md#versionamento).

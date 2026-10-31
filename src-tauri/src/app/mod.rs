@@ -1,5 +1,6 @@
 //! Ciclo de vida do aplicativo: metadados, estado gerenciado e janela.
 
+pub mod attention;
 pub mod tray;
 
 use serde::Serialize;
@@ -15,16 +16,37 @@ pub struct AppInfo {
     version: String,
     platform: &'static str,
     agent_execution_available: bool,
+    /// Etiqueta da instância de teste (`dogfood`); `None` na principal.
+    instance: Option<String>,
+}
+
+/// Identificador da instância principal (a que o usuário usa no dia a dia).
+const MAIN_IDENTIFIER: &str = "app.harnessy.desktop";
+const MAX_TAG_CHARS: usize = 24;
+
+/// Etiqueta de uma instância de teste (`dogfood`, `preview`…): o que vem depois do identificador
+/// principal. Cada uma tem dados, ícone e branches próprios; `None` na instância principal.
+pub fn instance_tag(identifier: &str) -> Option<String> {
+    let tag = identifier
+        .strip_prefix(MAIN_IDENTIFIER)?
+        .strip_prefix('.')?;
+    let valid = !tag.is_empty()
+        && tag.chars().count() <= MAX_TAG_CHARS
+        && tag
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    valid.then(|| tag.to_owned())
 }
 
 #[tauri::command]
-pub fn app_info(app: AppHandle) -> AppInfo {
+pub async fn app_info(app: AppHandle) -> AppInfo {
     let version = app.package_info().version.to_string();
     eprintln!("[harnessy] IPC app_info: version={version}");
     AppInfo {
         version,
         platform: std::env::consts::OS,
         agent_execution_available: agent_tools_present(),
+        instance: instance_tag(&app.config().identifier),
     }
 }
 
@@ -47,6 +69,7 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     flow::sync::recover(&*database.connection()?, &read_only)?;
     app.manage(database);
     app.manage(Registry::default());
+    app.manage(crate::run::preview::Previews::default());
     tray::install(app)?;
     Ok(())
 }
@@ -56,5 +79,32 @@ pub fn show_main_window(app: &AppHandle) {
         if let Err(error) = window.show().and_then(|_| window.set_focus()) {
             eprintln!("[harnessy] Falha ao reabrir janela: {error}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_a_suffix_after_the_main_identifier_makes_a_test_instance() {
+        assert_eq!(instance_tag("app.harnessy.desktop"), None);
+        assert_eq!(instance_tag("app.harnessy.desktop."), None);
+        assert_eq!(
+            instance_tag("app.harnessy.desktop.dogfood").as_deref(),
+            Some("dogfood")
+        );
+        assert_eq!(
+            instance_tag("app.harnessy.desktop.preview-2").as_deref(),
+            Some("preview-2")
+        );
+        assert_eq!(instance_tag("app.harnessy.desktop.Maiusculas"), None);
+        assert_eq!(instance_tag("app.harnessy.desktop.a/b"), None);
+        assert_eq!(instance_tag("app.harnessy.desktopx"), None);
+        assert_eq!(instance_tag("com.outra.coisa"), None);
+        assert_eq!(
+            instance_tag(&format!("app.harnessy.desktop.{}", "a".repeat(40))),
+            None
+        );
     }
 }

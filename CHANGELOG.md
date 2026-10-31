@@ -2,6 +2,201 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.21.0] — 2026-10-31
+
+Rodar localmente para testar a mudança (fatia 2a):
+
+- Novo comando rápido **Rodar localmente** (vira **Parar ambiente** quando está no ar). Sem `.harnessy/workspace.toml`, um diálogo pergunta o comando (já sugerido a partir do `package.json`) e a porta, grava o arquivo e sobe. Se o arquivo veio do repositório, mostra o comando e pede confirmação antes de rodar.
+- Painel **Ambiente de teste** na tarefa: estado em texto (Subindo…, No ar, Parado, Caiu com o código), endereço, **Abrir no navegador**, **Parar** / **Rodar de novo** e o log ao vivo, rolável por teclado.
+- O card mostra **No ar** enquanto o ambiente da tarefa está rodando.
+
+## Front [0.29.1] — 2026-10-31
+
+O log do ambiente de teste (e os demais logs) ganha uma paleta de terminal legível, verificada em captura de tela:
+
+- **Superfície escura e quente** (`--log-bg`) no lugar do bege sobre bege, com todos os pares de cor acima de 6:1 de contraste (a maioria acima de 7:1). Os tokens `--log-*` ficam em `tokens.css`.
+- **Cor por tipo de linha**, com um sinal à esquerda para não depender só da cor: erro em vermelho com barra e `✕`, aviso em âmbar com `!`, pronto/OK em verde com `✓`, endereço local em azul, comando atenuado, rastro de pilha em cinza e as falas do próprio Harnessy ("recriando a cópia…") em âmbar itálico com `›`. Erro vence qualquer outra regra.
+- Barra de título com a contagem de linhas e o botão **Copiar** (com confirmação). A dica de porta ocupada mostra `{port}` como código.
+- Os blocos de log técnico da run, a prévia do prompt e a linha de atividade do agente usam a mesma superfície.
+
+## Front [0.29.0] — 2026-10-31
+
+Instâncias de teste, para fazer dogfooding sem misturar com o seu Harnessy:
+
+- Uma instância de teste mostra a faixa **Instância de teste · dogfood** no topo e a etiqueta na versão. O ícone da barra de menus fica **H·dogfood**.
+- Novos comandos: `bun run app:dogfood` gera e abre **Harnessy Dogfood**, uma segunda instância com banco, preferências e ícone próprios (compilação em `src-tauri/target/dogfood`), e `bun run app:preview [porta]` roda o Harnessy de uma pasta em desenvolvimento, isolado, na porta dada. O `.harnessy/workspace.toml` deste repositório (que tinha `bun run dev`, e brigava pela porta 1420 com o app em desenvolvimento) agora usa `bun run app:preview {port}`.
+- O roteiro de teste ganhou um passo 0 sem backup e sem fechar o app principal.
+
+## Back [0.26.0] — 2026-10-31
+
+- **Instâncias de teste.** O identificador do app decide a instância (`app.harnessy.desktop` é a principal; `app.harnessy.desktop.<etiqueta>` é de teste, com dados próprios). `app_info` devolve `instance`, e o ícone da barra leva a etiqueta (`H·dogfood`).
+- **Branches que não colidem.** Instâncias de teste usam o prefixo `harnessy-<etiqueta>/run-N-…` (antes, duas instâncias no mesmo repositório disputavam `harnessy/run-1-…`), e um nome que já existe (um banco restaurado, outra instância) recebe `-2`, `-3`… em vez de falhar no `git worktree add`.
+
+## Front [0.28.1] — 2026-10-31
+
+Clicar numa tarefa responde na hora (verificado no navegador com os comandos lentos simulados: o card selecionado e o esqueleto do detalhe aparecem em cerca de 20 ms, e o detalhe completo em cerca de 70 ms):
+
+- O **detalhe monta em segundo plano**: o card destaca no mesmo instante do clique e um esqueleto ocupa o lugar do detalhe até ele ficar pronto. O histórico também mostra esqueleto enquanto carrega.
+- O **prompt do agente só é montado quando você abre a seção** "Prompt que o agente receberá" (antes, a cada tarefa aberta, com vários comandos `git`).
+- **Feedback de clique no card**: cursor de mão, escurece e ganha borda âmbar ao pressionar, e o card selecionado ganha barra de acento à esquerda, contorno e fundo próprios. Respeita "Reduzir movimento".
+- A **barra de ações do card** (editar, excluir, mover) deixou de cobrir o título e de ser cortada pela rolagem da raia: ela flutua acima da borda do card.
+- O **seletor de agente, modelo e esforço** virou uma grade alinhada, com a ajuda em linha própria e rótulos curtos (Proporcional, Automático), sem texto cortado nem legenda sobre a linha divisória.
+
+## Back [0.25.1] — 2026-10-31
+
+- **Corrigido um falso "porta ocupada".** A checagem de porta conectava nela, e numa porta da faixa efêmera o sistema pode escolher a mesma porta como origem (conexão consigo mesma), que parecia "alguém escuta". Essas conexões agora são ignoradas; o teste que revelou isso falhava só na suíte inteira.
+- **Os comandos de dados deixam de rodar na thread que desenha a janela.** Todos os comandos IPC de tarefas, runs, workspaces, entrega, perfil, automação e preferências passaram a `async` (no Tauri 2, um comando síncrono roda na thread principal e congela a interface enquanto trabalha). A prévia do prompt, que roda cerca de 10 processos `git`, era o pior caso.
+- **O harness do projeto é guardado em cache por commit** (até 16 entradas): a prévia do prompt e o início de runs deixam de refazer a leitura enquanto o commit não muda. Novo `worktree::resolve_rev`.
+
+## Front [0.28.0] — 2026-10-31
+
+- O padrão de **Quando revisar** passa a ser **Proporcional (recomendado)**, no lugar de "Sempre". Os rótulos do revisor dizem o que "Automático" faz (modelo e esforço pelo tamanho da mudança) e há uma frase de ajuda sob cada opção. Uma escolha já gravada no banco (por exemplo, "Sempre") **não é alterada**.
+
+## Back [0.25.0] — 2026-10-31
+
+Revisão proporcional: o custo da revisão acompanha o tamanho e o risco da mudança.
+
+- **"Sem testes" deixa de ser risco para documentação.** Uma mudança só de `.md`, `.mdx`, `.txt`, `.rst` ou `.adoc`, pequena, não passa mais pela revisão no modo proporcional (a conversa diz "só de documentação"). Mudança grande (mais de 300 linhas) ou em caminhos sensíveis (as mesmas travas da automação: dependências, migrações, CI, `.harnessy`) continua revisada.
+- **Modelo e esforço automáticos pelo diff.** O que o usuário deixou em Automático: mudança pequena revisa com o modelo de quem implementou (no mínimo Sonnet) e esforço baixo; as demais, um modelo acima e o esforço padrão. **Modelo ou esforço escolhidos pelo usuário (ou fixados pela Ação) nunca são alterados**, e vale também para a revisão sob demanda.
+- O status da revisão mostra o que foi usado ("Revisão independente (sonnet · esforço low · mudança pequena)…") e o ciclo grava o modelo realmente usado.
+
+## Front [0.27.0] — 2026-10-31
+
+Rodar localmente mais simples e a escolha de agente à vista:
+
+- O diálogo **Como subir este projeto?** perdeu o campo de porta e pede só o comando. `{port}` no comando faz o Harnessy escolher uma porta livre; para projetos Vite a sugestão já vem com ele.
+- Quando o ambiente cai por **porta ocupada**, o painel explica (pode ser o próprio Harnessy em desenvolvimento) e oferece **Editar comando**.
+- O seletor de **agente, modelo e esforço** (de quem implementa e de quem revisa) agora aparece **aberto** no detalhe da tarefa, em vez de recolhido.
+
+## Back [0.24.0] — 2026-10-31
+
+- O comando do perfil aceita o marcador `{port}`, trocado por uma **porta livre** escolhida pelo núcleo (a declarada, se estiver livre); o `PORT` do ambiente e a detecção do endereço usam a mesma porta. Qualquer outro `{...}` é recusado. A sugestão para scripts do Vite já traz `--port {port}`.
+- Sem `{port}`, uma porta declarada que já está em uso falha **antes** de recriar a cópia e instalar dependências, com a frase de como resolver.
+
+## Front [0.26.0] — 2026-10-31
+
+Você escolhe agente, modelo e **esforço** de quem implementa e de quem revisa, e a escolha deixa de se perder:
+
+- O seletor ganhou **Esforço** (Padrão, Baixo, Médio, Alto, Muito alto, Máximo no Claude Code; Padrão, Baixo, Médio, Alto no Codex), separado para quem implementa e para o revisor. Trocar de agente descarta um esforço que ele não conhece. O resumo mostra o que vale ("Claude Code · Sonnet · esforço médio · revisa: Codex (sempre)").
+- A escolha agora fica no **banco local**, não no `localStorage` da WebView. Antes, o app em desenvolvimento e o instalado tinham escolhas diferentes (foi assim que uma revisão feita pelo Claude saiu mesmo com o Codex escolhido) e ela se perdia ao limpar o cache. Uma escolha antiga do navegador migra para o banco na primeira abertura, sem sobrescrever uma já gravada.
+
+## Back [0.23.0] — 2026-10-31
+
+- Novo domínio `preferences` (tabela `preferences`) e comandos `get_preference` e `set_preference`, com lista de chaves aceitas, objeto JSON de até 4 KB.
+- **Esforço escolhido pelo usuário.** `start_run` aceita `effort` e `reviewerEffort`, e `review_run` aceita `reviewerEffort`; vencem o esforço da Ação. Validados por agente (`guard::user_effort`): Claude Code aceita `low`, `medium`, `high`, `xhigh` e `max`; Codex aceita `low`, `medium` e `high`, que agora recebe como `-c model_reasoning_effort` (antes ignorava o esforço). O esforço do revisor fica em `runs.reviewer_effort` (migração) e é reaproveitado no ciclo extra.
+
+## Front [0.25.0] — 2026-10-31
+
+Correções do primeiro uso no próprio Harnessy:
+
+- **Chevron da barra lateral:** o grupo do workspace atual agora abre e recolhe (antes ficava preso aberto).
+- **Implementar não leva mais para o Chat.** O usuário fica no quadro e o painel da tarefa mostra a etapa, o tempo decorrido e o que o agente está fazendo agora ("Editando guia/glossario.md"), com **Ver conversa** e **Cancelar**. **Revisar** também fica no quadro. Com a janela em foco, o que acabou de chegar aparece como aviso; sem foco, continua a notificação.
+- **Um só botão principal por tela.** Com a implementação já feita, o botão do detalhe vira **Implementar de novo** (secundário) e explica que ajustes se pedem na conversa; o principal é só o **Próximo passo**.
+- **Alterações da run** já abre aberto na raia de Revisão.
+- O aviso de erro some quando você inicia uma nova ação, em vez de ficar na tela.
+
+## Back [0.22.1] — 2026-10-31
+
+- **Rodar localmente funciona depois de a run terminar.** O worktree da run é removido ao fim dela (só a branch fica), e o ambiente de teste falhava com "o worktree não existe mais". Agora ele é **recriado a partir da branch** (`git worktree prune` + `add`), as dependências são instaladas e a cópia é removida de novo quando o ambiente para. O estado `starting` vale durante a preparação, com o andamento no log, e parar nessa fase impede o processo de abrir. Falha na preparação vira estado `failed` com o motivo no log.
+
+## Front [0.24.0] — 2026-10-31
+
+O quadro passa a dizer o que precisa de você, mesmo com a janela em segundo plano:
+
+- Filtro **Todas / Precisa de você / Com os agentes**, com contagem. "Precisa de você" reúne tarefas bloqueadas, com checks falhando, conflito, mudanças pedidas, prontas para merge, PR aguardando revisão ou só locais; PR mergeado e checks rodando ficam com os agentes. Uma frase ao lado ("2 tarefas pedem você") é anunciada para leitor de tela.
+- O ícone da bandeja mostra o contador ("H 2").
+- Quando algo novo chega com a janela **sem foco**, o macOS notifica ("Precisa de você" ou "N tarefas pedem você", com a mais urgente). O que já estava pendente ao abrir o app ou trocar de workspace não notifica.
+- Ao voltar para a janela, o banner **Enquanto você esteve fora** lista o que chegou, do mais urgente ao menos, com atalho para ver só o que precisa de você.
+- Os achados da revisão agora aparecem na linha do diff mesmo sem abrir a conversa da run antes.
+
+## Back [0.22.0] — 2026-10-31
+
+- Notificações do sistema pelo plugin oficial `tauri-plugin-notification`, usado **só pelo Rust**: nenhum comando do plugin é exposto à WebView e `capabilities/main.json` não ganhou permissão. Comando novo `notify_attention(title, body)` (texto cortado em 80 e 200 caracteres; sem permissão do usuário, não faz nada) e `set_attention_count(count)`, que escreve o contador ao lado do ícone da bandeja. O ícone da bandeja agora tem identificador próprio.
+
+## Front [0.23.0] — 2026-10-31
+
+Ver o que a run mudou, dentro do app:
+
+- Novo painel **Alterações da run** na tarefa (recolhido; lê ao abrir): resumo ("3 arquivos · +40 −12"), lista de arquivos com status e contagem, e o patch de um arquivo por vez, com número de linha dos dois lados e sinais `+`/`−` (o estado não depende só da cor). Abre pelo primeiro arquivo que a revisão comentou.
+- Os achados da revisão aparecem **na linha** a que se referem, com "Bloqueia" ou "Sugere" em texto (quando o log da run já foi carregado).
+- A área do patch é rolável e focável por teclado; binários e arquivos grandes dizem o que não é mostrado.
+
+## Back [0.21.0] — 2026-10-31
+
+- Novo comando `run_diff(runId)`: lê `base..branch` no repositório e devolve os arquivos alterados (status, linhas adicionadas e removidas, patch). O parser (`run::diff`) limita a 200 arquivos, 60 KB por patch e 400 KB no total, e avisa quando cortou. Assíncrono e só leitura.
+
+## Front [0.22.0] — 2026-10-31
+
+Um próximo passo por tarefa:
+
+- O painel da tarefa agora destaca **uma ação principal** ("Próximo passo"), deduzida do estágio de entrega, com uma frase dizendo por quê: **Implementar**, **Rodar localmente**, **Publicar PR**, **Revisar**, **Atualizar PR**, **Pedir ajuste** (checks falhando, conflito ou mudanças pedidas), **Fazer merge** ou **Tentar de novo**. Enquanto o agente trabalha, o painel diz que você será avisado, em vez de oferecer botões.
+- As demais ações ficam em **Mais ações**, recolhidas, com o motivo de cada indisponibilidade. Sem próximo passo, elas ficam à vista.
+- A tecla **A** executa o próximo passo da tarefa selecionada. Depois de ligar o ambiente de teste, o passo seguinte passa a ser publicar.
+
+## Back [0.20.0] — 2026-10-31
+
+Automação do ciclo, base (fatia 2b-1; o motor e a interface vêm nas próximas):
+
+- Novo domínio `automation`: seis etapas (**Iniciar, Revisão do staff, QA, Ambiente de teste, Publicar PR, Merge**) e três modos por etapa (**Eu conduzo**, **Assistido**, **Delegado**), com os atalhos `conduzo`, `copiloto` (padrão de um workspace novo) e `cinto`.
+- A escolha é **pessoal e local**: fica no SQLite, nunca em `.harnessy/workspace.toml`. O repositório só pode **apertar** as travas (menor teto de diff, mais caminhos sensíveis), nunca afrouxá-las.
+- Exceções por tarefa sobre o padrão do workspace (`task_automation`), pausa geral e travas configuráveis (teto de linhas e de arquivos do diff, caminhos sensíveis). Tabelas novas `workspace_automation`, `task_automation` e `automation_events` (migração).
+- **O merge nunca é automático**: o máximo é Assistido (o Harnessy deixa pronto e pede o OK). O núcleo recusa `auto` no merge.
+- `automation::decide` decide cada etapa de forma pura: **Nada**, **Executar**, **Pedir OK** (com os riscos como avisos), **Esperar** (falta algo que vai acontecer) ou **Parar** com o motivo em uma frase. Delegado só executa sem nenhum risco; a pausa geral para o delegado, mas não os pedidos de aprovação.
+- Registro do que o Harnessy decidiu (`automation_events`), sem repetir a mesma decisão em sequência.
+- Comandos: `get_automation`, `save_automation`, `apply_automation_preset`, `set_automation_paused`, `save_task_automation` e `list_automation_events`.
+
+## Back [0.19.0] — 2026-10-31
+
+Ambiente de teste local (fatia 2a):
+
+- Novo domínio `profile`: `.harnessy/workspace.toml` (`[preview] run`, `port`, `ready`) descreve como subir o projeto. O comando só roda depois de o usuário confirmar o texto exato (aprovação por sha256; editar o arquivo pede nova confirmação). Sem o arquivo, o núcleo sugere `bun run dev`/`npm run dev` a partir do `package.json`. Nova tabela `profile_approvals` (migração).
+- Novo `run::preview`: sobe o comando no worktree da run, com o ambiente fixo do núcleo (sem `GH_TOKEN`), em grupo de processos próprio. Detecta o endereço local pela saída (Vite e afins, sem cores ANSI) ou pela porta do perfil, guarda as últimas 500 linhas do log (com credenciais redigidas) e informa `starting`, `running`, `stopped` ou `failed`. Só um ambiente fica vivo por vez; parar mata tudo o que ele abriu.
+- O ambiente é encerrado ao fechar o app e ao excluir a tarefa, para não deixar servidor órfão na porta.
+- Comandos: `get_profile`, `save_profile`, `approve_profile`, `start_preview`, `stop_preview`, `open_preview` (só abre `http://localhost:N` anunciado pelo próprio ambiente), `preview_snapshot` e `list_previews`; eventos `preview-state` e `preview-log`.
+
+## Back [0.18.0] — 2026-10-31
+
+Duas camadas de harness ([ADR 0004](docs/adr/0004-duas-camadas-de-harness.md)):
+
+- O harness do projeto (`AGENTS.md`, `CLAUDE.md`, `.claude/rules/*.md`, `docs/adr/*.md`) é lido **pelo Rust** do commit base, com limite de tamanho e redação de credenciais, e entra no prompt do implementador e do revisor como um bloco de **dados** delimitado, depois das regras do núcleo. Ele informa as convenções, mas não muda papel, formato da resposta, veredito, permissões nem ferramentas; em conflito, valem as regras do Harnessy. O texto de um arquivo não consegue fechar o bloco.
+- Uma mudança que reescreve o AGENTS.md não altera as regras pelas quais é julgada, porque a leitura é do commit base.
+- O início do prompt deixou de mandar o agente "seguir o AGENTS.md" por conta própria. A Ação `revisar` também não manda mais ler arquivos do repositório; ela usa o bloco do Harnessy.
+- A prévia do prompt mostra o bloco, então você vê exatamente o que o agente recebe.
+
+## Back [0.17.1] — 2026-10-31
+
+- A Ação embutida `revisar` agora é um **staff engineer**: avalia simplicidade e complexidade proporcional à tarefa, fundamentos, aderência às regras e à arquitetura do projeto (lê `AGENTS.md`, `.claude/rules` e `docs/adr`), testabilidade, manutenção e o impacto no usuário. Bugs e casos de borda deixam de ser o foco dela: são do QA, papel separado que entra com o ambiente de teste. O filtro do núcleo continua descartando achados fora das linhas alteradas.
+
+## Front [0.20.0] — 2026-10-31
+
+O quadro passa a mostrar a entrega de cada tarefa:
+
+- Cada card em **Revisão** ganha um selo de estágio, com ícone e texto: **Só local**, **PR em draft**, **PR aberto**, **Checks rodando**, **Checks falhando**, **Conflito**, **Mudanças pedidas**, **Pronto para merge**, **Mergeado** ou **PR fechado**. O tooltip e o leitor de tela dizem o que está acontecendo e qual é a próxima ação.
+- O cabeçalho de cada raia resume os estágios, com o que pede ação primeiro (por exemplo, "1 Checks falhando · 2 Pronto para merge").
+- Novos comandos rápidos **Publicar PR** (vira **Atualizar PR** depois) e **Fazer merge**, que pede confirmação e explica o motivo quando está indisponível.
+- Os PRs abertos são relidos no GitHub ao voltar para a janela e a cada 90 segundos. Uma mudança de estágio é anunciada para leitor de tela sem mover o foco. O ícone de "checks rodando" respeita `prefers-reduced-motion`.
+
+## Back [0.17.0] — 2026-10-31
+
+Entrega de uma run como PR (fatia 1; a interface vem na sequência):
+
+- Novo domínio `delivery` e tabela `deliveries` (migração nova): PR da run, estado, draft, checks, conflitos e o SHA que a revisão aprovou.
+- Comandos `publish_run`, `refresh_delivery`, `merge_delivery` e `list_deliveries`. Publicar verifica o diff (recusa diff vazio e arquivos que parecem segredos), faz `git push` sem force e sem hooks, abre o PR **em draft** com tarefa, critérios, contraprova e revisão no corpo, e não duplica se já existir um PR da branch.
+- O merge é squash, só se o PR estiver aberto, sem checks reprovados ou pendentes, sem conflito e sem revisão pedindo mudanças; usa `--match-head-commit`, então só mescla o commit que acabou de ser lido. Ao mesclar, a tarefa vai para Concluído.
+- Os comandos são assíncronos e não seguram o banco durante a chamada de rede.
+- Um novo commit no PR invalida a aprovação da revisão (`reviewed_sha` ≠ `head_sha`).
+
+## Front [0.19.0] — 2026-10-31
+
+- A criação de tarefa na raia **A fazer** ganhou um formulário mais claro: o campo **Título** (com o botão **Criar**) e, embaixo, **+ Descrição e critérios** abre descrição e critérios de aceite opcionais no mesmo lugar. Uma linha diz que só o título basta e que o resto pode vir depois. Ctrl/⌘+Enter cria a partir da descrição ou dos critérios.
+
+## Front [0.18.0] — 2026-10-31
+
+Barra lateral organizada por workspace:
+
+- Cada workspace é um grupo expansível com **Tarefas**, **Chat**, **Conexões** e **Nova tarefa**; clicar numa ação já troca de workspace e de tela.
+- O workspace atual fica sempre aberto e mostra o contador de runs em andamento. Sem workspaces, a barra mantém Tarefas e Conexões.
+
 ## Front [0.17.1] — 2026-10-30
 
 Correções do QA de regras de negócio:

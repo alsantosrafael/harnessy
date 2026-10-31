@@ -31,6 +31,8 @@ pub fn model(id: &str) -> Result<&'static str> {
 pub const LADDER: [&str; 4] = ["haiku", DEFAULT_MODEL, "opus", "fable"];
 /// Níveis de esforço aceitos pelo `claude --effort`.
 pub const EFFORTS: [&str; 5] = ["low", "medium", "high", "xhigh", "max"];
+/// Níveis do raciocínio do Codex (`model_reasoning_effort`); são menos que os do Claude.
+pub const CODEX_EFFORTS: [&str; 3] = ["low", "medium", "high"];
 
 /// Próximo modelo da lista acima de `current`; `None` no topo ou fora da lista.
 pub fn next_model(current: &str) -> Option<&'static str> {
@@ -99,6 +101,26 @@ pub fn effort(id: &str) -> Result<&'static str> {
         .find(|known| *known == id)
         .ok_or(AppError::Validation(
             "Esforço desconhecido; use low, medium, high, xhigh ou max.",
+        ))
+}
+
+/// Esforço escolhido pelo usuário para um agente; vazio é "o padrão" e vira `None`.
+pub fn user_effort(runtime: &str, text: Option<&str>) -> Result<Option<&'static str>> {
+    let Some(text) = text.map(str::trim).filter(|text| !text.is_empty()) else {
+        return Ok(None);
+    };
+    let known: &[&'static str] = if runtime == "codex" {
+        &CODEX_EFFORTS
+    } else {
+        &EFFORTS
+    };
+    known
+        .iter()
+        .copied()
+        .find(|level| *level == text)
+        .map(Some)
+        .ok_or(AppError::Validation(
+            "Esforço desconhecido para este agente.",
         ))
 }
 
@@ -260,7 +282,12 @@ fn base_args(settings: &Path, model: &str, max_turns: u32) -> Vec<String> {
 /// Argumentos fixos do `codex exec`; o prompt segue por stdin (`-`). O
 /// `--sandbox` da linha de comando vale mais que o `config.toml` do usuário:
 /// leitura não escreve nada; escrita só escreve dentro do worktree, sem rede.
-pub fn codex_args(access: Access, model: &str, schema: Option<&Path>) -> Vec<String> {
+pub fn codex_args(
+    access: Access,
+    model: &str,
+    effort: Option<&str>,
+    schema: Option<&Path>,
+) -> Vec<String> {
     let sandbox = match access {
         Access::Read => "read-only",
         Access::Write => "workspace-write",
@@ -280,6 +307,10 @@ pub fn codex_args(access: Access, model: &str, schema: Option<&Path>) -> Vec<Str
     .collect();
     if model != CODEX_DEFAULT && !model.is_empty() {
         args.extend(["--model".into(), model.into()]);
+    }
+    // Só níveis que o Codex conhece; os do Claude (`xhigh`, `max`) não passam.
+    if let Some(level) = effort.filter(|level| CODEX_EFFORTS.contains(level)) {
+        args.extend(["-c".into(), format!("model_reasoning_effort=\"{level}\"")]);
     }
     if let Some(schema) = schema {
         args.extend([
@@ -324,10 +355,37 @@ mod tests {
     use super::*;
 
     #[test]
+    fn user_effort_is_validated_per_agent_and_blank_means_default() {
+        assert_eq!(user_effort("claude", Some("xhigh")).unwrap(), Some("xhigh"));
+        assert_eq!(user_effort("claude", Some(" max ")).unwrap(), Some("max"));
+        assert_eq!(user_effort("claude", Some("")).unwrap(), None);
+        assert_eq!(user_effort("claude", None).unwrap(), None);
+        assert!(user_effort("claude", Some("altissimo")).is_err());
+        assert_eq!(user_effort("codex", Some("high")).unwrap(), Some("high"));
+        assert!(
+            user_effort("codex", Some("max")).is_err(),
+            "os níveis xhigh e max são do Claude"
+        );
+    }
+
+    #[test]
+    fn codex_gets_its_reasoning_effort_only_for_levels_it_knows() {
+        let args = codex_args(Access::Write, CODEX_DEFAULT, Some("high"), None);
+        assert!(args
+            .windows(2)
+            .any(|w| w == ["-c", "model_reasoning_effort=\"high\""]));
+        let unknown = codex_args(Access::Write, CODEX_DEFAULT, Some("max"), None);
+        assert!(!unknown.iter().any(|a| a.contains("reasoning")));
+        let none = codex_args(Access::Write, CODEX_DEFAULT, None, None);
+        assert!(!none.iter().any(|a| a == "-c"));
+    }
+
+    #[test]
     fn codex_reads_read_only_writes_only_in_the_workspace_and_takes_the_prompt_from_stdin() {
         let read = codex_args(
             Access::Read,
             CODEX_DEFAULT,
+            None,
             Some(Path::new("/x/schema.json")),
         );
         let at = read.iter().position(|a| a == "--sandbox").unwrap();
@@ -337,7 +395,7 @@ mod tests {
             .windows(2)
             .any(|w| w == ["--output-schema", "/x/schema.json"]));
         assert!(!read.iter().any(|a| a == "--model"));
-        let write = codex_args(Access::Write, "gpt-5.1", None);
+        let write = codex_args(Access::Write, "gpt-5.1", None, None);
         let at = write.iter().position(|a| a == "--sandbox").unwrap();
         assert_eq!(write[at + 1], "workspace-write");
         assert!(write.windows(2).any(|w| w == ["--model", "gpt-5.1"]));

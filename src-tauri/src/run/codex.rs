@@ -4,7 +4,8 @@
 //! `workspace-write` (só o worktree, sem rede), que é a contenção do Codex.
 //!
 //! `spec.model` igual a [`guard::CODEX_DEFAULT`] usa o modelo da configuração do próprio Codex;
-//! `spec.effort` não é repassado (os níveis dele não são os do Claude). O Codex
+//! `spec.effort` vira `-c model_reasoning_effort` só para `low`, `medium` e `high`
+//! (os níveis `xhigh` e `max` são do Claude e não passam). O Codex
 //! não retoma sessão aqui: a correção leva o contexto completo.
 
 use std::path::{Path, PathBuf};
@@ -52,7 +53,7 @@ impl Runtime for Codex {
         };
         let plan = supervisor::Plan {
             binary: self.binary.clone(),
-            args: guard::codex_args(spec.access, spec.model, schema.as_deref()),
+            args: guard::codex_args(spec.access, spec.model, spec.effort, schema.as_deref()),
             env: self.env.clone(),
             cwd: spec.dir.to_path_buf(),
             prompt: spec.prompt.to_owned(),

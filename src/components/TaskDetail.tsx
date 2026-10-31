@@ -43,6 +43,8 @@ interface Props {
   /** Inicia a run com a Ação escolhida; sem Ação, usa a principal (implementar). */
   onStart: (id: number, action?: string, continueFrom?: number | null) => void;
   onResolve: (runId: number) => void;
+  /** Implementar é o próximo passo da tarefa; senão é um recomeço e não vira o botão principal. */
+  implementIsNext: boolean;
   onDirty: (dirty: boolean) => void;
   onClose: () => void;
   /** Continuar da run do passo anterior (escolha compartilhada com os comandos rápidos). */
@@ -65,6 +67,7 @@ export function TaskDetail({
   onSaved,
   onStart,
   onResolve,
+  implementIsNext,
   onDirty,
   onClose,
   useChain,
@@ -79,6 +82,9 @@ export function TaskDetail({
   const continueFrom = chainFrom && useChain ? chainFrom.id : null;
   const [error, setError] = useState("");
   const [prompt, setPrompt] = useState("");
+  // O prompt só é montado (vários comandos git) quando a seção é aberta, não a cada tarefa aberta.
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [historyReady, setHistoryReady] = useState(false);
   const [history, setHistory] = useState<TaskEvent[]>([]);
   const [actions, setActions] = useState<ActionInfo[]>([]);
   // Recarrega o catálogo depois de criar ou confirmar uma Ação.
@@ -97,6 +103,7 @@ export function TaskDetail({
   // `revision` muda ao salvar o conteúdo, que é o que entra no prompt.
   // biome-ignore lint/correctness/useExhaustiveDependencies: o prompt depende do conteúdo salvo, não do estado.
   useEffect(() => {
+    if (!promptOpen) return;
     let alive = true;
     previewPrompt(task.workspaceId, task.id)
       .then((text) => alive && setPrompt(text))
@@ -104,7 +111,7 @@ export function TaskDetail({
     return () => {
       alive = false;
     };
-  }, [task.workspaceId, task.id, task.revision]);
+  }, [promptOpen, task.workspaceId, task.id, task.revision]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `actionsTick` é o gatilho de recarga.
   useEffect(() => {
@@ -121,8 +128,12 @@ export function TaskDetail({
   useEffect(() => {
     let alive = true;
     taskHistory(task.id)
-      .then((rows) => alive && setHistory(rows))
-      .catch(() => {});
+      .then((rows) => {
+        if (!alive) return;
+        setHistory(rows);
+        setHistoryReady(true);
+      })
+      .catch(() => alive && setHistoryReady(true));
     return () => {
       alive = false;
     };
@@ -254,7 +265,7 @@ export function TaskDetail({
 
       <div className="detail-col">
         <section className="run-bar" aria-label="Implementar">
-          <AgentPicker choice={choice} onChange={onChoice} />
+          <AgentPicker choice={choice} onChange={onChoice} defaultOpen />
           {chainFrom && (
             <label className="chain-option">
               <input
@@ -267,14 +278,20 @@ export function TaskDetail({
           )}
           <button
             type="button"
-            className="button primary"
+            className={implementIsNext ? "button primary" : "button"}
             disabled={!canStart || starting || dirty || primaryReason !== null}
             onClick={() => onStart(task.id, undefined, continueFrom)}
           >
             {starting
               ? "Iniciando…"
-              : `Implementar com ${agentOf(choice.runtime)?.label ?? choice.runtime} · ${modelName(choice.runtime, choice.model)}`}
+              : `${implementIsNext ? "Implementar" : "Implementar de novo"} com ${agentOf(choice.runtime)?.label ?? choice.runtime} · ${modelName(choice.runtime, choice.model)}`}
           </button>
+          {!implementIsNext && (
+            <p className="muted">
+              Já existe uma implementação. Para mudar algo, peça um ajuste na conversa; recomeçar do
+              zero é só se você quiser descartar o caminho atual.
+            </p>
+          )}
           {dirty && <p className="muted">Salve a tarefa antes de implementar.</p>}
           {primaryReason && <p className="local-error">{primaryReason}</p>}
         </section>
@@ -320,7 +337,9 @@ export function TaskDetail({
               })}
             </ul>
           )}
-          <details>
+          <details
+            onToggle={(event) => setPromptOpen((event.currentTarget as HTMLDetailsElement).open)}
+          >
             <summary>Nova Ação</summary>
             <NewActionForm onCreated={() => setActionsTick((tick) => tick + 1)} />
           </details>
@@ -328,11 +347,19 @@ export function TaskDetail({
 
         <details>
           <summary>Prompt que o agente receberá</summary>
-          <pre className="run-log">{prompt || "Carregando…"}</pre>
+          <pre className="run-log" aria-busy={promptOpen && !prompt}>
+            {prompt || (promptOpen ? "Montando o prompt…" : "")}
+          </pre>
         </details>
 
         <section aria-label="Histórico">
           <h3 className="section-title">Histórico</h3>
+          {!historyReady && (
+            <div className="skeleton-stack" aria-busy="true">
+              <div className="skeleton skeleton-line" />
+              <div className="skeleton skeleton-line" />
+            </div>
+          )}
           <ol className="history">
             {history.map((event) => (
               <li key={event.seq} className={`actor-${event.actor}`}>
@@ -357,6 +384,25 @@ export function TaskDetail({
             ))}
           </ol>
         </section>
+      </div>
+    </div>
+  );
+}
+
+/** Esqueleto do detalhe: aparece no mesmo instante do clique, enquanto o detalhe de verdade monta. */
+export function TaskDetailSkeleton() {
+  return (
+    <div className="task-detail" aria-busy="true" role="status" aria-label="Carregando a tarefa">
+      <div className="detail-col">
+        <div className="skeleton skeleton-title" />
+        <div className="skeleton skeleton-line" />
+        <div className="skeleton skeleton-block" />
+        <div className="skeleton skeleton-block" />
+      </div>
+      <div className="detail-col">
+        <div className="skeleton skeleton-card" />
+        <div className="skeleton skeleton-line" />
+        <div className="skeleton skeleton-line" />
       </div>
     </div>
   );

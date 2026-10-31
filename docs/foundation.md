@@ -1,6 +1,6 @@
 # Fundação desktop — 0.1.0
 
-[← README](../README.md) · [Guia de uso](user-guide.md) · [Desenvolvimento](development.md)
+[← README](../README.md) · [Guia do Harnessy](user-guide.md) · [Desenvolvimento](development.md)
 
 ## Decisões implementadas
 

@@ -55,3 +55,22 @@ details > summary { cursor: pointer; color: var(--text-secondary); font-size: va
 .confirm-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
 .button.is-danger { background: var(--critical); border-color: var(--critical); color: #fff; }
 .button.is-danger:hover:not(:disabled) { filter: brightness(0.92); }
+
+/* Próximo passo: um único botão principal; o resto fica recolhido para não competir com ele. */
+.next-action { display: grid; gap: var(--space-1); }
+.next-kicker { font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.02em; color: var(--text-secondary); }
+.quick-button.is-next { min-height: 44px; font-size: var(--text-base); }
+.quick-button.is-next kbd { margin-left: auto; padding: 0 6px; border: 1px solid var(--amber-800); border-bottom-width: 2px; border-radius: 4px; font-size: var(--text-xs); font-weight: 600; }
+.next-waiting { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--text-sm); color: var(--text-secondary); }
+.quick-more > summary { cursor: pointer; padding: var(--space-1) 0; font-size: var(--text-sm); color: var(--text-secondary); }
+.quick-more > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }
+.quick-more[open] > summary { margin-bottom: var(--space-2); }
+
+/* Run em andamento: o usuário acompanha sem sair do quadro. */
+.agent-progress { display: grid; gap: var(--space-2); }
+.agent-progress p { margin: 0; }
+.agent-progress-head { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+.agent-elapsed { margin-left: auto; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.agent-activity { padding: var(--space-2) var(--space-3); border: 1px solid var(--log-border); border-radius: var(--radius-md); background: var(--log-bg); color: var(--log-text); font: 12px/1.45 var(--font-mono); overflow-wrap: anywhere; }
+.agent-activity::before { content: "›"; margin-right: var(--space-2); color: var(--log-note); font-weight: 700; }
+.agent-progress-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }

@@ -76,8 +76,18 @@ pub fn run_access(acesso: Acesso) -> Access {
 
 /// Prompt completo de uma Run: início fixo do núcleo, comandos que o Harnessy já
 /// negou neste workspace e o pedido da Ação preenchido.
-pub fn build_prompt(action: &Action, ctx: &Contexto<'_>, avoid: &[String]) -> String {
-    prompt::compose(run_access(action.acesso), &action.render(ctx), avoid)
+pub fn build_prompt(
+    action: &Action,
+    ctx: &Contexto<'_>,
+    avoid: &[String],
+    project: &str,
+) -> String {
+    prompt::compose(
+        run_access(action.acesso),
+        &action.render(ctx),
+        avoid,
+        project,
+    )
 }
 
 #[cfg(test)]
@@ -102,6 +112,7 @@ mod tests {
             &action,
             &contexto("Trocar o rótulo.", "O rótulo novo aparece."),
             &[],
+            "",
         );
         assert!(prompt.starts_with("Você trabalha neste repositório"));
         assert!(prompt.contains("# Tarefa: Ajustar texto"));
@@ -118,7 +129,7 @@ mod tests {
         let temp = TempDir::new("explicar");
         let action = find(&temp.path, None, action::EXPLAIN).unwrap();
         assert_eq!(run_access(action.acesso), Access::Read);
-        let prompt = build_prompt(&action, &contexto("", ""), &[]);
+        let prompt = build_prompt(&action, &contexto("", ""), &[], "");
         assert!(prompt.contains("só de leitura"));
         assert!(prompt.contains("Explique onde e como fazer a mudança"));
         assert_eq!(

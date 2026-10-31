@@ -6,6 +6,8 @@ export interface AppInfo {
   version: string;
   platform: string;
   agentExecutionAvailable: boolean;
+  /** Etiqueta de uma instância de teste (`dogfood`, `preview`); ausente na principal. */
+  instance?: string | null;
 }
 
 export async function getAppInfo(): Promise<AppInfo | null> {
@@ -134,6 +136,8 @@ export interface Run {
   reviewerModel: string | null;
   /** Quando revisar (`auto`, `always`, `never`); `null` vale `auto`. */
   reviewWhen: string | null;
+  /** Esforço pedido ao revisor; `null` = o padrão. */
+  reviewerEffort: string | null;
   /** Achados do revisor descartados por não apontarem para o diff. */
   reviewDiscarded: number | null;
   /** Run cuja branch serviu de base (passo encadeado). */
@@ -197,6 +201,8 @@ export const startRun = (
     reviewerModel: choice.reviewerModel,
     reviewWhen: choice.reviewWhen,
     instruction,
+    effort: choice.effort || null,
+    reviewerEffort: choice.reviewerEffort || null,
   });
 /** Passo proposto por "Dividir em passos", editável antes de virar tarefa. */
 export interface StepProposal {
@@ -225,7 +231,93 @@ export const reviewRun = (runId: number, choice: AgentChoice) =>
     runId,
     reviewer: choice.reviewer,
     reviewerModel: choice.reviewerModel,
+    reviewerEffort: choice.reviewerEffort || null,
   });
+/** PR de uma run, como o núcleo o conhece; `checks` e `mergeable` vêm do GitHub. */
+export interface Delivery {
+  runId: number;
+  prNumber: number;
+  prUrl: string;
+  state: "open" | "merged" | "closed";
+  draft: boolean;
+  headSha: string | null;
+  checks: "none" | "pending" | "passing" | "failing";
+  mergeable: "unknown" | "mergeable" | "conflicting";
+  /** SHA que a revisão aprovou; só vale se for igual a `headSha`. */
+  reviewedSha: string | null;
+  publishedAt: number;
+  mergedAt: number | null;
+}
+/** Envia a branch da run e abre o PR em draft (ou adota o que já existe). */
+export const publishRun = (runId: number) => localCall<Delivery>("publish_run", { runId });
+/** Relê o PR no GitHub: checks, conflitos e merge feito por fora. */
+export const refreshDelivery = (runId: number) =>
+  localCall<Delivery>("refresh_delivery", { runId });
+/** Squash merge do PR da run, só com o PR seguro; a tarefa vai para Concluído. */
+export const mergeDelivery = (runId: number) => localCall<Delivery>("merge_delivery", { runId });
+export const listDeliveries = (workspaceId: number) =>
+  localCall<Delivery[]>("list_deliveries", { workspaceId });
+/** Mostra no ícone da bandeja quantas tarefas pedem o usuário. */
+export const setAttentionCount = (count: number) =>
+  localCall<void>("set_attention_count", { count });
+/** Notificação do sistema; sem permissão do usuário, não faz nada. */
+export const notifyAttention = (title: string, body: string) =>
+  localCall<void>("notify_attention", { title, body });
+/** Um arquivo alterado pela run, com os hunks para leitura. */
+export interface FileDiff {
+  path: string;
+  status: "modified" | "added" | "deleted" | "renamed";
+  additions: number;
+  deletions: number;
+  binary: boolean;
+  patch: string;
+  truncated: boolean;
+}
+export interface RunDiff {
+  files: FileDiff[];
+  additions: number;
+  deletions: number;
+  truncated: boolean;
+}
+/** Alterações da run (`base..branch`) por arquivo, só leitura. */
+export const runDiff = (runId: number) => localCall<RunDiff>("run_diff", { runId });
+/** Como subir o projeto: o perfil do workspace e se o usuário já confirmou o comando. */
+export interface ProfileView {
+  exists: boolean;
+  run: string | null;
+  port: number | null;
+  approved: boolean;
+  /** Comando sugerido a partir do `package.json` quando não há perfil. */
+  suggestion: string | null;
+  error: string | null;
+}
+export const getProfile = (workspaceId: number) =>
+  localCall<ProfileView>("get_profile", { workspaceId });
+/** Grava `.harnessy/workspace.toml` com o comando escolhido e o confirma. */
+export const saveProfile = (workspaceId: number, run: string, port: number | null) =>
+  localCall<ProfileView>("save_profile", { workspaceId, run, port });
+/** Confirma o comando que o repositório já traz no perfil. */
+export const approveProfile = (workspaceId: number) =>
+  localCall<ProfileView>("approve_profile", { workspaceId });
+
+/** Ambiente de teste local de uma run. `url` é sempre `http://localhost:N`. */
+export interface PreviewInfo {
+  runId: number;
+  state: "starting" | "running" | "stopped" | "failed";
+  url: string | null;
+  exitCode: number | null;
+  startedAt: number;
+}
+export const startPreview = (runId: number) => localCall<PreviewInfo>("start_preview", { runId });
+export const stopPreview = (runId: number) => localCall<void>("stop_preview", { runId });
+export const openPreview = (runId: number) => localCall<void>("open_preview", { runId });
+export const previewSnapshot = (runId: number) =>
+  localCall<[PreviewInfo | null, string[]]>("preview_snapshot", { runId });
+export const listPreviews = () => localCall<PreviewInfo[]>("list_previews");
+/** Preferência pessoal guardada no banco local; `null` se ainda não foi definida. */
+export const getPreference = (key: string) => localCall<string | null>("get_preference", { key });
+export const setPreference = (key: string, value: string) =>
+  localCall<void>("set_preference", { key, value });
 export const cancelRun = (runId: number) => localCall<void>("cancel_run", { runId });
 /** Ciclo extra numa run que falhou, com o próximo modelo da lista (decidido pelo núcleo). */
 export const continueRun = (runId: number) => localCall<Run>("continue_run", { runId });
@@ -241,5 +333,9 @@ async function subscribe<T>(name: string, handler: (payload: T) => void): Promis
 export const onRunEvent = (handler: (event: RunEvent) => void) =>
   subscribe<RunEvent>("run-event", handler);
 export const onRunState = (handler: (run: Run) => void) => subscribe<Run>("run-state", handler);
+export const onPreviewState = (handler: (info: PreviewInfo) => void) =>
+  subscribe<PreviewInfo>("preview-state", handler);
+export const onPreviewLog = (handler: (log: { runId: number; line: string }) => void) =>
+  subscribe<{ runId: number; line: string }>("preview-log", handler);
 export const onTaskChanged = (handler: (change: TaskChange) => void) =>
   subscribe<TaskChange>("task-changed", handler);

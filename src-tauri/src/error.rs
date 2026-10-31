@@ -33,6 +33,9 @@ pub enum AppError {
 
     #[error("Ação inválida: {0}")]
     Action(String),
+
+    #[error("{0}")]
+    Delivery(String),
 }
 
 impl Serialize for AppError {

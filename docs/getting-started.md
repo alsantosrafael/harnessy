@@ -1,6 +1,6 @@
 # Primeiros passos
 
-[← README](../README.md) · [Guia de uso](user-guide.md) · [Solução de problemas](troubleshooting.md)
+[← README](../README.md) · [Guia do Harnessy](user-guide.md) · [Solução de problemas](troubleshooting.md)
 
 ## Escolha como executar
 
@@ -135,4 +135,4 @@ Abra pelo Finder ou pelo comando da etapa 1. O bundle atual é local, sem assina
 - **Conexões** mostra o estado real das sessões do GitHub, Codex e Claude Code.
 - O menu **H** permite reabrir a janela depois de fechá-la.
 
-Continue no [guia de uso](user-guide.md). Se algo divergir, consulte [solução de problemas](troubleshooting.md).
+Continue nos [primeiros passos do guia](guia/02-primeiros-passos.md), que mostram como conectar as ferramentas e fazer sua primeira tarefa. Se algo divergir, consulte [solução de problemas](troubleshooting.md).

@@ -160,6 +160,72 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE runs ADD COLUMN reviewer_model TEXT;
     ALTER TABLE runs ADD COLUMN review_when TEXT CHECK (review_when IS NULL OR review_when IN ('auto', 'always', 'never'));
 ",
+    "
+    CREATE TABLE deliveries (
+        run_id INTEGER PRIMARY KEY REFERENCES runs(id),
+        pr_number INTEGER NOT NULL,
+        pr_url TEXT NOT NULL,
+        state TEXT NOT NULL CHECK (state IN ('open', 'merged', 'closed')),
+        draft INTEGER NOT NULL DEFAULT 1,
+        head_sha TEXT,
+        checks TEXT NOT NULL DEFAULT 'none' CHECK (checks IN ('none', 'pending', 'passing', 'failing')),
+        mergeable TEXT NOT NULL DEFAULT 'unknown' CHECK (mergeable IN ('unknown', 'mergeable', 'conflicting')),
+        reviewed_sha TEXT,
+        published_at INTEGER NOT NULL,
+        merged_at INTEGER
+    );
+",
+    "
+    CREATE TABLE profile_approvals (
+        workspace_id INTEGER PRIMARY KEY REFERENCES workspaces(id),
+        sha256 TEXT NOT NULL,
+        approved_at INTEGER NOT NULL
+    );
+",
+    "
+    CREATE TABLE workspace_automation (
+        workspace_id INTEGER PRIMARY KEY REFERENCES workspaces(id),
+        start TEXT NOT NULL CHECK (start IN ('manual', 'assisted', 'auto')),
+        review TEXT NOT NULL CHECK (review IN ('manual', 'assisted', 'auto')),
+        qa TEXT NOT NULL CHECK (qa IN ('manual', 'assisted', 'auto')),
+        preview TEXT NOT NULL CHECK (preview IN ('manual', 'assisted', 'auto')),
+        publish TEXT NOT NULL CHECK (publish IN ('manual', 'assisted', 'auto')),
+        merge TEXT NOT NULL CHECK (merge IN ('manual', 'assisted')),
+        paused INTEGER NOT NULL DEFAULT 0,
+        max_diff_lines INTEGER NOT NULL,
+        max_files INTEGER NOT NULL,
+        sensitive TEXT NOT NULL
+    );
+    CREATE TABLE task_automation (
+        task_id INTEGER PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE,
+        start TEXT CHECK (start IS NULL OR start IN ('manual', 'assisted', 'auto')),
+        review TEXT CHECK (review IS NULL OR review IN ('manual', 'assisted', 'auto')),
+        qa TEXT CHECK (qa IS NULL OR qa IN ('manual', 'assisted', 'auto')),
+        preview TEXT CHECK (preview IS NULL OR preview IN ('manual', 'assisted', 'auto')),
+        publish TEXT CHECK (publish IS NULL OR publish IN ('manual', 'assisted', 'auto')),
+        merge TEXT CHECK (merge IS NULL OR merge IN ('manual', 'assisted'))
+    );
+    CREATE TABLE automation_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        workspace_id INTEGER NOT NULL,
+        task_id INTEGER NOT NULL,
+        run_id INTEGER,
+        stage TEXT NOT NULL,
+        outcome TEXT NOT NULL CHECK (outcome IN ('ran', 'asked', 'waiting', 'held')),
+        reason TEXT NOT NULL,
+        at INTEGER NOT NULL
+    );
+    CREATE INDEX automation_events_task ON automation_events(task_id, id);
+    CREATE INDEX automation_events_workspace ON automation_events(workspace_id, id);
+",
+    "
+    CREATE TABLE preferences (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+    ALTER TABLE runs ADD COLUMN reviewer_effort TEXT;
+",
 ];
 
 /// Segundos desde a época Unix; `0` se o relógio estiver antes dela.
