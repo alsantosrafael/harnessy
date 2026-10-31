@@ -32,6 +32,11 @@ export function App() {
   const [workspacesReady, setWorkspacesReady] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  // O workspace que passa a ser o atual começa aberto; depois disso o usuário pode recolhê-lo.
+  useEffect(() => {
+    if (workspaceId === null) return;
+    setExpanded((set) => (set.has(workspaceId) ? set : new Set(set).add(workspaceId)));
+  }, [workspaceId]);
   const [loadError, setLoadError] = useState("");
   const [boardTick, setBoardTick] = useState(0);
   const [runError, setRunError] = useState("");
@@ -110,7 +115,7 @@ export function App() {
     show("chat");
   };
   function toggleWorkspace(id: number) {
-    // O workspace atual fica sempre aberto; clicar nele só o torna ativo.
+    // Clicar em outro workspace o torna ativo e o abre; clicar no atual abre ou recolhe o grupo.
     if (id !== workspaceId) {
       setWorkspaceId(id);
       setExpanded((set) => new Set(set).add(id));
@@ -169,7 +174,7 @@ export function App() {
           )}
           {workspaces.map((item) => {
             const current = item.id === workspaceId;
-            const open = current || expanded.has(item.id);
+            const open = expanded.has(item.id);
             const go = (next: View) => {
               setWorkspaceId(item.id);
               show(next);

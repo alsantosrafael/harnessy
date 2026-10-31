@@ -915,9 +915,9 @@ pub fn start_preview(
     process::wait_for_login_path();
     let dirs = process::search_dirs();
     let target = app_data(&app)?.join("cargo-target");
-    let spec = super::preview::spec_for(&*store.connection()?, run_id, &dirs, &target)?;
+    let (spec, hooks) = super::preview::plan_for(&*store.connection()?, run_id, &dirs, &target)?;
     let handle = app.clone();
-    previews.start(spec, move |event| emit_preview(&handle, event))
+    previews.start(spec, hooks, move |event| emit_preview(&handle, event))
 }
 
 #[tauri::command]

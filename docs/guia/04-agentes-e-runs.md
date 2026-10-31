@@ -36,6 +36,10 @@ A escolha fica salva no seu Mac e vale para todas as tarefas.
 
 > Quando uma run **falha** ou o resultado não convence, o botão **Tentar com** o próximo modelo repete o trabalho com um modelo maior, sem perder o que já foi feito.
 
+## Acompanhar sem sair do quadro
+
+Ao mandar implementar, **você continua no quadro**. No painel da tarefa aparecem a etapa (**Preparando a cópia do projeto**, **Implementando**), o **tempo decorrido**, o que o agente está fazendo agora (por exemplo, "Editando guia/glossario.md") e os botões **Ver conversa** e **Cancelar**. Quando a run termina, o Harnessy avisa ali mesmo (e, com a janela em segundo plano, por notificação).
+
 ## Acompanhar o trabalho: o Chat
 
 Cada tarefa tem uma **conversa** no **Chat** (`⌘2`), que reúne **todas as runs dela**, em ordem. Ali você vê o que o agente fez e disse, o resultado das verificações e da revisão, e o campo para pedir mais.

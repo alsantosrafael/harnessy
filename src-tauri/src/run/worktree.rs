@@ -71,6 +71,21 @@ pub fn create(
     .map(|_| ())
 }
 
+/// Recria o worktree de uma branch que já existe. O worktree de uma run é removido ao
+/// terminar; a branch fica, e é dela que o ambiente de teste volta a nascer.
+pub fn checkout(
+    git_bin: &Path,
+    dirs: &[PathBuf],
+    repo: &Path,
+    dir: &Path,
+    branch: &str,
+) -> Result<(), String> {
+    // Registro de um worktree cuja pasta já sumiu impediria criar outro no mesmo lugar.
+    let _ = git(git_bin, dirs, repo, &["worktree", "prune"]);
+    let dir = dir.to_string_lossy();
+    git(git_bin, dirs, repo, &["worktree", "add", &dir, branch]).map(|_| ())
+}
+
 /// Instala dependências quando o projeto usa Bun com lockfile.
 pub fn install_deps(bun: Option<&Path>, dirs: &[PathBuf], dir: &Path) -> Result<(), String> {
     let uses_bun = dir.join("package.json").is_file()
@@ -275,6 +290,23 @@ mod tests {
         assert!(commit_all(&git_bin, &dirs, &wt, &base, "mudança").unwrap());
         remove(&git_bin, &dirs, &repo, &wt).unwrap();
         assert!(!wt.exists());
+
+        // O worktree some ao fim da run, mas a branch fica: dá para recriá-lo no mesmo lugar.
+        checkout(&git_bin, &dirs, &repo, &wt, "harnessy/run-1-x").unwrap();
+        assert!(wt.join("b.txt").is_file(), "a mudança da run volta junto");
+        // Pasta apagada à mão (sem `git worktree remove`) também não impede recriar.
+        std::fs::remove_dir_all(&wt).unwrap();
+        checkout(&git_bin, &dirs, &repo, &wt, "harnessy/run-1-x").unwrap();
+        assert!(wt.join("b.txt").is_file());
+        assert!(checkout(
+            &git_bin,
+            &dirs,
+            &repo,
+            &root.join("outro"),
+            "branch-que-nao-existe"
+        )
+        .is_err());
+        remove(&git_bin, &dirs, &repo, &wt).unwrap();
         let _ = std::fs::remove_dir_all(&root);
     }
 }

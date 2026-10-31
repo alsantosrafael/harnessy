@@ -10,6 +10,20 @@ Rodar localmente para testar a mudança (fatia 2a):
 - Painel **Ambiente de teste** na tarefa: estado em texto (Subindo…, No ar, Parado, Caiu com o código), endereço, **Abrir no navegador**, **Parar** / **Rodar de novo** e o log ao vivo, rolável por teclado.
 - O card mostra **No ar** enquanto o ambiente da tarefa está rodando.
 
+## Front [0.25.0] — 2026-10-31
+
+Correções do primeiro uso no próprio Harnessy:
+
+- **Chevron da barra lateral:** o grupo do workspace atual agora abre e recolhe (antes ficava preso aberto).
+- **Implementar não leva mais para o Chat.** O usuário fica no quadro e o painel da tarefa mostra a etapa, o tempo decorrido e o que o agente está fazendo agora ("Editando guia/glossario.md"), com **Ver conversa** e **Cancelar**. **Revisar** também fica no quadro. Com a janela em foco, o que acabou de chegar aparece como aviso; sem foco, continua a notificação.
+- **Um só botão principal por tela.** Com a implementação já feita, o botão do detalhe vira **Implementar de novo** (secundário) e explica que ajustes se pedem na conversa; o principal é só o **Próximo passo**.
+- **Alterações da run** já abre aberto na raia de Revisão.
+- O aviso de erro some quando você inicia uma nova ação, em vez de ficar na tela.
+
+## Back [0.22.1] — 2026-10-31
+
+- **Rodar localmente funciona depois de a run terminar.** O worktree da run é removido ao fim dela (só a branch fica), e o ambiente de teste falhava com "o worktree não existe mais". Agora ele é **recriado a partir da branch** (`git worktree prune` + `add`), as dependências são instaladas e a cópia é removida de novo quando o ambiente para. O estado `starting` vale durante a preparação, com o andamento no log, e parar nessa fase impede o processo de abrir. Falha na preparação vira estado `failed` com o motivo no log.
+
 ## Front [0.24.0] — 2026-10-31
 
 O quadro passa a dizer o que precisa de você, mesmo com a janela em segundo plano:

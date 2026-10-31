@@ -11,6 +11,7 @@ import {
   Trash2,
   type LucideIcon,
 } from "lucide-react";
+import type { Progress } from "../lib/progress";
 import type { NextAction, QuickId, QuickState } from "../lib/quick";
 
 const icons: Record<QuickId, LucideIcon> = {
@@ -34,12 +35,27 @@ interface Props {
   next: NextAction | null;
   /** O agente está trabalhando: não há próximo passo, só esperar. */
   working: boolean;
+  /** Etapa, atividade e tempo da run em andamento, para o usuário acompanhar sem sair do quadro. */
+  progress: Progress | null;
+  onCancel: () => void;
+  onOpenChat: () => void;
   onRun: (id: QuickId) => void;
   onDelete: () => void;
 }
 
 /** Comandos rápidos da tarefa selecionada, ao lado do quadro. Texto sempre visível. */
-export function QuickActions({ taskId, states, title, next, working, onRun, onDelete }: Props) {
+export function QuickActions({
+  taskId,
+  states,
+  title,
+  next,
+  working,
+  progress,
+  onCancel,
+  onOpenChat,
+  onRun,
+  onDelete,
+}: Props) {
   const others = states.filter((state) => state.id !== next?.id);
   const NextIcon = next ? icons[next.id] : null;
   return (
@@ -67,10 +83,29 @@ export function QuickActions({ taskId, states, title, next, working, onRun, onDe
         </div>
       )}
       {!next && working && (
-        <p className="next-waiting" role="status">
-          <span className="pulse" aria-hidden="true" /> O agente está trabalhando. Você será avisado
-          quando precisar de você.
-        </p>
+        <div className="agent-progress">
+          <p className="agent-progress-head">
+            <span className="pulse" aria-hidden="true" />
+            <strong>{progress?.phase ?? "O agente está trabalhando"}</strong>
+            {progress && <span className="agent-elapsed">{progress.elapsed}</span>}
+          </p>
+          {progress?.activity && <p className="agent-activity">{progress.activity}</p>}
+          <p className="muted">
+            Pode continuar aqui ou usar outros aplicativos: o Harnessy avisa quando precisar de
+            você.
+          </p>
+          <div className="agent-progress-actions">
+            <button type="button" className="button" onClick={onOpenChat}>
+              Ver conversa
+            </button>
+            <button type="button" className="button" onClick={onCancel}>
+              Cancelar
+            </button>
+          </div>
+          <span className="sr-only" role="status">
+            {progress?.phase}
+          </span>
+        </div>
       )}
       {/* Sem próximo passo, as ações ficam à vista; com ele, recolhidas para não competir. */}
       <details className="quick-more" key={next?.id ?? "none"} open={!next && !working}>

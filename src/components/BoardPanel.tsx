@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import {
+  type Attention,
   attentionOf,
   byUrgency,
+  notificationFor,
   countPhrase,
   type Filter,
   matchesFilter,
@@ -11,6 +13,7 @@ import {
 import { applyChange, applyMove, blockedByTask, groupByStatus, statusName } from "../lib/board";
 import {
   approveProfile,
+  cancelRun,
   deleteTask,
   getProfile,
   listDeliveries,
@@ -35,6 +38,7 @@ import {
 import type { AgentChoice } from "../lib/agents";
 import { deliveryOf, needsRefresh, stagesByTask, workRun } from "../lib/delivery";
 import { parseReview, type Finding } from "../lib/feed";
+import { progressOf } from "../lib/progress";
 import { isLive } from "../lib/preview";
 import { canStartRun, chainBase, isActive } from "../lib/runs";
 import { useAttentionSignals } from "../lib/useAttention";
@@ -171,7 +175,6 @@ export function BoardPanel({
       ),
     [tasks, filter, attention, stages, working],
   );
-  const signals = useAttentionSignals(attention, !loading && deliveriesReady, workspaceId);
   const selected = tasks.find((task) => task.id === selectedId) ?? null;
 
   // O detalhe fica embaixo do quadro: ao escolher uma tarefa, leva a tela até ele.
@@ -200,6 +203,20 @@ export function BoardPanel({
       window.clearTimeout(timers.current.notice);
     },
     [],
+  );
+
+  // Com a janela em foco, o que acabou de chegar vira um aviso ali mesmo; sem foco, notificação.
+  const signals = useAttentionSignals(
+    attention,
+    !loading && deliveriesReady,
+    workspaceId,
+    useCallback(
+      (arrived: Attention[]) => {
+        const text = notificationFor(arrived);
+        if (text) say({ text: `${text.title}: ${text.body}` });
+      },
+      [say],
+    ),
   );
 
   // Otimista: a tela muda na hora; o núcleo confirma (ou o card volta e o erro aparece).
@@ -416,9 +433,10 @@ export function BoardPanel({
     [workspaceId, flash],
   );
 
+  // Iniciar uma run mantém o usuário no quadro: o painel da tarefa mostra o que o agente faz.
   async function start(taskId: number, action?: string, continueFrom: number | null = null) {
-    const run = await runsState.start(taskId, choice, action, continueFrom);
-    if (run) onOpenRun();
+    setError("");
+    await runsState.start(taskId, choice, action, continueFrom);
   }
 
   async function resolve(runId: number) {
@@ -494,6 +512,7 @@ export function BoardPanel({
   /** Rodar localmente: pede o comando se faltar, confirma o texto do repositório, e sobe. */
   async function runPreview(runId: number) {
     if (workspaceId === null) return;
+    setError("");
     try {
       const profile = await getProfile(workspaceId);
       if (!profile.exists) {
@@ -531,6 +550,7 @@ export function BoardPanel({
 
   /** Executa uma ação de entrega com feedback; o erro vem do núcleo, já em português. */
   async function deliver(action: () => Promise<Delivery>, done: (result: Delivery) => string) {
+    setError("");
     setDelivering(true);
     try {
       const result = await action();
@@ -561,10 +581,11 @@ export function BoardPanel({
     );
 
   async function review(runId: number) {
+    setError("");
     try {
       await reviewRun(runId, choice);
       runsState.open(runId);
-      onOpenRun();
+      say({ text: "Revisão pedida. Os achados aparecem nas alterações e você será avisado." });
     } catch (cause) {
       setError(message(cause));
     }
@@ -572,6 +593,25 @@ export function BoardPanel({
 
   const workspace = workspaces.find((item) => item.id === workspaceId) ?? null;
   const startable = canStartRun(agentReady, runs);
+  const activeRun = selected
+    ? (runs.find((run) => run.taskId === selected.id && isActive(run)) ?? null)
+    : null;
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const activeId = activeRun?.id;
+  useEffect(() => {
+    if (activeId === undefined) return;
+    setNowMs(Date.now());
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [activeId]);
+  // O log da run em andamento precisa estar carregado e acompanhado para o painel mostrar a atividade.
+  const { openRun, open: openRunLog } = runsState;
+  useEffect(() => {
+    if (!hidden && activeId !== undefined && openRun !== activeId) openRunLog(activeId);
+  }, [hidden, activeId, openRun, openRunLog]);
+  const progress = activeRun
+    ? progressOf(activeRun, runsState.eventsByRun[activeRun.id], nowMs)
+    : null;
   const selectedWork = selected ? workRun(runs, selected.id) : null;
   const quickInput = selected
     ? {
@@ -813,6 +853,12 @@ export function BoardPanel({
               states={quickStates(quickInput)}
               next={next}
               working={working.has(selected.id)}
+              progress={progress}
+              onCancel={() => activeRun && void cancelRun(activeRun.id).catch(fail)}
+              onOpenChat={() => {
+                if (activeRun) runsState.open(activeRun.id);
+                onOpenRun();
+              }}
               onRun={quick}
               onDelete={() => remove(selected.id)}
             />
@@ -829,6 +875,7 @@ export function BoardPanel({
                   runId={selectedWork.id}
                   taskId={selected.id}
                   findings={reviewFindings(runsState.eventsByRun[selectedWork.id])}
+                  defaultOpen={selected.status === "review"}
                 />
               )}
               {(() => {
@@ -866,6 +913,7 @@ export function BoardPanel({
                 }
                 onStart={start}
                 onResolve={resolve}
+                implementIsNext={!selectedWork || next?.id === "implement"}
                 onDirty={setDirty}
                 onClose={() => select(null)}
                 useChain={useChain}

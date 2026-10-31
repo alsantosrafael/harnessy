@@ -17,7 +17,7 @@ Ler as alterações mostra **o que** mudou; só usar mostra **se funciona**. O b
 
 | Estado | Significa |
 |---|---|
-| **Subindo…** | Está ligando |
+| **Subindo…** | Está ligando (inclui recriar a cópia e instalar dependências, se for preciso) |
 | **No ar** | Pronto: aparece o endereço, como `http://localhost:5173` |
 | **Parado** | Foi desligado |
 | **Caiu (código N)** | O comando terminou com erro; veja o log |
@@ -37,7 +37,7 @@ A confirmação vale para **aquele texto exato**. Se o arquivo for editado, o Ha
 
 - Só **um** ambiente fica no ar por vez, para não brigar por porta. Ligar outro desliga o anterior.
 - O ambiente é **desligado sozinho** ao fechar o Harnessy ou excluir a tarefa.
-- Ele roda **na cópia da run**, não no seu projeto original; por isso reflete exatamente a mudança do agente.
+- Ele roda **numa cópia da run**, não no seu projeto original; por isso reflete exatamente a mudança do agente. A cópia que o agente usou é apagada quando a run termina, então o Harnessy **a recria a partir da branch** na hora de rodar (o painel mostra "recriando…" e "instalando as dependências…", e isso pode levar alguns minutos na primeira vez) e a **remove de novo** ao parar.
 - O comando roda sem as suas senhas e tokens: o Harnessy usa só um conjunto fixo e seguro de variáveis do ambiente.
 - O botão **Abrir no navegador** só abre endereços locais (`http://localhost:…`) que o próprio ambiente anunciou.
 
@@ -48,7 +48,7 @@ A confirmação vale para **aquele texto exato**. Se o arquivo for editado, o Ha
 | Fica em **Subindo…** | O comando não imprimiu um endereço e você não informou a porta. Veja o log; se o projeto abre numa porta fixa, informe-a e rode de novo |
 | **Caiu (código 1)** | Leia o final do log. Muitas vezes falta instalar algo ou a porta já está em uso |
 | "Porta já em uso" | Outro programa usa a porta. Troque a porta no comando ou feche o outro programa |
-| "O worktree desta run não existe mais" | A cópia da run foi removida. Peça um novo ajuste para criar outra |
+| Falha ao "recriar a cópia" | A branch da run não existe mais no git (foi apagada) ou já está aberta em outro lugar. Leia o motivo no log do painel |
 | Pede confirmação de novo | O arquivo `.harnessy/workspace.toml` mudou desde a última confirmação |
 
 Próximo: [Publicar e fazer merge →](07-publicar-e-merge.md)

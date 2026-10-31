@@ -7,8 +7,12 @@ use serde::Serialize;
 
 use crate::{
     error::{AppError, Result},
-    profile,
-    run::{self, guard, preview::Spec},
+    process, profile,
+    run::{
+        self, guard,
+        preview::{Hooks, Spec},
+        worktree,
+    },
     workspace,
 };
 
@@ -89,21 +93,16 @@ pub fn approve_profile(db: &Connection, workspace_id: i64) -> Result<ProfileView
 }
 
 /// Plano de execução do ambiente de uma run, ou a frase do que falta.
-pub fn spec_for(
+///
+/// O worktree de uma run é removido quando ela termina; a branch fica. Se a pasta sumiu,
+/// o plano traz os passos para recriá-la a partir da branch (e removê-la ao fim).
+pub fn plan_for(
     db: &Connection,
     run_id: i64,
     dirs: &[PathBuf],
     cargo_target: &Path,
-) -> Result<Spec> {
+) -> Result<(Spec, Hooks)> {
     let run = run::get(db, run_id)?;
-    let worktree = run
-        .worktree_path
-        .as_deref()
-        .map(PathBuf::from)
-        .filter(|dir| dir.is_dir())
-        .ok_or(AppError::Validation(
-            "O worktree desta run não existe mais; não há o que rodar.",
-        ))?;
     let ws = workspace::get(db, run.workspace_id)?;
     let loaded = profile::read(Path::new(&ws.folder))?.ok_or(AppError::Validation(
         "Defina como subir o projeto antes de rodar localmente.",
@@ -113,12 +112,56 @@ pub fn spec_for(
             "Confirme o comando do projeto antes de rodá-lo.",
         ));
     }
-    Ok(Spec {
+    let dir = run
+        .worktree_path
+        .as_deref()
+        .map(PathBuf::from)
+        .ok_or(AppError::Validation(
+            "Esta run não deixou uma cópia para rodar.",
+        ))?;
+    let hooks = if dir.is_dir() {
+        Hooks::default()
+    } else {
+        recreate(&ws.folder, &dir, run.branch.as_deref(), dirs)?
+    };
+    let spec = Spec {
         run_id,
         command: loaded.profile.preview.run,
-        cwd: worktree,
+        cwd: dir,
         env: guard::env(dirs, cargo_target, |name| std::env::var(name).ok()),
         port: loaded.profile.preview.port,
         ready: loaded.profile.preview.ready,
+    };
+    Ok((spec, hooks))
+}
+
+/// Passos para recriar a cópia da run a partir da branch dela, com dependências instaladas.
+fn recreate(repo: &str, dir: &Path, branch: Option<&str>, dirs: &[PathBuf]) -> Result<Hooks> {
+    let branch = branch
+        .ok_or(AppError::Validation(
+            "A run não deixou uma branch para rodar.",
+        ))?
+        .to_owned();
+    let git = process::find_binary("git", dirs)
+        .ok_or(AppError::Validation("git não encontrado neste computador."))?;
+    let bun = process::find_binary("bun", dirs);
+    let (repo, dir_prepare, dir_cleanup) =
+        (PathBuf::from(repo), dir.to_path_buf(), dir.to_path_buf());
+    let (dirs_prepare, dirs_cleanup) = (dirs.to_vec(), dirs.to_vec());
+    let (git_cleanup, repo_cleanup) = (git.clone(), repo.clone());
+    Ok(Hooks {
+        prepare: Some(Box::new(move |log| {
+            log("A cópia desta run não existe mais; recriando a partir da branch…");
+            worktree::checkout(&git, &dirs_prepare, &repo, &dir_prepare, &branch)
+                .map_err(AppError::Delivery)?;
+            log("Instalando as dependências…");
+            worktree::install_deps(bun.as_deref(), &dirs_prepare, &dir_prepare)
+                .map_err(AppError::Delivery)?;
+            log("Cópia pronta; subindo o projeto…");
+            Ok(())
+        })),
+        cleanup: Some(Box::new(move || {
+            let _ = worktree::remove(&git_cleanup, &dirs_cleanup, &repo_cleanup, &dir_cleanup);
+        })),
     })
 }

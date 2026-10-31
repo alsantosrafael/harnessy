@@ -8,6 +8,8 @@ interface Props {
   taskId: number;
   /** Achados da revisão (os que bloqueiam e as sugestões), para aparecerem na linha deles. */
   findings: Finding[];
+  /** Abre já ao montar: na raia de Revisão, ler o que mudou é o centro do trabalho. */
+  defaultOpen?: boolean;
 }
 
 const STATUS_LABEL: Record<FileDiff["status"], string> = {
@@ -23,8 +25,8 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
  * O que a run mudou, para o humano ler antes de aprovar. Só leitura: carrega ao abrir,
  * mostra um arquivo por vez e põe cada achado da revisão na linha a que ele se refere.
  */
-export function ChangesPanel({ runId, taskId, findings }: Props) {
-  const [open, setOpen] = useState(false);
+export function ChangesPanel({ runId, taskId, findings, defaultOpen = false }: Props) {
+  const [open, setOpen] = useState(defaultOpen);
   const [diff, setDiff] = useState<RunDiff | null>(null);
   const [error, setError] = useState("");
   const [path, setPath] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export function ChangesPanel({ runId, taskId, findings }: Props) {
   return (
     <details
       className="changes-panel"
+      open={open}
       onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
     >
       <summary>

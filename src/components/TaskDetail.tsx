@@ -43,6 +43,8 @@ interface Props {
   /** Inicia a run com a Ação escolhida; sem Ação, usa a principal (implementar). */
   onStart: (id: number, action?: string, continueFrom?: number | null) => void;
   onResolve: (runId: number) => void;
+  /** Implementar é o próximo passo da tarefa; senão é um recomeço e não vira o botão principal. */
+  implementIsNext: boolean;
   onDirty: (dirty: boolean) => void;
   onClose: () => void;
   /** Continuar da run do passo anterior (escolha compartilhada com os comandos rápidos). */
@@ -65,6 +67,7 @@ export function TaskDetail({
   onSaved,
   onStart,
   onResolve,
+  implementIsNext,
   onDirty,
   onClose,
   useChain,
@@ -267,14 +270,20 @@ export function TaskDetail({
           )}
           <button
             type="button"
-            className="button primary"
+            className={implementIsNext ? "button primary" : "button"}
             disabled={!canStart || starting || dirty || primaryReason !== null}
             onClick={() => onStart(task.id, undefined, continueFrom)}
           >
             {starting
               ? "Iniciando…"
-              : `Implementar com ${agentOf(choice.runtime)?.label ?? choice.runtime} · ${modelName(choice.runtime, choice.model)}`}
+              : `${implementIsNext ? "Implementar" : "Implementar de novo"} com ${agentOf(choice.runtime)?.label ?? choice.runtime} · ${modelName(choice.runtime, choice.model)}`}
           </button>
+          {!implementIsNext && (
+            <p className="muted">
+              Já existe uma implementação. Para mudar algo, peça um ajuste na conversa; recomeçar do
+              zero é só se você quiser descartar o caminho atual.
+            </p>
+          )}
           {dirty && <p className="muted">Salve a tarefa antes de implementar.</p>}
           {primaryReason && <p className="local-error">{primaryReason}</p>}
         </section>

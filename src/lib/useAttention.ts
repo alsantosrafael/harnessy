@@ -17,10 +17,14 @@ export function useAttentionSignals(
   attention: ReadonlyMap<number, Attention>,
   ready: boolean,
   resetKey: unknown,
+  /** Algo novo chegou com a janela em foco: o quadro pode avisar ali mesmo. */
+  onArrive?: (arrived: Attention[]) => void,
 ): AttentionSignals {
   const [digest, setDigest] = useState<Attention[]>([]);
   const known = useRef<Map<number, string> | null>(null);
   const away = useRef<Attention[]>([]);
+  const onArriveRef = useRef(onArrive);
+  onArriveRef.current = onArrive;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `resetKey` é o gatilho de recomeço.
   useEffect(() => {
@@ -36,7 +40,11 @@ export function useAttentionSignals(
     known.current = new Map([...attention].map(([id, item]) => [id, item.key]));
     if (before === null) return;
     const arrived = [...attention.values()].filter((item) => before.get(item.taskId) !== item.key);
-    if (arrived.length === 0 || document.hasFocus()) return;
+    if (arrived.length === 0) return;
+    if (document.hasFocus()) {
+      onArriveRef.current?.(arrived);
+      return;
+    }
     away.current = mergeArrivals(away.current, arrived);
     const text = notificationFor(arrived);
     if (text) notifyAttention(text.title, text.body).catch(() => undefined);

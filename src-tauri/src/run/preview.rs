@@ -48,6 +48,17 @@ pub enum Event {
     Log { run_id: i64, line: String },
 }
 
+/// Prepara a cópia da run; recebe uma função para registrar o que está fazendo.
+pub type Prepare = Box<dyn FnOnce(&dyn Fn(&str)) -> Result<()> + Send>;
+
+/// Passos opcionais em volta do processo: preparar a cópia da run antes e limpá-la depois.
+#[derive(Default)]
+pub struct Hooks {
+    /// Recebe uma função para registrar o que está fazendo (vira linhas do log).
+    pub prepare: Option<Prepare>,
+    pub cleanup: Option<Box<dyn FnOnce() + Send>>,
+}
+
 pub struct Spec {
     pub run_id: i64,
     pub command: String,
@@ -116,7 +127,9 @@ impl Previews {
                 kill_group(pgid);
                 true
             }
-            _ => false,
+            // Ainda preparando: o processo nem abriu; a marca de "parar" basta.
+            Some(None) => true,
+            None => false,
         }
     }
 
@@ -145,9 +158,11 @@ impl Previews {
     }
 
     /// Sobe o ambiente. Só um fica vivo por vez (portas e memória): o anterior é encerrado.
+    /// O estado `starting` vale desde já, também enquanto `hooks.prepare` recria a cópia da run.
     pub fn start(
         &self,
         spec: Spec,
+        hooks: Hooks,
         notify: impl Fn(Event) + Send + Sync + 'static,
     ) -> Result<Info> {
         if self.info(spec.run_id).is_some_and(|info| alive(info.state)) {
@@ -156,6 +171,70 @@ impl Previews {
             ));
         }
         self.stop_all();
+        let info = Info {
+            run_id: spec.run_id,
+            state: "starting",
+            url: None,
+            exit_code: None,
+            started_at: now(),
+        };
+        if let Ok(mut map) = self.inner.lock() {
+            map.insert(
+                spec.run_id,
+                Entry {
+                    info: info.clone(),
+                    pgid: None,
+                    stopping: false,
+                    log: VecDeque::new(),
+                },
+            );
+        }
+        let previews = self.clone();
+        let notify: Arc<dyn Fn(Event) + Send + Sync> = Arc::new(notify);
+        std::thread::spawn(move || previews.run(spec, hooks, notify));
+        Ok(info)
+    }
+
+    fn say(&self, run_id: i64, text: &str, notify: &dyn Fn(Event)) {
+        self.line(run_id, text, None, notify);
+    }
+
+    fn finish(&self, run_id: i64, failed: bool, code: Option<i32>, notify: &dyn Fn(Event)) {
+        let stopped = self.with(run_id, |entry| entry.stopping).unwrap_or(false);
+        let state = if !failed && (stopped || code == Some(0)) {
+            "stopped"
+        } else {
+            "failed"
+        };
+        if let Some(info) = self.set(run_id, state, None, code) {
+            notify(Event::State(info));
+        }
+    }
+
+    /// Orquestra uma subida: prepara a cópia, abre o processo, acompanha e limpa.
+    fn run(&self, spec: Spec, hooks: Hooks, notify: Arc<dyn Fn(Event) + Send + Sync>) {
+        let run_id = spec.run_id;
+        let Hooks { prepare, cleanup } = hooks;
+        let cleanup = move || {
+            if let Some(cleanup) = cleanup {
+                cleanup();
+            }
+        };
+        if let Some(prepare) = prepare {
+            let log = |text: &str| self.say(run_id, text, &*notify);
+            if let Err(error) = prepare(&log) {
+                self.say(run_id, &error.to_string(), &*notify);
+                self.finish(run_id, true, None, &*notify);
+                cleanup();
+                return;
+            }
+        }
+        // Parar durante a preparação: não chega a abrir o processo.
+        if self.with(run_id, |entry| entry.stopping).unwrap_or(false) {
+            self.finish(run_id, false, None, &*notify);
+            cleanup();
+            return;
+        }
         let mut command = Command::new("/bin/sh");
         command
             .args(["-c", &spec.command])
@@ -169,29 +248,26 @@ impl Previews {
         if let Some(port) = spec.port {
             command.env("PORT", port.to_string());
         }
-        let mut child = command.spawn().map_err(|_| {
-            AppError::Delivery("Não foi possível iniciar o ambiente de teste.".into())
-        })?;
-        let info = Info {
-            run_id: spec.run_id,
-            state: "starting",
-            url: None,
-            exit_code: None,
-            started_at: now(),
+        let mut child = match command.spawn() {
+            Ok(child) => child,
+            Err(_) => {
+                self.say(
+                    run_id,
+                    "Não foi possível iniciar o ambiente de teste.",
+                    &*notify,
+                );
+                self.finish(run_id, true, None, &*notify);
+                cleanup();
+                return;
+            }
         };
-        if let Ok(mut map) = self.inner.lock() {
-            map.insert(
-                spec.run_id,
-                Entry {
-                    info: info.clone(),
-                    pgid: Some(child.id() as i32),
-                    stopping: false,
-                    log: VecDeque::new(),
-                },
-            );
+        let pgid = child.id() as i32;
+        self.with(run_id, |entry| entry.pgid = Some(pgid));
+        // Um "parar" que chegou entre a verificação e o spawn ainda precisa valer.
+        if self.with(run_id, |entry| entry.stopping).unwrap_or(false) {
+            kill_group(pgid);
         }
-        let notify = Arc::new(notify);
-        let run_id = spec.run_id;
+        let mut readers = Vec::new();
         for stream in [
             child
                 .stdout
@@ -206,35 +282,25 @@ impl Previews {
         .flatten()
         {
             let (previews, notify, ready) = (self.clone(), notify.clone(), spec.ready.clone());
-            std::thread::spawn(move || {
+            readers.push(std::thread::spawn(move || {
                 for raw in BufReader::new(stream)
                     .lines()
                     .map_while(std::result::Result::ok)
                 {
                     previews.line(run_id, &raw, ready.as_deref(), &*notify);
                 }
-            });
+            }));
         }
         if let Some(port) = spec.port {
             let (previews, notify) = (self.clone(), notify.clone());
             std::thread::spawn(move || previews.wait_for_port(run_id, port, &*notify));
         }
-        let (previews, notify) = (self.clone(), notify);
-        std::thread::spawn(move || {
-            let code = child.wait().ok().and_then(|exit| exit.code());
-            let stopped = previews
-                .with(run_id, |entry| entry.stopping)
-                .unwrap_or(false);
-            let state = if stopped || code == Some(0) {
-                "stopped"
-            } else {
-                "failed"
-            };
-            if let Some(info) = previews.set(run_id, state, None, code) {
-                notify(Event::State(info));
-            }
-        });
-        Ok(info)
+        let code = child.wait().ok().and_then(|exit| exit.code());
+        for reader in readers {
+            let _ = reader.join();
+        }
+        self.finish(run_id, false, code, &*notify);
+        cleanup();
     }
 
     fn line(&self, run_id: i64, raw: &str, ready: Option<&str>, notify: &dyn Fn(Event)) {
@@ -409,6 +475,7 @@ mod tests {
         previews
             .start(
                 spec("echo 'Local: http://localhost:4321'; sleep 30"),
+                Hooks::default(),
                 move |event| {
                     if let Event::Log { line, .. } = event {
                         let _ = tx.lock().map(|tx| tx.send(line));
@@ -424,7 +491,9 @@ mod tests {
             .contains("4321"));
         assert!(previews.log(1).iter().any(|line| line.contains("Local:")));
         assert!(
-            previews.start(spec("sleep 1"), |_| {}).is_err(),
+            previews
+                .start(spec("sleep 1"), Hooks::default(), |_| {})
+                .is_err(),
             "já está no ar"
         );
         assert!(previews.stop(1));
@@ -437,7 +506,9 @@ mod tests {
     #[test]
     fn a_command_that_dies_is_reported_as_failed_with_its_exit_code() {
         let previews = Previews::default();
-        previews.start(spec("echo erro; exit 3"), |_| {}).unwrap();
+        previews
+            .start(spec("echo erro; exit 3"), Hooks::default(), |_| {})
+            .unwrap();
         assert_eq!(wait_for(&previews, "failed").exit_code, Some(3));
     }
 
@@ -447,6 +518,7 @@ mod tests {
         previews
             .start(
                 spec("i=0; while [ $i -lt 700 ]; do echo l$i; i=$((i+1)); done"),
+                Hooks::default(),
                 |_| {},
             )
             .unwrap();
@@ -454,5 +526,78 @@ mod tests {
         let log = previews.log(1);
         assert_eq!(log.len(), MAX_LOG_LINES);
         assert_eq!(log.last().map(String::as_str), Some("l699"));
+    }
+
+    #[test]
+    fn preparation_is_logged_then_the_process_runs_and_cleanup_follows() {
+        let previews = Previews::default();
+        let cleaned = Arc::new(Mutex::new(false));
+        let flag = cleaned.clone();
+        let hooks = Hooks {
+            prepare: Some(Box::new(|log| {
+                log("Recriando a cópia da run…");
+                Ok(())
+            })),
+            cleanup: Some(Box::new(move || {
+                *flag.lock().unwrap() = true;
+            })),
+        };
+        previews.start(spec("echo ok"), hooks, |_| {}).unwrap();
+        assert_eq!(
+            previews.info(1).map(|i| i.state),
+            Some("starting"),
+            "vale já durante a preparação"
+        );
+        wait_for(&previews, "stopped");
+        assert!(previews.log(1).iter().any(|l| l.contains("Recriando")));
+        let until = Instant::now() + Duration::from_secs(2);
+        while !*cleaned.lock().unwrap() && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(
+            *cleaned.lock().unwrap(),
+            "a cópia temporária é removida ao fim"
+        );
+    }
+
+    #[test]
+    fn a_failed_preparation_fails_with_its_reason_and_never_opens_the_process() {
+        let previews = Previews::default();
+        let hooks = Hooks {
+            prepare: Some(Box::new(|_| {
+                Err(AppError::Delivery(
+                    "git worktree: a branch não existe".into(),
+                ))
+            })),
+            cleanup: None,
+        };
+        previews
+            .start(spec("echo nao-deveria-rodar"), hooks, |_| {})
+            .unwrap();
+        wait_for(&previews, "failed");
+        let log = previews.log(1);
+        assert!(log.iter().any(|l| l.contains("a branch não existe")));
+        assert!(!log.iter().any(|l| l.contains("nao-deveria-rodar")));
+    }
+
+    #[test]
+    fn stopping_while_preparing_prevents_the_process_from_starting() {
+        let previews = Previews::default();
+        let hooks = Hooks {
+            prepare: Some(Box::new(|_| {
+                std::thread::sleep(Duration::from_millis(300));
+                Ok(())
+            })),
+            cleanup: None,
+        };
+        previews
+            .start(spec("echo nao-deveria-rodar"), hooks, |_| {})
+            .unwrap();
+        assert!(previews.stop(1));
+        wait_for(&previews, "stopped");
+        assert!(!previews
+            .log(1)
+            .iter()
+            .any(|l| l.contains("nao-deveria-rodar")));
     }
 }
