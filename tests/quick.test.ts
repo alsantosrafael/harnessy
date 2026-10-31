@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import type { LocalTask, Run } from "../src/lib/desktop.ts";
-import { quickStates } from "../src/lib/quick.ts";
+import { nextAction, quickStates } from "../src/lib/quick.ts";
 
 const task = (status: LocalTask["status"]): LocalTask => ({
   id: 1,
@@ -127,4 +127,71 @@ test("running locally needs a finished run with changes and flips to stopping wh
     ...base,
   });
   assert.equal(on.find((state) => state.id === "preview")?.label, "Parar ambiente");
+});
+
+const pr = (extra: Record<string, unknown> = {}) =>
+  ({
+    runId: 1,
+    prNumber: 3,
+    prUrl: "u",
+    state: "open",
+    draft: true,
+    headSha: "a",
+    checks: "none",
+    mergeable: "unknown",
+    reviewedSha: null,
+    publishedAt: 0,
+    mergedAt: null,
+    ...extra,
+  }) as never;
+const next = (extra: Record<string, unknown> = {}, status: LocalTask["status"] = "review") => {
+  const work = (extra.work as Run | undefined) ?? run({});
+  return nextAction({
+    task: task(status),
+    lastRun: work,
+    workRun: work,
+    ...base,
+    ...extra,
+  } as never)?.id;
+};
+
+test("the next step follows the delivery line, one action at a time", () => {
+  assert.equal(nextAction({ task: task("todo"), lastRun: null, ...base })?.id, "implement");
+  assert.equal(next({}), "preview", "primeiro ver a mudança funcionando");
+  assert.equal(next({ previewSeen: true }), "publish", "depois de testar, publicar");
+  assert.equal(next({ delivery: pr() }), "review", "PR sem revisão aprovada");
+  assert.equal(
+    next({ delivery: pr({ checks: "pending" }) }),
+    "publish",
+    "atualizar enquanto os checks rodam",
+  );
+  assert.equal(next({ delivery: pr({ checks: "failing" }) }), "conversation", "pedir ajuste");
+  const approved = run({ review: "approve" });
+  assert.equal(
+    next({ work: approved, delivery: pr({ reviewedSha: "a", checks: "passing" }) }),
+    "merge",
+  );
+});
+
+test("there is no next step while the agent works, after merge, or when done", () => {
+  assert.equal(next({ work: run({ state: "implementing" }) }), undefined);
+  assert.equal(
+    nextAction({
+      task: task("review"),
+      lastRun: run({}),
+      starting: true,
+      canStart: true,
+      dirty: false,
+    }),
+    null,
+  );
+  assert.equal(next({ delivery: pr({ state: "merged" }) }), undefined);
+  assert.equal(next({}, "done"), undefined);
+});
+
+test("a run that delivered nothing asks to try again", () => {
+  const failed = run({ state: "failed", branch: null });
+  const action = nextAction({ task: task("review"), lastRun: failed, ...base });
+  assert.equal(action?.id, "implement");
+  assert.equal(action?.label, "Tentar de novo");
 });

@@ -10,6 +10,14 @@ Rodar localmente para testar a mudança (fatia 2a):
 - Painel **Ambiente de teste** na tarefa: estado em texto (Subindo…, No ar, Parado, Caiu com o código), endereço, **Abrir no navegador**, **Parar** / **Rodar de novo** e o log ao vivo, rolável por teclado.
 - O card mostra **No ar** enquanto o ambiente da tarefa está rodando.
 
+## Front [0.22.0] — 2026-10-31
+
+Um próximo passo por tarefa:
+
+- O painel da tarefa agora destaca **uma ação principal** ("Próximo passo"), deduzida do estágio de entrega, com uma frase dizendo por quê: **Implementar**, **Rodar localmente**, **Publicar PR**, **Revisar**, **Atualizar PR**, **Pedir ajuste** (checks falhando, conflito ou mudanças pedidas), **Fazer merge** ou **Tentar de novo**. Enquanto o agente trabalha, o painel diz que você será avisado, em vez de oferecer botões.
+- As demais ações ficam em **Mais ações**, recolhidas, com o motivo de cada indisponibilidade. Sem próximo passo, elas ficam à vista.
+- A tecla **A** executa o próximo passo da tarefa selecionada. Depois de ligar o ambiente de teste, o passo seguinte passa a ser publicar.
+
 ## Back [0.20.0] — 2026-10-31
 
 Automação do ciclo, base (fatia 2b-1; o motor e a interface vêm nas próximas):

@@ -30,7 +30,7 @@ import { isLive } from "../lib/preview";
 import { canStartRun, chainBase, isActive } from "../lib/runs";
 import { usePreviews } from "../lib/usePreviews";
 import type { RunsState } from "../lib/useRuns";
-import { quickStates, type QuickId } from "../lib/quick";
+import { nextAction, quickStates, type QuickId } from "../lib/quick";
 import { type Confirmation, ConfirmDialog } from "./ConfirmDialog";
 import { Kanban, KanbanSkeleton, type NewTaskDraft } from "./Kanban";
 import { PreviewPanel } from "./PreviewPanel";
@@ -112,6 +112,7 @@ export function BoardPanel({
 
   // Refs deixam `move`/`select` estáveis, para os cards memoizados não re-renderizarem.
   const tasksRef = useRef(tasks);
+  const runNextRef = useRef<(() => void) | null>(null);
   const deliveriesRef = useRef(deliveries);
   deliveriesRef.current = deliveries;
   const stagesRef = useRef<ReturnType<typeof stagesByTask>>(new Map());
@@ -335,9 +336,16 @@ export function BoardPanel({
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
       const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
-      if (event.key !== "n" || typing || event.metaKey || event.ctrlKey || event.altKey) return;
-      event.preventDefault();
-      document.getElementById("new-task-title")?.focus();
+      if (typing || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key === "n") {
+        event.preventDefault();
+        document.getElementById("new-task-title")?.focus();
+      }
+      // `a` executa o próximo passo da tarefa selecionada (o botão principal).
+      if (event.key === "a" && runNextRef.current) {
+        event.preventDefault();
+        runNextRef.current();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -521,6 +529,27 @@ export function BoardPanel({
 
   const workspace = workspaces.find((item) => item.id === workspaceId) ?? null;
   const startable = canStartRun(agentReady, runs);
+  const selectedWork = selected ? workRun(runs, selected.id) : null;
+  const quickInput = selected
+    ? {
+        task: selected,
+        lastRun: runs.find((run) => run.taskId === selected.id) ?? null,
+        canStart: startable && !delivering,
+        starting,
+        dirty,
+        workRun: selectedWork,
+        delivery: deliveryOf(deliveries, selectedWork),
+        preview: previews.infos[selectedWork?.id ?? -1] ?? null,
+      }
+    : null;
+  // O ambiente já ter sido ligado conta como "testei": o próximo passo deixa de ser testar.
+  const next = quickInput
+    ? nextAction({
+        ...quickInput,
+        previewSeen: selectedWork ? previews.infos[selectedWork.id] !== undefined : false,
+      })
+    : null;
+  runNextRef.current = next ? () => quick(next.id) : null;
 
   return (
     <section id="board-panel" className="local-work" aria-label="Tarefas" hidden={hidden}>
@@ -659,20 +688,13 @@ export function BoardPanel({
               </p>
             )}
           </div>
-          {selected && (
+          {selected && quickInput && (
             <QuickActions
               taskId={selected.id}
               title={selected.title}
-              states={quickStates({
-                task: selected,
-                lastRun: runs.find((run) => run.taskId === selected.id) ?? null,
-                canStart: startable && !delivering,
-                starting,
-                dirty,
-                workRun: workRun(runs, selected.id),
-                delivery: deliveryOf(deliveries, workRun(runs, selected.id)),
-                preview: previews.infos[workRun(runs, selected.id)?.id ?? -1] ?? null,
-              })}
+              states={quickStates(quickInput)}
+              next={next}
+              working={working.has(selected.id)}
               onRun={quick}
               onDelete={() => remove(selected.id)}
             />
