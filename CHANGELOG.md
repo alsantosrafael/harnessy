@@ -10,6 +10,15 @@ Rodar localmente para testar a mudança (fatia 2a):
 - Painel **Ambiente de teste** na tarefa: estado em texto (Subindo…, No ar, Parado, Caiu com o código), endereço, **Abrir no navegador**, **Parar** / **Rodar de novo** e o log ao vivo, rolável por teclado.
 - O card mostra **No ar** enquanto o ambiente da tarefa está rodando.
 
+## Front [0.29.1] — 2026-10-31
+
+O log do ambiente de teste (e os demais logs) ganha uma paleta de terminal legível, verificada em captura de tela:
+
+- **Superfície escura e quente** (`--log-bg`) no lugar do bege sobre bege, com todos os pares de cor acima de 6:1 de contraste (a maioria acima de 7:1). Os tokens `--log-*` ficam em `tokens.css`.
+- **Cor por tipo de linha**, com um sinal à esquerda para não depender só da cor: erro em vermelho com barra e `✕`, aviso em âmbar com `!`, pronto/OK em verde com `✓`, endereço local em azul, comando atenuado, rastro de pilha em cinza e as falas do próprio Harnessy ("recriando a cópia…") em âmbar itálico com `›`. Erro vence qualquer outra regra.
+- Barra de título com a contagem de linhas e o botão **Copiar** (com confirmação). A dica de porta ocupada mostra `{port}` como código.
+- Os blocos de log técnico da run, a prévia do prompt e a linha de atividade do agente usam a mesma superfície.
+
 ## Front [0.29.0] — 2026-10-31
 
 Instâncias de teste, para fazer dogfooding sem misturar com o seu Harnessy:

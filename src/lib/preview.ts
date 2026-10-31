@@ -59,3 +59,31 @@ export function hintFor(
   }
   return null;
 }
+
+export type LogKind = "error" | "warn" | "ok" | "info" | "note" | "command" | "dim" | "plain";
+
+const ERROR_LINE =
+  /\b(error|erro|failed|failure|fatal|panic|exception|ERR!|EADDRINUSE|ELIFECYCLE)\b|exited with code [1-9]|^caiu\b/i;
+const WARN_LINE = /\b(warn|warning|deprecated|aviso)\b/i;
+const OK_LINE = /(✓|✔)|\b(ready in|built in|compiled|listening on|server running)\b/i;
+const URL_LINE = /https?:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+/i;
+// O que o próprio Harnessy conta durante a preparação da cópia.
+const NOTE_LINE =
+  /^(A cópia desta run|Preparando|Instalando|Cópia pronta|O ambiente|Não foi possível iniciar)/;
+
+/**
+ * Tipo de uma linha do log, para colorir o terminal. O erro vence os demais (uma linha que diz
+ * "error" nunca vira "ok"), e o que não casa com nada fica sem cor.
+ */
+export function logKind(line: string): LogKind {
+  const text = line.trim();
+  if (text === "") return "plain";
+  if (text.startsWith("$ ")) return "command";
+  if (NOTE_LINE.test(text)) return "note";
+  if (ERROR_LINE.test(text)) return "error";
+  if (WARN_LINE.test(text)) return "warn";
+  if (OK_LINE.test(text)) return "ok";
+  if (URL_LINE.test(text)) return "info";
+  if (/^\s*(at |\d+ \|)/.test(line) || text.startsWith("└") || text.startsWith("├")) return "dim";
+  return "plain";
+}

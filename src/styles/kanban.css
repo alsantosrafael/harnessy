@@ -128,8 +128,32 @@
 .preview-url { margin: 0; font-size: var(--text-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
 .preview-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .preview-actions .button { display: inline-flex; align-items: center; gap: var(--space-2); }
-.preview-log { margin: 0; max-height: 220px; overflow: auto; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--text); font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-.preview-log:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Terminal: superfície escura com cores semânticas por tipo de linha. O sinal à esquerda repete o que a cor diz. */
+.log-box { border: 1px solid var(--log-border); border-radius: var(--radius-md); background: var(--log-bg); overflow: hidden; }
+.log-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 5px var(--space-3); border-bottom: 1px solid var(--log-border); background: var(--log-bar); color: var(--log-dim); font-size: var(--text-xs); }
+.log-bar-title { font-weight: 600; letter-spacing: 0.02em; }
+.log-copy { padding: 1px var(--space-2); border: 1px solid var(--log-border); border-radius: var(--radius-sm); background: none; color: var(--log-text); font-size: var(--text-xs); }
+.log-copy:hover { background: var(--log-border); }
+.log-copy:focus-visible { outline: 2px solid var(--log-note); outline-offset: 1px; }
+.preview-log { margin: 0; max-height: 240px; overflow: auto; padding: var(--space-3) var(--space-3) var(--space-3) var(--space-2); background: var(--log-bg); color: var(--log-text); font: 12px/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; scrollbar-width: thin; scrollbar-color: var(--log-scroll) transparent; tab-size: 2; }
+.preview-log::selection, .preview-log *::selection { background: var(--log-select); }
+.preview-log:focus-visible { outline: 2px solid var(--log-note); outline-offset: -2px; }
+.log-line { display: block; padding-left: 1.6em; text-indent: -1.6em; border-left: 2px solid transparent; margin-left: -2px; }
+.log-line::before { display: inline-block; width: 1.6em; text-indent: 0; text-align: center; color: var(--log-dim); }
+.log-line.is-command { color: var(--log-prompt); }
+/* O próprio texto já começa com "$": o marcador só reserva a coluna. */
+.log-line.is-command::before { content: ""; }
+.log-line.is-note { color: var(--log-note); font-style: italic; }
+.log-line.is-note::before { content: "›"; }
+.log-line.is-ok { color: var(--log-ok); }
+.log-line.is-ok::before { content: "✓"; color: var(--log-ok); }
+.log-line.is-info { color: var(--log-info); }
+.log-line.is-warn { color: var(--log-warn); }
+.log-line.is-warn::before { content: "!"; color: var(--log-warn); font-weight: 700; }
+.log-line.is-error { color: var(--log-error); border-left-color: var(--log-error); background: rgba(255, 155, 138, 0.08); }
+.log-line.is-error::before { content: "✕"; color: var(--log-error); font-weight: 700; }
+.log-line.is-dim { color: var(--log-dim); }
+.log-empty { color: var(--log-dim); font-style: italic; }
 .setup-dialog .field { display: grid; gap: var(--space-1); margin-bottom: var(--space-3); font-size: var(--text-sm); font-weight: 600; }
 .setup-dialog input { padding: var(--space-2) var(--space-3); border: 1px solid var(--input-border); border-radius: var(--radius-sm); background: var(--input-bg); color: var(--text); font: inherit; font-weight: 400; }
 .setup-dialog input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
@@ -184,3 +208,4 @@
 /* Folga no topo da lista: a barra de ações do primeiro card sai pela borda e não pode ser cortada
    pela rolagem da raia (sem somar espaço: a margem negativa devolve o que o padding tomou). */
 .lane-cards { padding-top: 20px; margin-top: -17px; }
+.preview-hint code { padding: 0 4px; border-radius: 3px; background: rgba(114, 80, 19, 0.12); font: 12px var(--font-mono); }

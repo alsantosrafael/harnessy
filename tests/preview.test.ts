@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import type { PreviewInfo } from "../src/lib/desktop.ts";
-import { appendLog, hintFor, isLive, previewLabel, upsertPreview } from "../src/lib/preview.ts";
+import {
+  appendLog,
+  hintFor,
+  isLive,
+  logKind,
+  previewLabel,
+  upsertPreview,
+} from "../src/lib/preview.ts";
 
 const info = (extra: Partial<PreviewInfo>): PreviewInfo => ({
   runId: 1,
@@ -48,4 +55,19 @@ test("a port clash on a failed environment gets a hint about the {port} marker",
   assert.equal(hintFor(failed, ["erro qualquer"]), null);
   assert.equal(hintFor(info({}), log), null, "só quando o ambiente caiu");
   assert.equal(hintFor(null, log), null);
+});
+
+test("log lines are classified for the terminal, with errors winning over everything", () => {
+  assert.equal(logKind("$ bunx --bun vite --host 127.0.0.1"), "command");
+  assert.equal(logKind("A cópia desta run não existe mais; recriando a partir da branch…"), "note");
+  assert.equal(logKind("Instalando as dependências…"), "note");
+  assert.equal(logKind("Error: Port 1420 is already in use"), "error");
+  assert.equal(logKind('error: script "dev" exited with code 1'), "error");
+  assert.equal(logKind("error when starting dev server: ready in 3 ms"), "error", "erro vence ok");
+  assert.equal(logKind("warning: unused import"), "warn");
+  assert.equal(logKind("  VITE v6.4.5  ready in 82 ms"), "ok");
+  assert.equal(logKind("  ➜  Local:   http://localhost:5173/"), "info");
+  assert.equal(logKind("    at onError (/x/vite.js:25336:22)"), "dim");
+  assert.equal(logKind("alguma coisa qualquer"), "plain");
+  assert.equal(logKind("   "), "plain");
 });
