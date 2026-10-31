@@ -162,30 +162,41 @@ function RefinementProposal({
   const [criteria, setCriteria] = useState(draft.criteria);
   const [busy, setBusy] = useState(false);
   const [applied, setApplied] = useState(false);
-  // Revisão da tarefa quando o rascunho apareceu: se ela mudou depois, salvar recusa em vez de sobrescrever.
-  const [revision, setRevision] = useState<number | null>(null);
+  // Texto da tarefa quando o rascunho apareceu: se descrição ou critérios mudaram depois,
+  // aplicar recusa em vez de sobrescrever. Mudar só o título, ou salvar sem alterar o texto, não conta.
+  const [base, setBase] = useState<{ description: string; criteria: string } | null>(null);
   useEffect(() => {
     let live = true;
     listTasks(run.workspaceId)
       .then((tasks) => {
         const found = tasks.find((task) => task.id === run.taskId);
-        if (live && found) setRevision(found.revision);
+        if (live && found) setBase({ description: found.description, criteria: found.criteria });
       })
       .catch((cause) => onError(message(cause)));
     return () => {
       live = false;
     };
   }, [run.workspaceId, run.taskId, onError]);
-  if (applied) return <p role="status">Descrição e critérios aplicados à tarefa.</p>;
+  if (applied)
+    return (
+      <p role="status">
+        Descrição e critérios aplicados à tarefa. Veja o resultado no painel da tarefa, no quadro.
+      </p>
+    );
 
   const decisions = [...earlier, ...decisionsOf(draft.questions, answers)];
   const apply = async () => {
     const current = (await listTasks(run.workspaceId)).find((task) => task.id === run.taskId);
-    if (!current || revision === null) throw new Error("A tarefa não existe mais.");
+    if (!current || base === null) throw new Error("A tarefa não existe mais.");
+    if (current.description !== base.description || current.criteria !== base.criteria) {
+      throw new Error(
+        "A descrição ou os critérios da tarefa mudaram depois deste rascunho. Refine de novo para não sobrescrever a edição.",
+      );
+    }
     await saveTask({
       id: current.id,
       workspaceId: current.workspaceId,
-      revision,
+      revision: current.revision,
       title: current.title,
       description: withDecisions(description, decisions),
       criteria,
@@ -296,10 +307,7 @@ function RefinementProposal({
             Refinar de novo
           </button>
         )}
-        <button
-          className="button primary"
-          disabled={busy || revision === null || !description.trim()}
-        >
+        <button className="button primary" disabled={busy || base === null || !description.trim()}>
           {busy ? "Aplicando…" : "Aplicar à tarefa"}
         </button>
       </div>

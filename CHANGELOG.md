@@ -2,6 +2,15 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Back [0.27.3] — 2026-10-31
+
+- O prompt do **Refinar** pede só Read, Glob e Grep para conferir o código; antes o agente tentava `grep` via Bash, que o modo de leitura nega, e o feed mostrava "Negado".
+
+## Front [0.30.2] — 2026-10-31
+
+- **Corrigido:** depois de **Aplicar à tarefa**, o painel da tarefa mostrava o texto antigo e perguntava "Descartar alterações?" ao clicar em outro card. O formulário agora acompanha a tarefa quando você não editou nada.
+- **Corrigido:** **Aplicar à tarefa** falhava com "tarefa desatualizada" se a tarefa fosse salva depois do rascunho (até só o título). Agora só recusa se a descrição ou os critérios mudaram, com uma mensagem que diz o que fazer.
+
 ## Front [0.30.1] — 2026-10-31
 
 Refinar v2, a partir de papers sobre esclarecimento de requisitos por LLMs:
