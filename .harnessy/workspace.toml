@@ -1,4 +1,4 @@
 schema = 1
 
 [preview]
-run = "bun run dev"
+run = "bun run app:preview {port}"

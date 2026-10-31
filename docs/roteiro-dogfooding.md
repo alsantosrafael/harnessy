@@ -20,33 +20,36 @@ Tempo estimado: 60 a 90 minutos (a espera do agente e do CI é a maior parte).
 | Publicar PR em draft, estágios, merge com confirmação | PR cuja base não é a branch padrão (veja o aviso do passo 0) |
 | Filtro "Precisa de você", bandeja, notificação, resumo de ausência | |
 
-## 0. Preparação (não pule)
+## 0. Preparação: uma instância separada para o teste
 
-1. **Feche o Harnessy instalado**, se estiver aberto (menu da bandeja → Encerrar). Ele compartilha o banco com o build de teste.
-2. **Faça backup dos dados**. As migrações novas não voltam atrás; o app antigo recusaria o banco novo.
-   ```sh
-   cp -R ~/Library/Application\ Support/app.harnessy.desktop ~/harnessy-backup-$(date +%Y%m%d)
-   ```
-3. Confirme a branch e o estado do repositório:
-   ```sh
-   git branch --show-current   # feat/entrega-pr-no-board
-   git status --short          # deve estar vazio
-   ```
-4. **Decida o destino do PR de teste.** Esta branch tem 13 commits que não estão no GitHub, e a `main` local está 4 commits à frente da `origin/main`. O PR da run vai mostrar tudo isso junto, e o **merge (passo 9) levaria esses commits para a `main` do GitHub**.
-   - **Opção A (recomendada):** você mesmo faz o merge desta branch na `main` e dá o push, e só então faz o teste, sobre a `main`.
-   - **Opção B:** teste na branch e **pare no passo 8**. Feche o PR depois e apague a branch remota (passo 12).
-5. Suba o app em modo de desenvolvimento, **na pasta do repositório**:
+Testar o Harnessy com o próprio Harnessy tem uma armadilha: o app que você usa para trabalhar e o app em teste seriam **o mesmo** (mesmo banco, mesmo ícone, mesma porta). Por isso o teste roda numa **segunda instância**, com identidade própria:
+
+| | Seu Harnessy principal | Instância de teste |
+|---|---|---|
+| Nome | Harnessy | **Harnessy Dogfood** |
+| Dados | `~/Library/Application Support/app.harnessy.desktop` | `~/Library/Application Support/app.harnessy.desktop.dogfood` |
+| Ícone na barra | **H** | **H·dogfood** |
+| Branches das runs | `harnessy/run-N-…` | `harnessy-dogfood/run-N-…` |
+| Faixa na tela | nenhuma | **Instância de teste · dogfood** |
+
+**Você não precisa fechar o app principal nem fazer backup**: nada do que acontece na instância de teste toca o seu banco.
+
+1. Gere e abra a instância de teste, **na pasta do repositório**:
    ```sh
    bun install --frozen-lockfile
-   bun run tauri dev
+   bun run app:dogfood
    ```
-   Isso ocupa a porta **1420**. Por isso o ambiente de teste do passo 6 usa outra porta.
-6. Em **Conexões**, confirme `gh`, `claude` e `git` verdes. Sem `gh` logado, os passos 7 a 9 não funcionam.
-7. Crie (ou escolha) o workspace apontando para esta pasta do Harnessy.
+   A primeira vez compila o núcleo do zero (alguns minutos, num diretório próprio que não atrapalha o build normal). Depois é incremental.
+2. Confirme a faixa **Instância de teste · dogfood** no topo e o **H·dogfood** na barra de menus. Se não vê isso, você está no app errado.
+3. Em **Conexões**, confirme `gh`, `claude` e `git` verdes. Sem `gh` logado, os passos 7 a 9 não funcionam.
+4. Crie um workspace apontando para esta pasta do Harnessy. Os dois apps podem trabalhar no mesmo repositório sem se atrapalhar, porque cada um tem seu banco e seu prefixo de branch.
+5. **Decida o destino do PR de teste.** Esta branch tem commits que não estão no GitHub, e o PR da run vai mostrar tudo isso junto. O **merge (passo 9) levaria esses commits para a `main` do GitHub**.
+   - **Opção A (recomendada):** faça você mesmo o merge desta branch na `main` e dê o push, e só então teste, sobre a `main`.
+   - **Opção B:** teste na branch e **pare no passo 8**. Feche o PR depois e apague a branch remota (passo 12).
 
-- [ ] Backup feito
-- [ ] App aberto em modo dev, conexões verdes
-- [ ] Workspace do Harnessy selecionado
+- [ ] Instância de teste aberta, com a faixa e o **H·dogfood**
+- [ ] Conexões verdes
+- [ ] Workspace do Harnessy criado na instância de teste
 
 ## 1. Primeira impressão do quadro
 
@@ -105,18 +108,17 @@ Esperado: card em **Revisão**. Anote quanto tempo a run levou e se algo pareceu
 
 ## 6. Rodar localmente
 
+O repositório traz o comando certo no `.harnessy/workspace.toml`: `bun run app:preview {port}`. Ele abre **uma terceira instância**, a **Harnessy Preview**, com a cópia da run, identidade própria e a porta que o Harnessy escolher. É a forma de ver a mudança do Harnessy funcionando **dentro do app de verdade** (o front sozinho, no navegador, não tem dados).
+
 1. O Próximo passo deve ser **Rodar localmente**. Execute.
-2. No diálogo "Como subir este projeto?", use:
-   - **Comando:** `bunx --bun vite --host 127.0.0.1 --port 5199`
-   - **Porta:** `5199`
+2. Como o comando veio do repositório, o Harnessy **mostra o texto e pede a sua confirmação**. Confira que é `bun run app:preview {port}` e confirme.
 3. Confira:
-   - [ ] O painel passa por **Subindo…** e chega a **No ar**, com o endereço `http://localhost:5199`.
-   - [ ] O log mostra a saída do Vite, sem códigos de cor estranhos.
-   - [ ] O card mostra o selo **No ar**.
-   - [ ] **Abrir no navegador** abre o endereço. Esperado: a página diz "Abra o aplicativo desktop…", porque o front fora do Tauri não tem dados. Serve para ver o layout, não para testar o fluxo.
-   - [ ] Existe agora `.harnessy/workspace.toml` no repositório (aparece como não rastreado). Decida se quer versioná-lo.
-4. Clique em **Parar**: o estado vira **Parado** e a porta 5199 é liberada (`lsof -i :5199` não mostra nada).
-5. Edite o `.harnessy/workspace.toml` (mude a porta) e rode de novo: o app deve **pedir nova confirmação**, mostrando o comando.
+   - [ ] O painel passa por **Subindo…** e o log mostra a cópia sendo recriada e as dependências preparadas. **A primeira vez compila o núcleo Rust, o que leva alguns minutos**; nas seguintes é bem mais rápido.
+   - [ ] Uma janela **Harnessy Preview** abre sozinha, com a faixa **Instância de teste · preview** e o **H·preview** na barra.
+   - [ ] O painel chega a **No ar** e o card mostra o selo **No ar**.
+   - [ ] A porta **não é a 1420** (o log mostra a escolhida) e **não há conflito** com a instância de teste.
+4. Use a janela Preview para ver a mudança. Clique em **Parar** no painel: a janela Preview fecha e a porta é liberada (`lsof -i :PORTA` não mostra nada).
+5. Edite o `.harnessy/workspace.toml` (qualquer mudança no comando) e rode de novo: o app deve **pedir nova confirmação**.
 
 Depois do ambiente testado, o Próximo passo deve ser **Publicar PR**.
 
@@ -166,14 +168,16 @@ Depois do ambiente testado, o Próximo passo deve ser **Publicar PR**.
 
 ## 12. Desfazer o teste
 
-```sh
-# restaurar os dados
-rm -rf ~/Library/Application\ Support/app.harnessy.desktop
-cp -R ~/harnessy-backup-AAAAMMDD ~/Library/Application\ Support/app.harnessy.desktop
+Nada do teste tocou o seu Harnessy principal, então não há o que restaurar.
 
-# limpar worktrees e a branch remota do teste (troque NOME)
+```sh
+# apagar os dados da instância de teste e da preview (opcional)
+rm -rf ~/Library/Application\ Support/app.harnessy.desktop.dogfood
+rm -rf ~/Library/Application\ Support/app.harnessy.desktop.preview
+
+# limpar cópias de trabalho e a branch remota do teste (troque NOME)
 git worktree prune
-git push origin --delete harnessy/run-NOME   # só se quiser descartar o PR
+git push origin --delete harnessy-dogfood/run-NOME   # só se quiser descartar o PR
 ```
 
 ## 13. Como reportar

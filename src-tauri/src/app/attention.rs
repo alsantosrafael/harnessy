@@ -17,12 +17,17 @@ fn clip(text: &str, max: usize) -> String {
     text.chars().take(max).collect()
 }
 
-/// Texto ao lado do ícone: "H" sem pendências, "H 3" com três tarefas pedindo o usuário.
-pub fn tray_title(count: u32) -> String {
+/// Texto ao lado do ícone: "H" sem pendências, "H 3" com três tarefas pedindo o usuário. Uma
+/// instância de teste leva a etiqueta ("H·dogfood 3"), para não confundi-la com a principal.
+pub fn tray_title(count: u32, instance: Option<&str>) -> String {
+    let base = match instance {
+        Some(tag) => format!("{BASE_TITLE}·{tag}"),
+        None => BASE_TITLE.to_owned(),
+    };
     if count == 0 {
-        BASE_TITLE.to_owned()
+        base
     } else {
-        format!("{BASE_TITLE} {}", count.min(99))
+        format!("{base} {}", count.min(99))
     }
 }
 
@@ -30,7 +35,8 @@ pub fn tray_title(count: u32) -> String {
 #[tauri::command]
 pub fn set_attention_count(app: AppHandle, count: u32) -> Result<()> {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
-        let _ = tray.set_title(Some(tray_title(count)));
+        let tag = super::instance_tag(&app.config().identifier);
+        let _ = tray.set_title(Some(tray_title(count, tag.as_deref())));
         let tooltip = match count {
             0 => "Harnessy — nada pede você agora".to_owned(),
             1 => "Harnessy — 1 tarefa pede você".to_owned(),
@@ -69,9 +75,11 @@ mod tests {
 
     #[test]
     fn the_tray_title_counts_up_to_99() {
-        assert_eq!(tray_title(0), "H");
-        assert_eq!(tray_title(3), "H 3");
-        assert_eq!(tray_title(500), "H 99");
+        assert_eq!(tray_title(0, None), "H");
+        assert_eq!(tray_title(3, None), "H 3");
+        assert_eq!(tray_title(500, None), "H 99");
+        assert_eq!(tray_title(0, Some("dogfood")), "H·dogfood");
+        assert_eq!(tray_title(2, Some("dogfood")), "H·dogfood 2");
     }
 
     #[test]

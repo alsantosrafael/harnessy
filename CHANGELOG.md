@@ -10,6 +10,19 @@ Rodar localmente para testar a mudança (fatia 2a):
 - Painel **Ambiente de teste** na tarefa: estado em texto (Subindo…, No ar, Parado, Caiu com o código), endereço, **Abrir no navegador**, **Parar** / **Rodar de novo** e o log ao vivo, rolável por teclado.
 - O card mostra **No ar** enquanto o ambiente da tarefa está rodando.
 
+## Front [0.29.0] — 2026-10-31
+
+Instâncias de teste, para fazer dogfooding sem misturar com o seu Harnessy:
+
+- Uma instância de teste mostra a faixa **Instância de teste · dogfood** no topo e a etiqueta na versão. O ícone da barra de menus fica **H·dogfood**.
+- Novos comandos: `bun run app:dogfood` gera e abre **Harnessy Dogfood**, uma segunda instância com banco, preferências e ícone próprios (compilação em `src-tauri/target/dogfood`), e `bun run app:preview [porta]` roda o Harnessy de uma pasta em desenvolvimento, isolado, na porta dada. O `.harnessy/workspace.toml` deste repositório (que tinha `bun run dev`, e brigava pela porta 1420 com o app em desenvolvimento) agora usa `bun run app:preview {port}`.
+- O roteiro de teste ganhou um passo 0 sem backup e sem fechar o app principal.
+
+## Back [0.26.0] — 2026-10-31
+
+- **Instâncias de teste.** O identificador do app decide a instância (`app.harnessy.desktop` é a principal; `app.harnessy.desktop.<etiqueta>` é de teste, com dados próprios). `app_info` devolve `instance`, e o ícone da barra leva a etiqueta (`H·dogfood`).
+- **Branches que não colidem.** Instâncias de teste usam o prefixo `harnessy-<etiqueta>/run-N-…` (antes, duas instâncias no mesmo repositório disputavam `harnessy/run-1-…`), e um nome que já existe (um banco restaurado, outra instância) recebe `-2`, `-3`… em vez de falhar no `git worktree add`.
+
 ## Front [0.28.1] — 2026-10-31
 
 Clicar numa tarefa responde na hora (verificado no navegador com os comandos lentos simulados: o card selecionado e o esqueleto do detalhe aparecem em cerca de 20 ms, e o detalhe completo em cerca de 70 ms):

@@ -1,6 +1,6 @@
 {
   "name": "harnessy",
-  "version": "0.28.1",
+  "version": "0.29.0",
   "private": true,
   "packageManager": "bun@1.4.3",
   "engines": {
@@ -17,6 +17,8 @@
     "app": "bun scripts/app.mjs open",
     "app:build": "bun scripts/app.mjs build",
     "app:install": "bun scripts/app.mjs install",
+    "app:dogfood": "bun scripts/app.mjs dogfood",
+    "app:preview": "bun scripts/app.mjs preview",
     "check": "bunx --bun tsc --noEmit && bun scripts/check-version.mjs",
     "check:rust": "cargo check --manifest-path src-tauri/Cargo.toml",
     "test": "vitest run",

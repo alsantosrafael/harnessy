@@ -14,12 +14,16 @@ const OPEN: &str = "open";
 const QUIT: &str = "quit";
 
 pub fn install(app: &App) -> tauri::Result<()> {
+    let tag = super::instance_tag(&app.config().identifier);
     let open = MenuItem::with_id(app, OPEN, "Abrir Harnessy", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, QUIT, "Encerrar Harnessy", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &quit])?;
     TrayIconBuilder::with_id(TRAY_ID)
-        .title("H")
-        .tooltip("Harnessy — aplicativo local")
+        .title(super::attention::tray_title(0, tag.as_deref()))
+        .tooltip(match tag.as_deref() {
+            Some(tag) => format!("Harnessy ({tag}) — instância de teste, com dados separados"),
+            None => "Harnessy — aplicativo local".to_owned(),
+        })
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
             OPEN => show_main_window(app),

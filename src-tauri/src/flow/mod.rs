@@ -194,7 +194,13 @@ fn pipeline(
         }
         None => worktree::head_sha(&git, &dirs, &job.repo)?,
     };
-    let branch = worktree::branch_name(id, &job.title);
+    let namespace = worktree::branch_namespace(&job.data_dir);
+    let branch = worktree::unique_branch(
+        &git,
+        &dirs,
+        &job.repo,
+        &worktree::branch_name_in(&namespace, id, &job.title),
+    );
     let dir = job.data_dir.join("worktrees").join(format!("run-{id}"));
     std::fs::create_dir_all(job.data_dir.join("worktrees")).map_err(|e| e.to_string())?;
     worktree::create(&git, &dirs, &job.repo, &dir, &branch, &base)?;

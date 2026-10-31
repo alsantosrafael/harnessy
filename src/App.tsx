@@ -265,7 +265,11 @@ export function App() {
         <div className="sidebar-bottom">
           <button ref={helpButton} className="nav-item" onClick={() => setHelp(true)}>
             <CircleHelp size={16} aria-hidden="true" />
-            Sobre<span className="version">v{__APP_VERSION__}</span>
+            Sobre
+            <span className="version">
+              v{__APP_VERSION__}
+              {info?.instance ? ` · ${info.instance}` : ""}
+            </span>
           </button>
         </div>
       </aside>
@@ -277,6 +281,14 @@ export function App() {
             {workspace && view !== "connections" && <span aria-hidden="true">/</span>}
             <strong>{viewTitle}</strong>
           </nav>
+          {info?.instance && (
+            <span
+              className="instance-pill"
+              title="Instância de teste: banco, preferências, branches e ícone próprios, separados do seu Harnessy principal."
+            >
+              Instância de teste · {info.instance}
+            </span>
+          )}
           <span
             className="runtime-status"
             title={runtimeError ? "Erro de comunicação com o núcleo" : undefined}

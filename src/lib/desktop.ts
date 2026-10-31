@@ -6,6 +6,8 @@ export interface AppInfo {
   version: string;
   platform: string;
   agentExecutionAvailable: boolean;
+  /** Etiqueta de uma instância de teste (`dogfood`, `preview`); ausente na principal. */
+  instance?: string | null;
 }
 
 export async function getAppInfo(): Promise<AppInfo | null> {

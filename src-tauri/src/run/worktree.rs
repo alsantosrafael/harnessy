@@ -253,8 +253,46 @@ pub fn slug(title: &str) -> String {
     }
 }
 
+/// Espaço de nomes das branches de uma instância. A principal usa `harnessy`; uma instância de
+/// teste (`app.harnessy.desktop.<tag>`) usa `harnessy-<tag>`, porque cada uma conta as runs do
+/// zero e duas no mesmo repositório disputariam `harnessy/run-1-…`.
+pub fn branch_namespace(data_dir: &Path) -> String {
+    let tag = data_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(|name| name.strip_prefix("app.harnessy.desktop."))
+        .filter(|tag| {
+            !tag.is_empty()
+                && tag
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        });
+    match tag {
+        Some(tag) => format!("harnessy-{tag}"),
+        None => "harnessy".to_owned(),
+    }
+}
+
+pub fn branch_name_in(namespace: &str, run_id: i64, title: &str) -> String {
+    format!("{namespace}/run-{run_id}-{}", slug(title))
+}
+
+#[cfg(test)]
 pub fn branch_name(run_id: i64, title: &str) -> String {
-    format!("harnessy/run-{run_id}-{}", slug(title))
+    branch_name_in("harnessy", run_id, title)
+}
+
+/// Nome de branch que ainda não existe no repositório: o desejado ou, se já existir (um banco
+/// restaurado, outra instância), o primeiro `-2`, `-3`… livre.
+pub fn unique_branch(git_bin: &Path, dirs: &[PathBuf], repo: &Path, wanted: &str) -> String {
+    let free = |name: &str| branch_sha(git_bin, dirs, repo, name).is_err();
+    if free(wanted) {
+        return wanted.to_owned();
+    }
+    (2..100)
+        .map(|n| format!("{wanted}-{n}"))
+        .find(|name| free(name))
+        .unwrap_or_else(|| wanted.to_owned())
 }
 
 #[cfg(test)]
@@ -267,6 +305,15 @@ mod tests {
         assert_eq!(slug("¿¿¿"), "tarefa");
         assert!(slug(&"a".repeat(200)).len() <= MAX_SLUG);
         assert_eq!(branch_name(3, "Fix: bug"), "harnessy/run-3-fix-bug");
+        let ns = |dir: &str| branch_namespace(Path::new(dir));
+        assert_eq!(ns("/x/app.harnessy.desktop"), "harnessy");
+        assert_eq!(ns("/x/app.harnessy.desktop.dogfood"), "harnessy-dogfood");
+        assert_eq!(ns("/x/app.harnessy.desktop.Mau Nome"), "harnessy");
+        assert_eq!(ns("/tmp/qualquer"), "harnessy");
+        assert_eq!(
+            branch_name_in("harnessy-dogfood", 1, "Fix"),
+            "harnessy-dogfood/run-1-fix"
+        );
     }
 
     #[test]
@@ -306,6 +353,16 @@ mod tests {
         assert!(commit_all(&git_bin, &dirs, &wt, &base, "mudança").unwrap());
         remove(&git_bin, &dirs, &repo, &wt).unwrap();
         assert!(!wt.exists());
+
+        // Duas instâncias no mesmo repositório não podem escolher o mesmo nome de branch.
+        assert_eq!(
+            unique_branch(&git_bin, &dirs, &repo, "harnessy/run-9-novo"),
+            "harnessy/run-9-novo"
+        );
+        assert_eq!(
+            unique_branch(&git_bin, &dirs, &repo, "harnessy/run-1-x"),
+            "harnessy/run-1-x-2"
+        );
 
         // O worktree some ao fim da run, mas a branch fica: dá para recriá-lo no mesmo lugar.
         checkout(&git_bin, &dirs, &repo, &wt, "harnessy/run-1-x").unwrap();

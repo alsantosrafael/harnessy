@@ -170,3 +170,14 @@ O agente não sabe que existe card, então gerir cards não custa token. O estad
 8. Fechar janela, reabrir pela bandeja e encerrar explicitamente.
 
 IPC e lifecycle precisam de verificação no Tauri real. Navegador/WebKit ajuda a validar a interface, mas não comprova a integração desktop. Para requisitos e próximos gates, consulte [SPEC.md](../SPEC.md).
+
+## Dogfooding: o Harnessy rodando no próprio Harnessy
+
+Para testar o código desta pasta sem tocar no seu Harnessy do dia a dia, use instâncias de teste. Cada uma tem **identificador próprio**, e é ele que decide onde ficam os dados (`~/Library/Application Support/<identificador>`), as preferências, o armazenamento da WebView e o ícone da barra:
+
+| Comando | O que faz |
+|---|---|
+| `bun run app:dogfood` | Gera e abre **Harnessy Dogfood** (`app.harnessy.desktop.dogfood`) com compilação em `src-tauri/target/dogfood`. `-- --build-only` só gera |
+| `bun run app:preview [porta]` | Roda o Harnessy desta pasta em desenvolvimento (`app.harnessy.desktop.preview`), com o `devUrl` na porta dada (ou `PORT`). É o comando do `.harnessy/workspace.toml` deste repositório, com `{port}` |
+
+Uma instância de teste mostra a faixa **Instância de teste · \<etiqueta\>** e o **H·\<etiqueta\>** na barra de menus (`app::instance_tag`). Branches de runs ganham o prefixo `harnessy-<etiqueta>/`, e um nome já existente recebe `-2`, `-3`… (`worktree::unique_branch`), então duas instâncias no mesmo repositório não disputam `harnessy/run-1-…`. O roteiro completo está em [roteiro-dogfooding.md](roteiro-dogfooding.md).
