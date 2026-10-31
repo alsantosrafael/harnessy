@@ -11,7 +11,33 @@ const labels: Record<string, string> = {
 };
 const terminal = new Set(["completed", "no_changes", "failed", "cancelled", "interrupted"]);
 /** Linhas de log mantidas na tela por run. */
-const MAX_VISIBLE_EVENTS = 500;
+const MAX_VISIBLE_EVENTS = 2_000;
+
+/** Run de onde um ajuste continua: a concluída mais recente da conversa que deixou branch. */
+export const adjustmentBase = (thread: readonly Run[]): Run | null =>
+  [...thread].reverse().find((run) => run.state === "completed" && Boolean(run.branch)) ?? null;
+
+/** Quanto texto cabe num ajuste (o núcleo recusa acima disso). */
+export const FOLLOWUP_LIMIT = 4_000;
+
+/** Runs da mesma tarefa, da mais antiga à mais nova: a conversa inteira dela. */
+export const threadOf = (runs: readonly Run[], taskId: number | null) =>
+  taskId === null ? [] : runs.filter((run) => run.taskId === taskId).sort((a, b) => a.id - b.id);
+
+/** Uma conversa por tarefa: a run mais recente e quantas runs ela tem, da mais recente à mais antiga. */
+export function conversations(runs: readonly Run[]): { latest: Run; count: number }[] {
+  const byTask = new Map<number, { latest: Run; count: number }>();
+  for (const run of runs) {
+    const current = byTask.get(run.taskId);
+    if (!current) byTask.set(run.taskId, { latest: run, count: 1 });
+    else
+      byTask.set(run.taskId, {
+        latest: run.id > current.latest.id ? run : current.latest,
+        count: current.count + 1,
+      });
+  }
+  return [...byTask.values()].sort((a, b) => b.latest.id - a.latest.id);
+}
 
 export const stateLabel = (state: string) => labels[state] ?? state;
 export const isActive = (run: Run) => !terminal.has(run.state);
@@ -27,7 +53,10 @@ export function mergeEvents(current: RunEvent[], incoming: RunEvent[]): RunEvent
   const seen = new Set(current.map((event) => event.seq));
   const merged = [...current, ...incoming.filter((event) => !seen.has(event.seq))];
   merged.sort((a, b) => a.seq - b.seq);
-  return merged.slice(-MAX_VISIBLE_EVENTS);
+  const tail = merged.slice(-MAX_VISIBLE_EVENTS);
+  // O pedido de quem usa abre a conversa: nunca é cortado junto com o começo do log.
+  const asked = merged.filter((event) => event.kind === "user" && !tail.includes(event));
+  return [...asked, ...tail];
 }
 
 /** Tom visual da contraprova: `alert` chama atenção; `muted` é informativo. */

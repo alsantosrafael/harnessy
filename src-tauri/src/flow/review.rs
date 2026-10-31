@@ -144,6 +144,17 @@ pub(super) fn is_due(quando: Quando, proof: Verdict, diff_lines: usize) -> bool 
     }
 }
 
+/// Por que a revisão automática foi dispensada, dito conforme a contraprova: só
+/// "comprovada" quando a contraprova de fato comprovou a mudança.
+pub(super) fn skipped_message(proof: Verdict) -> String {
+    let why = match proof {
+        Verdict::Proved => "a mudança foi comprovada por testes e o diff é pequeno",
+        Verdict::Skipped => "o diff é pequeno e a contraprova não rodou",
+        _ => "o diff é pequeno e não há sinal de risco",
+    };
+    format!("Revisão dispensada: {why}. Escolha revisar \"Sempre\" para revisar toda run.")
+}
+
 /// Linhas adicionadas e removidas num diff unificado.
 pub(super) fn diff_size(diff: &str) -> usize {
     diff.lines()
@@ -286,6 +297,15 @@ pub(super) fn prompt_for(reviewer: &Reviewer, diff: &str, checks: &str, proof: &
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_skipped_review_note_only_says_proved_when_it_was() {
+        assert!(skipped_message(Verdict::Proved).contains("comprovada por testes"));
+        let skipped = skipped_message(Verdict::Skipped);
+        assert!(!skipped.contains("comprovada"), "{skipped}");
+        assert!(skipped.contains("contraprova não rodou"));
+        assert!(skipped_message(Verdict::Skipped).contains("Sempre"));
+    }
 
     const DIFF_U0: &str = "diff --git a/src/a.ts b/src/a.ts
 index 1..2 100644

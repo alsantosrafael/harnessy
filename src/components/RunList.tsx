@@ -3,9 +3,9 @@ import { useState } from "react";
 import { agentOf } from "../lib/agents";
 import type { Run } from "../lib/desktop";
 import type { Runtime } from "../lib/roles";
-import { isActive, stateLabel, timeAgo } from "../lib/runs";
+import { conversations, isActive, stateLabel, timeAgo } from "../lib/runs";
 
-/** Quantas runs anteriores aparecem antes de "Mostrar mais". */
+/** Quantas conversas aparecem antes de "Mostrar mais". */
 const RECENT = 6;
 
 interface Props {
@@ -21,7 +21,17 @@ function Mark({ run }: { run: Run }) {
   return <Minus size={14} aria-hidden="true" />;
 }
 
-function Row({ run, selected, onOpen }: { run: Run; selected: boolean; onOpen: Props["onOpen"] }) {
+function Row({
+  run,
+  count,
+  selected,
+  onOpen,
+}: {
+  run: Run;
+  count: number;
+  selected: boolean;
+  onOpen: Props["onOpen"];
+}) {
   return (
     <li>
       <button
@@ -34,8 +44,9 @@ function Row({ run, selected, onOpen }: { run: Run; selected: boolean; onOpen: P
         <span className="run-row-text">
           <strong>{run.title}</strong>
           <span>
-            {stateLabel(run.state)} · {agentOf(run.runtime as Runtime)?.label ?? run.runtime} ·{" "}
-            {timeAgo(run.startedAt)}
+            {stateLabel(run.state)}
+            {count > 1 ? ` · ${count} runs` : ""} ·{" "}
+            {agentOf(run.runtime as Runtime)?.label ?? run.runtime} · {timeAgo(run.startedAt)}
           </span>
         </span>
       </button>
@@ -43,36 +54,37 @@ function Row({ run, selected, onOpen }: { run: Run; selected: boolean; onOpen: P
   );
 }
 
-/** Runs do workspace: as ativas no topo, as anteriores logo abaixo e recolhidas. */
+/**
+ * Uma linha por tarefa, com a run mais recente dela. A linha não muda de grupo quando a
+ * run termina, e a conversa aberta fica sempre visível, mesmo fora das mais recentes.
+ */
 export function RunList({ runs, openRun, onOpen }: Props) {
   const [all, setAll] = useState(false);
-  const active = runs.filter(isActive);
-  const past = runs.filter((run) => !isActive(run));
-  const shownPast = all ? past : past.slice(0, RECENT);
+  const list = conversations(runs);
+  const openTask = runs.find((run) => run.id === openRun)?.taskId ?? null;
+  const shown = all
+    ? list
+    : list.filter((item, at) => at < RECENT || item.latest.taskId === openTask);
   return (
-    <nav className="run-list" aria-label="Runs">
-      {runs.length === 0 && <p className="muted">Nenhuma run ainda.</p>}
-      {active.length > 0 && (
+    <nav className="run-list" aria-label="Conversas">
+      {list.length === 0 && <p className="muted">Nenhuma conversa ainda.</p>}
+      {list.length > 0 && (
         <>
-          <h2 className="run-list-title">Em andamento</h2>
+          <h2 className="run-list-title">Conversas</h2>
           <ul>
-            {active.map((run) => (
-              <Row key={run.id} run={run} selected={run.id === openRun} onOpen={onOpen} />
+            {shown.map(({ latest, count }) => (
+              <Row
+                key={latest.taskId}
+                run={latest}
+                count={count}
+                selected={latest.taskId === openTask}
+                onOpen={onOpen}
+              />
             ))}
           </ul>
-        </>
-      )}
-      {past.length > 0 && (
-        <>
-          <h2 className="run-list-title">Anteriores</h2>
-          <ul>
-            {shownPast.map((run) => (
-              <Row key={run.id} run={run} selected={run.id === openRun} onOpen={onOpen} />
-            ))}
-          </ul>
-          {past.length > RECENT && (
+          {list.length > RECENT && (
             <button type="button" className="link-button" onClick={() => setAll(!all)}>
-              {all ? "Mostrar menos" : `Mostrar mais (${past.length - RECENT})`}
+              {all ? "Mostrar menos" : `Mostrar mais (${list.length - shown.length})`}
             </button>
           )}
         </>

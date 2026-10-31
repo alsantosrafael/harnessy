@@ -53,3 +53,16 @@ test("a malformed review event is dropped instead of breaking the feed", () => {
   assert.deepEqual(buildFeed([event(1, "review", "{")]), []);
   assert.deepEqual(parseReview('{"verdict":"approve","blocking":[{"x":1}]}')?.blocking, []);
 });
+
+test("what the user asked opens the conversation, before the agent's messages", () => {
+  const feed = buildFeed([
+    event(1, "user", "Use vírgula no custo."),
+    event(2, "status", "Preparando worktree…"),
+    event(3, "assistant", "Feito."),
+  ]);
+  assert.deepEqual(
+    feed.map((item) => item.kind),
+    ["user", "status", "message"],
+  );
+  assert.deepEqual(feed[0], { kind: "user", seq: 1, text: "Use vírgula no custo." });
+});

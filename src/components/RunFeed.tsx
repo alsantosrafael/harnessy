@@ -128,8 +128,9 @@ function StepsProposal({
 }
 
 interface Props {
-  run: Run;
-  events: RunEvent[];
+  /** Runs da tarefa, da mais antiga à mais nova: a conversa inteira. */
+  thread: Run[];
+  eventsByRun: Record<number, RunEvent[]>;
   onError: (text: string) => void;
   /** Passos confirmados viraram tarefas. */
   onStepsCreated: (tasks: LocalTask[]) => void;
@@ -194,6 +195,13 @@ function ReviewCard({ review }: { review: ReviewPayload }) {
 
 function FeedEntry({ item, agent }: { item: FeedItem; agent: string }) {
   switch (item.kind) {
+    case "user":
+      return (
+        <div className="feed-user">
+          <span className="feed-who">Você</span>
+          <p>{item.text}</p>
+        </div>
+      );
     case "message":
       return (
         <div className="feed-message">
@@ -239,10 +247,10 @@ function FeedEntry({ item, agent }: { item: FeedItem; agent: string }) {
   }
 }
 
-/** Conversa da run: o que o agente disse e fez, a revisão e as ações possíveis agora. */
+/** Conversa da tarefa: o que você pediu, o que o agente disse e fez em cada run, e as ações de agora. */
 export function RunFeed({
-  run,
-  events,
+  thread,
+  eventsByRun,
   onError,
   onStepsCreated,
   choice,
@@ -251,10 +259,12 @@ export function RunFeed({
 }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
-  const feed = buildFeed(events);
+  const run = thread[thread.length - 1];
+  const events = eventsByRun[run.id] ?? [];
   const active = isActive(run);
   const proposed = run.state === "completed" ? stepsFrom(events) : null;
   const agent = agentLabel(run.runtime);
+  const eventTotal = thread.reduce((sum, item) => sum + (eventsByRun[item.id]?.length ?? 0), 0);
   // Revisão sob demanda: "revisando" vale até chegar o veredito ou o aviso de que não rodou.
   const [since, setSince] = useState<number | null>(null);
   const reviewing =
@@ -266,18 +276,19 @@ export function RunFeed({
     );
 
   // Acompanha o fim da conversa, a menos que a pessoa tenha rolado para ler algo acima.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `events` e `run.state` disparam o acompanhamento.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: o total de eventos e o estado disparam o acompanhamento.
   useEffect(() => {
     const box = scroller.current;
     if (box && stick.current) box.scrollTop = box.scrollHeight;
-  }, [events, run.state]);
+  }, [eventTotal, run.state]);
 
   return (
-    <article className="run-feed" aria-label={`Run: ${run.title}`}>
+    <article className="run-feed" aria-label={`Conversa: ${run.title}`}>
       <header className="feed-header">
         <div>
           <h2>{run.title}</h2>
           <p className="muted">
+            {thread.length > 1 ? `${thread.length} runs · ` : ""}
             {agent} · {modelName(run.runtime as Runtime, run.model ?? "")} · {stateLabel(run.state)}
             {run.branch ? ` · ${run.branch}` : ""}
           </p>
@@ -308,10 +319,29 @@ export function RunFeed({
           stick.current = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
         }}
       >
-        {feed.length === 0 && <p className="feed-status">Aguardando o agente…</p>}
-        {feed.map((item) => (
-          <FeedEntry key={item.seq} item={item} agent={agent} />
-        ))}
+        {thread.map((item) => {
+          const last = item.id === run.id;
+          const feed = buildFeed(eventsByRun[item.id] ?? []);
+          return (
+            <section key={item.id} className="feed-turn" aria-label={`Run #${item.id}`}>
+              {thread.length > 1 && (
+                <h3 className="feed-run-mark">
+                  Run #{item.id} · {stateLabel(item.state)}
+                </h3>
+              )}
+              {feed.length === 0 && last && <p className="feed-status">Aguardando o agente…</p>}
+              {feed.map((entry) => (
+                <FeedEntry key={entry.seq} item={entry} agent={agentLabel(item.runtime)} />
+              ))}
+              {!last && (
+                <footer className="feed-end is-past">
+                  {item.summary && <p>{item.summary}</p>}
+                  <ProofLine proof={item.proof} />
+                </footer>
+              )}
+            </section>
+          );
+        })}
         {active && (
           <p className="feed-working" role="status">
             <span className="pulse" aria-hidden="true" /> {agent} trabalhando…

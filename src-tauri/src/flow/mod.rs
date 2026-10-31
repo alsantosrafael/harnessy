@@ -418,6 +418,14 @@ fn work(
             }
         }
 
+        if !reviewed && job.review.is_none() {
+            reviewed = true;
+            sink.event(
+                id,
+                "status",
+                "Revisão não rodou: está desligada para esta run (escolha de revisão \"Nunca\" ou Ação `revisar` em modo manual).",
+            );
+        }
         if let (false, Some(reviewer)) = (reviewed, job.review.as_ref()) {
             reviewed = true;
             let at = number + 1;
@@ -499,11 +507,7 @@ fn review_cycle(
         }
     };
     if !review::is_due(reviewer.action.quando, proof.verdict, diffs.size) {
-        sink.event(
-            id,
-            "status",
-            "Revisão dispensada: a mudança foi comprovada e o diff é pequeno. Escolha revisar \"Sempre\" para revisar toda run.",
-        );
+        sink.event(id, "status", &review::skipped_message(proof.verdict));
         return None;
     }
     let checks: String = job

@@ -66,6 +66,18 @@ impl Registry {
         }
     }
 
+    /// Como [`Registry::register`], mas recusa (`false`) se a run já está registrada:
+    /// duas revisões na mesma run disputariam o slot de cancelamento e o número do ciclo.
+    pub fn try_register(&self, run_id: i64) -> bool {
+        match self.runs.lock() {
+            Ok(mut runs) if !runs.contains_key(&run_id) => {
+                runs.insert(run_id, Slot::default());
+                true
+            }
+            _ => false,
+        }
+    }
+
     pub fn unregister(&self, run_id: i64) {
         if let Ok(mut runs) = self.runs.lock() {
             runs.remove(&run_id);
@@ -184,6 +196,16 @@ pub fn run(
 mod tests {
     use super::*;
     use crate::process;
+
+    #[test]
+    fn a_run_can_only_be_registered_once_until_it_is_released() {
+        let registry = Registry::default();
+        assert!(registry.try_register(7));
+        assert!(!registry.try_register(7), "segunda revisão da mesma run");
+        assert!(registry.try_register(8), "outra run não é afetada");
+        registry.unregister(7);
+        assert!(registry.try_register(7));
+    }
 
     fn plan(script: &str) -> Plan {
         let dirs = process::search_dirs();

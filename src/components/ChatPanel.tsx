@@ -4,7 +4,7 @@ import type { AgentChoice } from "../lib/agents";
 import { splitDraft } from "../lib/chatTask";
 import { reviewRun, saveTask, type LocalTask, type Workspace } from "../lib/desktop";
 import { DRAFT_LIMIT, type DraftSession } from "../lib/drafts";
-import { canStartRun, isActive } from "../lib/runs";
+import { adjustmentBase, canStartRun, FOLLOWUP_LIMIT, isActive } from "../lib/runs";
 import type { RunsState } from "../lib/useRuns";
 import { AgentPicker } from "./AgentPicker";
 import { RunFeed } from "./RunFeed";
@@ -52,12 +52,16 @@ export function ChatPanel({
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const { runs, openRun, events } = runsState;
-  const shown = runs.find((run) => run.id === openRun) ?? null;
+  const { runs, openRun, thread, eventsByRun } = runsState;
+  // O ajuste vale para a run mais recente da conversa aberta.
+  const shown = thread[thread.length - 1] ?? null;
 
   // Com uma run aberta, o campo pede ajuste nela (mesma tarefa); sem run, cria tarefa nova.
   const iterating = shown !== null;
   const running = shown !== null && isActive(shown);
+  // Mesma contagem do núcleo (caracteres, não unidades UTF-16).
+  const askedLength = [...draft.trim()].length;
+  const tooLong = iterating && askedLength > FOLLOWUP_LIMIT;
 
   // Dito em texto, não só no botão desabilitado: o que falta para iniciar.
   const blockedBy = !agentReady
@@ -66,13 +70,16 @@ export function ChatPanel({
       ? "Crie um workspace em Tarefas para guardar a tarefa."
       : running
         ? "A run está em andamento. Quando terminar, peça o ajuste aqui."
-        : "";
+        : tooLong
+          ? `O ajuste aceita até ${FOLLOWUP_LIMIT.toLocaleString("pt-BR")} caracteres (agora ${askedLength.toLocaleString("pt-BR")}). Encurte o texto.`
+          : "";
 
   async function iterate(run: NonNullable<typeof shown>) {
     setBusy(true);
     setError("");
-    // Só uma run concluída tem branch para continuar; nas outras o ajuste parte do código atual.
-    const base = run.state === "completed" && run.branch ? run.id : null;
+    // Continua da run concluída mais recente que deixou branch, mesmo que a última tenha falhado;
+    // sem nenhuma, o ajuste parte do código atual.
+    const base = adjustmentBase(thread)?.id ?? null;
     const next = await runsState.start(run.taskId, choice, run.action, base, draft.trim());
     if (next) {
       session.edit("");
@@ -85,7 +92,7 @@ export function ChatPanel({
   }
 
   async function start() {
-    if (!agentReady || busy || workspaceId === null || !draft.trim() || running) return;
+    if (!agentReady || busy || workspaceId === null || !draft.trim() || running || tooLong) return;
     if (shown) return iterate(shown);
     setBusy(true);
     setError("");
@@ -133,8 +140,8 @@ export function ChatPanel({
         <div className="chat-main">
           {shown ? (
             <RunFeed
-              run={shown}
-              events={events}
+              thread={thread}
+              eventsByRun={eventsByRun}
               onError={onError}
               onStepsCreated={onStepsCreated}
               choice={choice}

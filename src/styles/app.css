@@ -85,6 +85,12 @@ kbd{padding:0 5px;border:1px solid var(--border);border-bottom-width:2px;border-
 .feed-scroll{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:var(--space-3);padding:var(--space-4)}
 .feed-message{align-self:flex-start;max-width:min(720px,92%);padding:var(--space-3);border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-muted)}
 .feed-message p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}
+.feed-turn{display:flex;flex-direction:column;gap:var(--space-3)}
+.feed-turn+.feed-turn{padding-top:var(--space-4);border-top:1px dashed var(--border)}
+.feed-run-mark{font-size:var(--text-xs);font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
+.feed-user{align-self:flex-end;max-width:min(720px,92%);padding:var(--space-3);border:1px solid var(--amber-500);border-radius:var(--radius-md);background:color-mix(in srgb,var(--accent) 14%,var(--surface-raised))}
+.feed-user p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;color:var(--text)}
+.feed-end.is-past{padding-top:0;border-top:0}
 .feed-who{display:block;margin-bottom:var(--space-1);font-size:var(--text-xs);font-weight:600;color:var(--text-muted)}
 .feed-group{font-size:var(--text-sm);color:var(--text-muted)}
 .feed-group summary{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

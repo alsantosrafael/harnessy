@@ -51,9 +51,10 @@ pub fn compose(access: Access, pedido: &str, avoid: &[String]) -> String {
     prompt
 }
 
-/// Ajuste pedido pelo usuário numa run encadeada: vai depois do pedido da Ação,
-/// que continua valendo. Texto vazio deixa o prompt como está.
-pub fn with_followup(prompt: String, instruction: &str) -> Result<String> {
+/// Ajuste pedido pelo usuário: vai depois do pedido da Ação, que continua valendo.
+/// `continuing` diz se o worktree parte da branch de uma run anterior; sem ela, o
+/// texto não afirma que há trabalho prévio. Texto vazio deixa o prompt como está.
+pub fn with_followup(prompt: String, instruction: &str, continuing: bool) -> Result<String> {
     let instruction = instruction.trim();
     if instruction.is_empty() {
         return Ok(prompt);
@@ -61,8 +62,13 @@ pub fn with_followup(prompt: String, instruction: &str) -> Result<String> {
     if instruction.chars().count() > MAX_FOLLOWUP_CHARS {
         return Err(AppError::Validation("O ajuste pedido é longo demais."));
     }
+    let context = if continuing {
+        "O trabalho anterior desta tarefa já está neste worktree. Faça só o ajuste abaixo, sem refazer o que já está certo."
+    } else {
+        "Faça o ajuste abaixo."
+    };
     Ok(format!(
-        "{prompt}\n\n## Ajuste pedido agora\nO trabalho anterior desta tarefa já está neste worktree. Faça só o ajuste abaixo, sem refazer o que já está certo.\n\n{instruction}\n"
+        "{prompt}\n\n## Ajuste pedido agora\n{context}\n\n{instruction}\n"
     ))
 }
 
@@ -106,11 +112,17 @@ mod tests {
     #[test]
     fn followup_goes_after_the_request_and_empty_text_changes_nothing() {
         let base = compose(Access::Write, "Pedido.", &[]);
-        assert_eq!(with_followup(base.clone(), "  ").unwrap(), base);
-        assert!(with_followup(base.clone(), &"x".repeat(4_001)).is_err());
-        let prompt = with_followup(base.clone(), "Use vírgula no custo.").unwrap();
+        assert_eq!(with_followup(base.clone(), "  ", true).unwrap(), base);
+        assert!(with_followup(base.clone(), &"x".repeat(4_001), true).is_err());
+        let prompt = with_followup(base.clone(), "Use vírgula no custo.", true).unwrap();
         assert!(prompt.starts_with(&base));
         assert!(prompt.ends_with("Use vírgula no custo.\n"));
         assert!(prompt.contains("## Ajuste pedido agora"));
+        assert!(prompt.contains("já está neste worktree"));
+        let fresh = with_followup(base, "Use vírgula no custo.", false).unwrap();
+        assert!(
+            !fresh.contains("já está neste worktree"),
+            "sem branch anterior não há trabalho prévio"
+        );
     }
 }

@@ -64,12 +64,23 @@ pub fn reconcile(db: &Connection, run: &Run) -> Result<Option<Change>> {
         run::PREPARING | run::IMPLEMENTING => (Status::Doing, ""),
         run::COMPLETED if run.blocked.is_empty() => (Status::Review, run.summary.as_str()),
         run::COMPLETED => (Status::Review, run.blocked.as_str()),
-        run::NO_CHANGES | run::FAILED => (Status::Todo, run.blocked.as_str()),
-        run::CANCELLED => (Status::Todo, NOTE_CANCELLED),
-        run::INTERRUPTED => (Status::Todo, NOTE_INTERRUPTED),
+        run::NO_CHANGES | run::FAILED => (resting(db, run)?, run.blocked.as_str()),
+        run::CANCELLED => (resting(db, run)?, NOTE_CANCELLED),
+        run::INTERRUPTED => (resting(db, run)?, NOTE_INTERRUPTED),
         _ => return Ok(None),
     };
     task::transition(db, run.task_id, to, Actor::System, note)
+}
+
+/// Onde o card descansa quando a run não entregou nada: em Revisão se a tarefa já
+/// tem trabalho pronto de uma run anterior (um ajuste que falha não desfaz isso),
+/// senão em A fazer.
+fn resting(db: &Connection, run: &Run) -> Result<Status> {
+    Ok(if run::has_completed_besides(db, run.task_id, run.id)? {
+        Status::Review
+    } else {
+        Status::Todo
+    })
 }
 
 /// Na abertura do app: runs que ficaram ativas viram `interrupted` e seus cards
@@ -81,7 +92,9 @@ pub fn recover(db: &Connection, read_only: &[String]) -> Result<Vec<Change>> {
     let mut changes = Vec::new();
     for (run_id, _, _) in active {
         let interrupted = run::get(db, run_id)?;
-        if read_only.contains(&interrupted.action) {
+        // Run de escrita grava o revisor ao nascer; a de leitura não. Vale também para Ação
+        // de leitura do repositório, que não está na lista fixa `read_only`.
+        if read_only.contains(&interrupted.action) || interrupted.reviewer.is_none() {
             continue;
         }
         changes.extend(reconcile(db, &interrupted)?);
@@ -269,6 +282,84 @@ mod tests {
     }
 
     #[test]
+    fn a_failed_adjustment_keeps_the_card_in_review_when_work_already_exists() {
+        let temp = TempDatabase::new("sync-rest");
+        let store = temp.open();
+        let db = store.connection().unwrap();
+        let (empty_task, empty_run) = fixture(&db);
+        // Sem trabalho pronto, uma run vazia devolve o card para A fazer.
+        let empty = finish(&db, &empty_run, run::NO_CHANGES, "nada", &[]);
+        reconcile(&db, &empty).unwrap();
+        assert_eq!(status(&db, empty_task), Status::Todo);
+
+        let task_id = add_task(&db, "Com trabalho");
+        let first = run::create(
+            &db,
+            &NewRun {
+                workspace_id: 1,
+                task_id,
+                title: "Com trabalho",
+                action: "implement",
+                role: "implementador",
+                runtime: "claude",
+                model: "sonnet",
+                effort: None,
+                base_run_id: None,
+            },
+        )
+        .unwrap();
+        let done = finish(&db, &first, run::COMPLETED, "ok", &[]);
+        reconcile(&db, &done).unwrap();
+        assert_eq!(status(&db, task_id), Status::Review);
+
+        // Um ajuste posterior que falha, não muda nada ou é cancelado não desfaz a Revisão.
+        for end in [
+            run::FAILED,
+            run::NO_CHANGES,
+            run::CANCELLED,
+            run::INTERRUPTED,
+        ] {
+            let adjust = run::create(
+                &db,
+                &NewRun {
+                    workspace_id: 1,
+                    task_id,
+                    title: "Tarefa",
+                    action: "implement",
+                    role: "implementador",
+                    runtime: "claude",
+                    model: "sonnet",
+                    effort: None,
+                    base_run_id: Some(first.id),
+                },
+            )
+            .unwrap();
+            reconcile(&db, &adjust).unwrap();
+            assert_eq!(status(&db, task_id), Status::Doing);
+            let ended = finish(&db, &adjust, end, "x", &[]);
+            reconcile(&db, &ended).unwrap();
+            assert_eq!(status(&db, task_id), Status::Review, "{end}");
+        }
+    }
+
+    #[test]
+    fn worktrees_left_by_a_task_are_listed_before_its_runs_are_deleted() {
+        let temp = TempDatabase::new("sync-worktrees");
+        let store = temp.open();
+        let db = store.connection().unwrap();
+        let (task_id, run) = fixture(&db);
+        assert!(run::worktrees_of_task(&db, task_id).unwrap().is_empty());
+        run::set_worktree(&db, run.id, "abc", "harnessy/run-1-x", "/tmp/wt-1").unwrap();
+        finish(&db, &run, run::FAILED, "x", &[]);
+        assert_eq!(
+            run::worktrees_of_task(&db, task_id).unwrap(),
+            vec!["/tmp/wt-1".to_owned()]
+        );
+        remove_task(&db, 1, task_id).unwrap();
+        assert!(run::worktrees_of_task(&db, task_id).unwrap().is_empty());
+    }
+
+    #[test]
     fn only_a_completed_run_with_a_branch_is_reviewable_and_never_during_another_run() {
         let temp = TempDatabase::new("sync-reviewable");
         let store = temp.open();
@@ -404,6 +495,7 @@ mod tests {
         let store = temp.open();
         let db = store.connection().unwrap();
         let (task_id, run) = fixture(&db);
+        run::set_review_choice(&db, run.id, "claude", "", "auto").unwrap();
         reconcile(&db, &finish(&db, &run, run::IMPLEMENTING, "", &[])).unwrap();
         assert_eq!(status(&db, task_id), Status::Doing);
 
@@ -446,6 +538,34 @@ mod tests {
         assert!(recover(&db, &["explicar".to_owned()]).unwrap().is_empty());
         assert_eq!(run::get(&db, read.id).unwrap().state, run::INTERRUPTED);
         assert_eq!(status(&db, task_id), Status::Review);
+    }
+
+    #[test]
+    fn recover_also_spares_a_repository_read_action_missing_from_the_fixed_list() {
+        let temp = TempDatabase::new("sync-recover-repo-read");
+        let store = temp.open();
+        let db = store.connection().unwrap();
+        let (task_id, first) = fixture(&db);
+        run::set_state(&db, first.id, run::COMPLETED, Some("ok")).unwrap();
+        task::transition(&db, task_id, Status::Review, Actor::System, "").unwrap();
+        // Ação de leitura do repositório: não está na lista fixa e não tem revisor.
+        run::create(
+            &db,
+            &NewRun {
+                workspace_id: 1,
+                task_id,
+                title: "Tarefa",
+                action: "auditar",
+                role: "implementador",
+                runtime: "claude",
+                model: "haiku",
+                effort: None,
+                base_run_id: None,
+            },
+        )
+        .unwrap();
+        assert!(recover(&db, &[]).unwrap().is_empty());
+        assert_eq!(status(&db, task_id), Status::Review, "o card não se mexe");
     }
 
     #[test]

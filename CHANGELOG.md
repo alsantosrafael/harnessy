@@ -2,6 +2,39 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.17.1] — 2026-10-30
+
+Correções do QA de regras de negócio:
+
+- O campo de ajuste avisa quando passa de 4.000 caracteres e não envia (antes o texto era recusado só no núcleo).
+- O ajuste continua da run **concluída mais recente que deixou branch**, mesmo quando a última run da conversa falhou. Antes partia do código limpo.
+- Excluir uma tarefa limpa o cache da conversa dela: o SQLite reaproveita ids, e uma run nova herdava a conversa da excluída.
+- Uma resposta de leitura concluída (sem branch e sem aviso) não esconde mais o bloqueio de uma run de escrita anterior.
+- O pedido do usuário não é mais cortado junto com o começo de um log longo (acima de 2.000 eventos).
+
+## Back [0.16.1] — 2026-10-30
+
+Correções do QA de regras de negócio:
+
+- **Ajuste longo travava o workspace:** `start_run` criava a run, registrava e movia o card antes de validar o ajuste; ao recusar, ficava uma run `preparing` sem processo. O prompt (e a validação) agora vem antes de criar a run.
+- O texto do ajuste só afirma que "o trabalho anterior já está neste worktree" quando a run parte da branch de outra run.
+- `review_run` recusa uma segunda revisão da mesma run ("Esta run já está sendo revisada"): antes duas disputavam o slot de cancelamento e o número do ciclo, e um dos ciclos se perdia.
+- Na abertura do app, runs interrompidas de Ações de leitura do repositório não mexem mais no card. A run de escrita grava o revisor ao nascer; a de leitura não, e é isso que as distingue da lista fixa.
+- A conversa explica quando a revisão não roda porque está desligada ("Nunca" ou Ação em modo manual), e a mensagem de revisão dispensada só diz "comprovada" quando a contraprova de fato comprovou.
+- Excluir uma tarefa remove também os worktrees que as runs dela deixaram no disco (as de runs que falharam). As branches continuam no git.
+
+## Front [0.17.0] — 2026-10-30
+
+- No **Chat**, a conversa agora é da **tarefa**, não de uma run só: ela reúne todas as runs, em ordem, cada uma com uma divisória (`Run #n · estado`), o resumo e a contraprova das anteriores. Pedir um ajuste não apaga mais o que já foi dito.
+- O que você pediu aparece na conversa, à direita: o texto da tarefa na primeira run e o ajuste digitado nas seguintes.
+- A lista da esquerda tem **uma linha por tarefa** (com "n runs"), que não muda de grupo quando a run termina; a conversa aberta fica sempre visível, mesmo fora das mais recentes.
+- O log mostrado por run passou de 500 para 2.000 eventos, para não cortar o começo de runs longas.
+
+## Back [0.16.0] — 2026-10-30
+
+- Cada run grava, como primeiro evento, o pedido do usuário (`user`): o ajuste digitado ou o título e a descrição da tarefa.
+- Corrigido: um ajuste que falha, termina sem alterações ou é cancelado/interrompido devolvia o card para **A fazer**, mesmo com trabalho pronto de uma run anterior. Agora o card volta para **Revisão** quando a tarefa já tem uma run concluída, e só vai para A fazer se não tiver.
+
 ## Front [0.16.1] — 2026-10-30
 
 - Corrigido: **Excluir** (e os avisos de "descartar alterações") não faziam nada no app. Eles usavam o `window.confirm` do navegador, que na janela do macOS pode devolver "não" sem mostrar nada. Agora a confirmação é um diálogo do próprio app, com **Cancelar** em foco e o botão de perigo em vermelho; Esc fecha.

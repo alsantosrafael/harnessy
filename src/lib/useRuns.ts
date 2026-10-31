@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AgentChoice } from "./agents";
 import {
   listRunEvents,
   listRuns,
   onRunEvent,
   onRunState,
-  startRun,
   type Run,
   type RunEvent,
+  startRun,
 } from "./desktop";
-import type { AgentChoice } from "./agents";
-import { isActive, mergeEvents, upsertRun } from "./runs";
+import { isActive, mergeEvents, threadOf, upsertRun } from "./runs";
 
 /** Rede de segurança: se um evento ao vivo se perder, o banco local corrige a tela. */
 const RUN_POLL_MS = 2_000;
@@ -18,7 +18,9 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
 export interface RunsState {
   runs: Run[];
   openRun: number | null;
-  events: RunEvent[];
+  /** Runs da tarefa da run aberta, da mais antiga à mais nova: a conversa inteira. */
+  thread: Run[];
+  eventsByRun: Record<number, RunEvent[]>;
   starting: boolean;
   open: (id: number | null) => void;
   /** Esquece as runs de uma tarefa excluída. */
@@ -34,8 +36,9 @@ export interface RunsState {
 }
 
 /**
- * Runs do workspace e o log da aberta, compartilhados entre o quadro e o chat.
- * Eventos do núcleo valem mesmo com a tela escondida.
+ * Runs do workspace e o log da conversa aberta, compartilhados entre o quadro e o chat.
+ * A conversa de uma tarefa reúne todas as runs dela, então pedir um ajuste não apaga o
+ * que já foi dito. Eventos do núcleo valem mesmo com a tela escondida.
  */
 export function useRuns(
   workspaceId: number | null,
@@ -44,32 +47,44 @@ export function useRuns(
 ): RunsState {
   const [runs, setRuns] = useState<Run[]>([]);
   const [openRun, setOpenRun] = useState<number | null>(null);
-  const [events, setEvents] = useState<RunEvent[]>([]);
+  const [eventsByRun, setEventsByRun] = useState<Record<number, RunEvent[]>>({});
   const [starting, setStarting] = useState(false);
   const openRef = useRef(openRun);
   openRef.current = openRun;
   const runsRef = useRef(runs);
   runsRef.current = runs;
-  const lastSeqRef = useRef(0);
-  lastSeqRef.current = events.reduce((max, event) => Math.max(max, event.seq), 0);
+  const eventsRef = useRef(eventsByRun);
+  eventsRef.current = eventsByRun;
+  // Runs cujo log já foi pedido ao banco, para não repetir a carga.
+  const loaded = useRef(new Set<number>());
+
+  const taskOfOpen = runs.find((run) => run.id === openRun)?.taskId ?? null;
+  const thread = useMemo(() => threadOf(runs, taskOfOpen), [runs, taskOfOpen]);
+
+  const addEvents = useCallback((runId: number, incoming: RunEvent[]) => {
+    setEventsByRun((current) => ({
+      ...current,
+      [runId]: mergeEvents(current[runId] ?? [], incoming),
+    }));
+  }, []);
 
   useEffect(() => {
     const stops = [
       onRunState((run) => setRuns((current) => upsertRun(current, run))),
-      onRunEvent((event) => {
-        if (event.runId === openRef.current) setEvents((c) => mergeEvents(c, [event]));
-      }),
+      onRunEvent((event) => addEvents(event.runId, [event])),
     ];
     return () => {
       for (const stop of stops) stop.then((off) => off());
     };
-  }, []);
+  }, [addEvents]);
 
   // Trocar de workspace zera a seleção; recarregar por `refreshKey` não.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `workspaceId` é o gatilho do reset.
   useEffect(() => {
     setRuns([]);
     setOpenRun(null);
+    setEventsByRun({});
+    loaded.current = new Set();
   }, [workspaceId]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `refreshKey` é o gatilho de recarga vindo do chat.
@@ -84,35 +99,42 @@ export function useRuns(
     };
   }, [workspaceId, refreshKey, onError]);
 
+  // Carrega o log de cada run da conversa aberta que ainda não veio do banco.
+  const threadKey = thread.map((run) => run.id).join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `threadKey` resume as runs da conversa.
   useEffect(() => {
-    if (openRun === null) return;
-    let alive = true;
-    setEvents([]);
-    listRunEvents(openRun, 0)
-      .then((rows) => alive && setEvents((current) => mergeEvents(current, rows)))
-      .catch((cause) => alive && onError(message(cause)));
-    return () => {
-      alive = false;
-    };
-  }, [openRun, onError]);
+    for (const run of thread) {
+      if (loaded.current.has(run.id)) continue;
+      loaded.current.add(run.id);
+      listRunEvents(run.id, 0)
+        .then((rows) => addEvents(run.id, rows))
+        .catch((cause) => {
+          loaded.current.delete(run.id);
+          onError(message(cause));
+        });
+    }
+  }, [threadKey, addEvents, onError]);
 
-  const openRunActive = runs.some((run) => run.id === openRun && isActive(run));
+  const activeKey = thread
+    .filter(isActive)
+    .map((run) => run.id)
+    .join(",");
   useEffect(() => {
-    if (openRun === null || workspaceId === null || !openRunActive) return;
-    let alive = true;
+    if (workspaceId === null || !activeKey) return;
+    const ids = activeKey.split(",").map(Number);
     const timer = setInterval(() => {
-      listRunEvents(openRun, lastSeqRef.current)
-        .then((rows) => alive && rows.length > 0 && setEvents((c) => mergeEvents(c, rows)))
-        .catch(() => {});
+      for (const id of ids) {
+        const last = (eventsRef.current[id] ?? []).reduce((max, e) => Math.max(max, e.seq), 0);
+        listRunEvents(id, last)
+          .then((rows) => rows.length > 0 && addEvents(id, rows))
+          .catch(() => {});
+      }
       listRuns(workspaceId)
-        .then((rows) => alive && setRuns(rows))
+        .then(setRuns)
         .catch(() => {});
     }, RUN_POLL_MS);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, [openRun, workspaceId, openRunActive]);
+    return () => clearInterval(timer);
+  }, [workspaceId, activeKey, addEvents]);
 
   const start = useCallback<RunsState["start"]>(
     async (taskId, choice, action, continueFrom = null, instruction = null) => {
@@ -136,8 +158,16 @@ export function useRuns(
   const forgetTask = useCallback((taskId: number) => {
     const open = runsRef.current.find((run) => run.id === openRef.current);
     if (open?.taskId === taskId) setOpenRun(null);
+    // O SQLite reaproveita ids: sem limpar o cache, uma run nova herdaria a conversa da excluída.
+    const gone = runsRef.current.filter((run) => run.taskId === taskId).map((run) => run.id);
+    for (const id of gone) loaded.current.delete(id);
+    setEventsByRun((current) => {
+      const next = { ...current };
+      for (const id of gone) delete next[id];
+      return next;
+    });
     setRuns((current) => current.filter((run) => run.taskId !== taskId));
   }, []);
 
-  return { runs, openRun, events, starting, open: setOpenRun, forgetTask, start };
+  return { runs, openRun, thread, eventsByRun, starting, open: setOpenRun, forgetTask, start };
 }

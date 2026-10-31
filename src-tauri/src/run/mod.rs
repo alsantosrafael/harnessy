@@ -480,9 +480,27 @@ pub fn active_runs(db: &Connection) -> Result<Vec<(i64, i64, i64)>> {
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
+/// A tarefa já tem outra run concluída, ou seja, trabalho pronto para revisar?
+pub fn has_completed_besides(db: &Connection, task_id: i64, run_id: i64) -> Result<bool> {
+    Ok(db.query_row(
+        "SELECT EXISTS(SELECT 1 FROM runs WHERE task_id=?1 AND id<>?2 AND state=?3)",
+        params![task_id, run_id, COMPLETED],
+        |r| r.get(0),
+    )?)
+}
+
 /// A tarefa tem alguma run ainda em andamento?
 pub fn has_active(db: &Connection, task_id: i64) -> Result<bool> {
     Ok(active_runs(db)?.iter().any(|(_, task, _)| *task == task_id))
+}
+
+/// Pastas de worktree ainda registradas nas runs da tarefa (as de runs que falharam
+/// ficam no disco para o ciclo com outro modelo).
+pub fn worktrees_of_task(db: &Connection, task_id: i64) -> Result<Vec<String>> {
+    let mut query = db
+        .prepare("SELECT worktree_path FROM runs WHERE task_id=?1 AND worktree_path IS NOT NULL")?;
+    let rows = query.query_map([task_id], |r| r.get(0))?;
+    Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
 /// Apaga as runs da tarefa com seus eventos e ciclos. Runs de outras tarefas que

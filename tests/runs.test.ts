@@ -6,12 +6,16 @@ import {
   canTryNextModel,
   blockHelp,
   blockTitle,
+  adjustmentBase,
   chainBase,
+  conversations,
+  FOLLOWUP_LIMIT,
   ledgerCost,
   ledgerItems,
   mergeEvents,
   proofLabel,
   reviewable,
+  threadOf,
   reviewLabel,
   timeAgo,
   stateLabel,
@@ -193,4 +197,50 @@ test("only a completed run with a branch can be reviewed on demand", () => {
   assert.equal(reviewable(done), true);
   assert.equal(reviewable({ ...done, branch: null }), false);
   assert.equal(reviewable({ ...done, state: "failed" }), false);
+});
+
+test("a conversation gathers every run of the task, oldest first, one row per task", () => {
+  const runs = [
+    { ...run(5, "completed"), taskId: 2 },
+    { ...run(4, "completed"), taskId: 1 },
+    { ...run(3, "failed"), taskId: 2 },
+    { ...run(1, "completed"), taskId: 1 },
+  ];
+  assert.deepEqual(
+    threadOf(runs, 2).map((item) => item.id),
+    [3, 5],
+  );
+  assert.deepEqual(threadOf(runs, null), []);
+  const list = conversations(runs);
+  assert.deepEqual(
+    list.map((item) => [item.latest.taskId, item.latest.id, item.count]),
+    [
+      [2, 5, 2],
+      [1, 4, 2],
+    ],
+  );
+});
+
+test("an adjustment continues from the latest completed run that left a branch", () => {
+  const withBranch = (id: number, state: string) => ({
+    ...run(id, state),
+    branch: state === "completed" ? `harnessy/run-${id}-x` : null,
+  });
+  // A última falhou: o ajuste parte da concluída anterior, não do código limpo.
+  const thread = [withBranch(1, "completed"), withBranch(2, "completed"), withBranch(3, "failed")];
+  assert.equal(adjustmentBase(thread)?.id, 2);
+  assert.equal(adjustmentBase([withBranch(3, "failed")]), null);
+  assert.equal(adjustmentBase([]), null);
+  assert.equal(FOLLOWUP_LIMIT, 4_000);
+});
+
+test("trimming a long log never drops what the user asked", () => {
+  const ev = (seq: number, kind = "tool") => ({ runId: 1, seq, kind, text: `e${seq}` });
+  const long = [ev(1, "user"), ...Array.from({ length: 2_500 }, (_, at) => ev(at + 2))];
+  const merged = mergeEvents([], long);
+  assert.equal(merged[0].kind, "user");
+  assert.equal(merged.length, 2_001);
+  assert.equal(merged[merged.length - 1].seq, 2_501);
+  // Repetir o mesmo lote não duplica nada.
+  assert.equal(mergeEvents(merged, long).length, 2_001);
 });

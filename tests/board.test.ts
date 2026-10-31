@@ -137,3 +137,17 @@ test("only the latest finished run of an open task can block it", () => {
 test("a resolved run no longer blocks", () => {
   assert.equal(blockedByTask([run(1, 1, "failed", "")], [task(1, "todo")]).size, 0);
 });
+
+test("a finished read answer does not hide the block of the write run before it", () => {
+  const tasks = [task(1, "todo")];
+  const failedWrite = run(1, 1, "failed", "Run falhou.");
+  const readAnswer = { ...run(2, 1, "completed"), action: "explicar" };
+  assert.deepEqual(blockedByTask([failedWrite, readAnswer], tasks).get(1), {
+    runId: 1,
+    state: "failed",
+    reason: "Run falhou.",
+  });
+  // Uma run de escrita concluída (com branch) sim supera o bloqueio anterior.
+  const written = { ...run(3, 1, "completed"), branch: "harnessy/run-3-x" };
+  assert.equal(blockedByTask([failedWrite, readAnswer, written], tasks).size, 0);
+});

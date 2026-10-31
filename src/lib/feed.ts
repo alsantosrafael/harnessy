@@ -18,6 +18,7 @@ export interface ReviewPayload {
 }
 
 export type FeedItem =
+  | { kind: "user"; seq: number; text: string }
   | { kind: "message"; seq: number; text: string }
   | { kind: "tools"; seq: number; lines: string[] }
   | { kind: "status"; seq: number; text: string }
@@ -71,6 +72,9 @@ export function buildFeed(events: readonly RunEvent[]): FeedItem[] {
       continue;
     }
     switch (event.kind) {
+      case "user":
+        items.push({ kind: "user", seq: event.seq, text: event.text });
+        break;
       case "assistant":
         items.push({ kind: "message", seq: event.seq, text: event.text });
         break;

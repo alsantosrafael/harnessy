@@ -66,12 +66,14 @@ export interface Block {
 
 /**
  * Tarefas bloqueadas: a última run da tarefa terminou com motivo de bloqueio e a
- * tarefa não está concluída. Uma run nova (ativa ou não) supera a anterior.
+ * tarefa não está concluída. Uma run nova (ativa ou não) supera a anterior, exceto uma resposta de leitura concluída e sem aviso.
  */
 export function blockedByTask(runs: Run[], tasks: LocalTask[]): Map<number, Block> {
   const done = new Set(tasks.filter((task) => task.status === "done").map((task) => task.id));
   const latest = new Map<number, Run>();
   for (const run of runs) {
+    // Resposta de leitura concluída (sem branch) não diz nada sobre o trabalho: não apaga o bloqueio.
+    if (run.state === "completed" && !run.branch && !run.blocked) continue;
     const current = latest.get(run.taskId);
     if (!current || run.id > current.id) latest.set(run.taskId, run);
   }

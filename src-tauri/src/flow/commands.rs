@@ -17,13 +17,15 @@ use crate::{
     process,
     run::{
         self, claude::ClaudeCode, codex::Codex, guard, prompt, redact, runtime::Runtime,
-        supervisor::Registry, CycleRecord, NewRun, Run,
+        supervisor::Registry, worktree, CycleRecord, NewRun, Run,
     },
     task::{self, commands::emit_change, Task},
     workspace,
 };
 
 const MAX_TITLE_BYTES: usize = 300;
+/// Quanto do pedido do usuário aparece na conversa da run.
+const MAX_SAID_CHARS: usize = 4_000;
 
 /// Ações do repositório do workspace e os hashes que o usuário já confirmou.
 fn repo_catalog(
@@ -321,6 +323,13 @@ pub fn start_run(
         Some(agent_runtime(pick.runtime, &dirs, &data_dir)?)
     };
 
+    // O prompt (e a validação do ajuste) vem antes de criar a run: recusar depois deixaria
+    // uma run `preparing` sem processo, que trava o workspace.
+    let prompt = prompt::with_followup(
+        prompt_for(&acao, &task, &ws.folder, &avoid),
+        instruction.as_deref().unwrap_or(""),
+        base.is_some(),
+    )?;
     let title: String = task.title.chars().take(MAX_TITLE_BYTES / 4).collect();
     let created = run::create(
         &*store.connection()?,
@@ -357,13 +366,22 @@ pub fn start_run(
     } else {
         verify::checks_for(Path::new(&ws.folder))
     };
+    let said: String = match instruction
+        .as_deref()
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+    {
+        Some(text) => text.to_owned(),
+        None if task.description.trim().is_empty() => task.title.clone(),
+        None => format!("{}\n\n{}", task.title, task.description.trim()),
+    }
+    .chars()
+    .take(MAX_SAID_CHARS)
+    .collect();
     let job = Job {
         run_id: created.id,
         title,
-        prompt: prompt::with_followup(
-            prompt_for(&acao, &task, &ws.folder, &avoid),
-            instruction.as_deref().unwrap_or(""),
-        )?,
+        prompt,
         repo: ws.folder.into(),
         data_dir,
         model: model.clone(),
@@ -388,6 +406,8 @@ pub fn start_run(
         app: app.clone(),
         read_only,
     };
+    // O pedido de quem usa abre a conversa da run: o ajuste digitado ou a própria tarefa.
+    sink.event(created.id, "user", &said);
     std::thread::spawn(move || {
         let registry = handle.state::<Registry>();
         if read_only {
@@ -532,7 +552,9 @@ pub fn review_run(
         .proof
         .clone()
         .unwrap_or_else(|| "não registrada".into());
-    registry.register(run_id);
+    if !registry.try_register(run_id) {
+        return Err(AppError::Validation("Esta run já está sendo revisada."));
+    }
     let handle = app.clone();
     let folder = PathBuf::from(&ws.folder);
     let sink = AppSink {
@@ -559,7 +581,28 @@ pub fn review_run(
 /// Exclui uma tarefa (e as runs dela) a pedido do usuário.
 #[tauri::command]
 pub fn delete_task(store: State<'_, Database>, workspace_id: i64, task_id: i64) -> Result<()> {
-    sync::remove_task(&*store.connection()?, workspace_id, task_id)
+    let (folder, worktrees) = {
+        let db = store.connection()?;
+        (
+            workspace::get(&db, workspace_id)?.folder,
+            run::worktrees_of_task(&db, task_id)?,
+        )
+    };
+    sync::remove_task(&*store.connection()?, workspace_id, task_id)?;
+    remove_leftover_worktrees(Path::new(&folder), &worktrees);
+    Ok(())
+}
+
+/// Sem as runs no banco, ninguém mais usaria estas pastas: remove as que sobraram.
+/// Best effort; a branch continua no git.
+fn remove_leftover_worktrees(repo: &Path, worktrees: &[String]) {
+    let dirs = process::search_dirs();
+    let Some(git) = process::find_binary("git", &dirs) else {
+        return;
+    };
+    for dir in worktrees.iter().map(Path::new).filter(|dir| dir.is_dir()) {
+        let _ = worktree::remove(&git, &dirs, repo, dir);
+    }
 }
 
 /// O usuário deu o bloqueio de uma run por resolvido (regras em [`sync::resolve`]).
