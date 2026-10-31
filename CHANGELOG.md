@@ -10,6 +10,18 @@ Rodar localmente para testar a mudança (fatia 2a):
 - Painel **Ambiente de teste** na tarefa: estado em texto (Subindo…, No ar, Parado, Caiu com o código), endereço, **Abrir no navegador**, **Parar** / **Rodar de novo** e o log ao vivo, rolável por teclado.
 - O card mostra **No ar** enquanto o ambiente da tarefa está rodando.
 
+## Back [0.20.0] — 2026-10-31
+
+Automação do ciclo, base (fatia 2b-1; o motor e a interface vêm nas próximas):
+
+- Novo domínio `automation`: seis etapas (**Iniciar, Revisão do staff, QA, Ambiente de teste, Publicar PR, Merge**) e três modos por etapa (**Eu conduzo**, **Assistido**, **Delegado**), com os atalhos `conduzo`, `copiloto` (padrão de um workspace novo) e `cinto`.
+- A escolha é **pessoal e local**: fica no SQLite, nunca em `.harnessy/workspace.toml`. O repositório só pode **apertar** as travas (menor teto de diff, mais caminhos sensíveis), nunca afrouxá-las.
+- Exceções por tarefa sobre o padrão do workspace (`task_automation`), pausa geral e travas configuráveis (teto de linhas e de arquivos do diff, caminhos sensíveis). Tabelas novas `workspace_automation`, `task_automation` e `automation_events` (migração).
+- **O merge nunca é automático**: o máximo é Assistido (o Harnessy deixa pronto e pede o OK). O núcleo recusa `auto` no merge.
+- `automation::decide` decide cada etapa de forma pura: **Nada**, **Executar**, **Pedir OK** (com os riscos como avisos), **Esperar** (falta algo que vai acontecer) ou **Parar** com o motivo em uma frase. Delegado só executa sem nenhum risco; a pausa geral para o delegado, mas não os pedidos de aprovação.
+- Registro do que o Harnessy decidiu (`automation_events`), sem repetir a mesma decisão em sequência.
+- Comandos: `get_automation`, `save_automation`, `apply_automation_preset`, `set_automation_paused`, `save_task_automation` e `list_automation_events`.
+
 ## Back [0.19.0] — 2026-10-31
 
 Ambiente de teste local (fatia 2a):

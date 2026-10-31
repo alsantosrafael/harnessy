@@ -6,6 +6,7 @@
 
 mod action;
 mod app;
+mod automation;
 mod connections;
 mod db;
 mod delivery;
@@ -41,6 +42,12 @@ pub fn run() {
             flow::commands::refresh_delivery,
             flow::commands::merge_delivery,
             flow::commands::list_deliveries,
+            automation::commands::get_automation,
+            automation::commands::save_automation,
+            automation::commands::apply_automation_preset,
+            automation::commands::set_automation_paused,
+            automation::commands::save_task_automation,
+            automation::commands::list_automation_events,
             flow::commands::get_profile,
             flow::commands::save_profile,
             flow::commands::approve_profile,
