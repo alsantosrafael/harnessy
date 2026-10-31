@@ -103,11 +103,19 @@ export function App() {
   }, [help]);
 
   const connect = () => setView("connections");
+  // Sai da run aberta: o chat volta ao estado de criar uma tarefa nova.
+  const newTask = (id?: number) => {
+    if (id !== undefined) setWorkspaceId(id);
+    runs.open(null);
+    show("chat");
+  };
   function toggleWorkspace(id: number) {
     // O workspace atual fica sempre aberto; clicar nele só o torna ativo.
     if (id !== workspaceId) {
       setWorkspaceId(id);
       setExpanded((set) => new Set(set).add(id));
+      // Outro workspace abre nas tarefas dele, como a navegação por workspace promete.
+      show("board");
       return;
     }
     setExpanded((set) => {
@@ -134,7 +142,7 @@ export function App() {
           </span>
           <strong>harnessy</strong>
         </div>
-        <button className="button primary new-task" onClick={() => show("chat")}>
+        <button className="button primary new-task" onClick={() => newTask()}>
           <SquarePen size={14} aria-hidden="true" />
           Nova tarefa
         </button>
@@ -210,7 +218,7 @@ export function App() {
                       <Plug size={15} aria-hidden="true" />
                       Conexões{current && <span className="shortcut">⌘3</span>}
                     </button>
-                    <button className="nav-item" onClick={() => go("chat")}>
+                    <button className="nav-item" onClick={() => newTask(item.id)}>
                       <SquarePen size={15} aria-hidden="true" />
                       Nova tarefa
                     </button>
