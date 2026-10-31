@@ -2,6 +2,14 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Back [0.27.4] — 2026-10-31
+
+- **Corrigido:** quando o agente esgota os turnos (`error_max_turns`), a run falhava só com "O agente terminou com erro". Agora o motivo aparece: usou os 25 turnos, o trabalho fica na branch e dá para continuar ou dividir a tarefa.
+
+## Front [0.30.3] — 2026-10-31
+
+- **Corrigido:** clicar no card da tarefa que já está aberta perguntava "Descartar alterações?" sem efeito algum, em loop. Clicar na tarefa aberta agora não faz nada.
+
 ## Back [0.27.3] — 2026-10-31
 
 - O prompt do **Refinar** pede só Read, Glob e Grep para conferir o código; antes o agente tentava `grep` via Bash, que o modo de leitura nega, e o feed mostrava "Negado".

@@ -246,6 +246,8 @@ export function BoardPanel({
   );
 
   const select = useCallback((id: number | null) => {
+    // Clicar na tarefa que já está aberta não troca nada: perguntar "Descartar?" seria um aviso sem efeito.
+    if (id !== null && id === selectedRef.current) return;
     const open = () => {
       dirtyRef.current = false;
       setUseChain(true);
