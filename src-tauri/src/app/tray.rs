@@ -8,6 +8,8 @@ use tauri::{
 
 use super::show_main_window;
 
+/// Identificador do ícone, para o contador de atenção encontrá-lo depois.
+pub const TRAY_ID: &str = "main";
 const OPEN: &str = "open";
 const QUIT: &str = "quit";
 
@@ -15,7 +17,7 @@ pub fn install(app: &App) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, OPEN, "Abrir Harnessy", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, QUIT, "Encerrar Harnessy", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &quit])?;
-    TrayIconBuilder::new()
+    TrayIconBuilder::with_id(TRAY_ID)
         .title("H")
         .tooltip("Harnessy — aplicativo local")
         .menu(&menu)

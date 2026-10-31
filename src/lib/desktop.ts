@@ -250,6 +250,12 @@ export const refreshDelivery = (runId: number) =>
 export const mergeDelivery = (runId: number) => localCall<Delivery>("merge_delivery", { runId });
 export const listDeliveries = (workspaceId: number) =>
   localCall<Delivery[]>("list_deliveries", { workspaceId });
+/** Mostra no ícone da bandeja quantas tarefas pedem o usuário. */
+export const setAttentionCount = (count: number) =>
+  localCall<void>("set_attention_count", { count });
+/** Notificação do sistema; sem permissão do usuário, não faz nada. */
+export const notifyAttention = (title: string, body: string) =>
+  localCall<void>("notify_attention", { title, body });
 /** Um arquivo alterado pela run, com os hunks para leitura. */
 export interface FileDiff {
   path: string;

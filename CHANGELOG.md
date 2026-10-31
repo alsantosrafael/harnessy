@@ -10,6 +10,20 @@ Rodar localmente para testar a mudança (fatia 2a):
 - Painel **Ambiente de teste** na tarefa: estado em texto (Subindo…, No ar, Parado, Caiu com o código), endereço, **Abrir no navegador**, **Parar** / **Rodar de novo** e o log ao vivo, rolável por teclado.
 - O card mostra **No ar** enquanto o ambiente da tarefa está rodando.
 
+## Front [0.24.0] — 2026-10-31
+
+O quadro passa a dizer o que precisa de você, mesmo com a janela em segundo plano:
+
+- Filtro **Todas / Precisa de você / Com os agentes**, com contagem. "Precisa de você" reúne tarefas bloqueadas, com checks falhando, conflito, mudanças pedidas, prontas para merge, PR aguardando revisão ou só locais; PR mergeado e checks rodando ficam com os agentes. Uma frase ao lado ("2 tarefas pedem você") é anunciada para leitor de tela.
+- O ícone da bandeja mostra o contador ("H 2").
+- Quando algo novo chega com a janela **sem foco**, o macOS notifica ("Precisa de você" ou "N tarefas pedem você", com a mais urgente). O que já estava pendente ao abrir o app ou trocar de workspace não notifica.
+- Ao voltar para a janela, o banner **Enquanto você esteve fora** lista o que chegou, do mais urgente ao menos, com atalho para ver só o que precisa de você.
+- Os achados da revisão agora aparecem na linha do diff mesmo sem abrir a conversa da run antes.
+
+## Back [0.22.0] — 2026-10-31
+
+- Notificações do sistema pelo plugin oficial `tauri-plugin-notification`, usado **só pelo Rust**: nenhum comando do plugin é exposto à WebView e `capabilities/main.json` não ganhou permissão. Comando novo `notify_attention(title, body)` (texto cortado em 80 e 200 caracteres; sem permissão do usuário, não faz nada) e `set_attention_count(count)`, que escreve o contador ao lado do ícone da bandeja. O ícone da bandeja agora tem identificador próprio.
+
 ## Front [0.23.0] — 2026-10-31
 
 Ver o que a run mudou, dentro do app:

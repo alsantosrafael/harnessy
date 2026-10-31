@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
+import {
+  attentionOf,
+  byUrgency,
+  countPhrase,
+  type Filter,
+  matchesFilter,
+  withAgents,
+} from "../lib/attention";
 import { applyChange, applyMove, blockedByTask, groupByStatus, statusName } from "../lib/board";
 import {
   approveProfile,
@@ -29,6 +37,7 @@ import { deliveryOf, needsRefresh, stagesByTask, workRun } from "../lib/delivery
 import { parseReview, type Finding } from "../lib/feed";
 import { isLive } from "../lib/preview";
 import { canStartRun, chainBase, isActive } from "../lib/runs";
+import { useAttentionSignals } from "../lib/useAttention";
 import { usePreviews } from "../lib/usePreviews";
 import type { RunsState } from "../lib/useRuns";
 import { nextAction, quickStates, type QuickId } from "../lib/quick";
@@ -101,6 +110,8 @@ export function BoardPanel({
   const [tasks, setTasks] = useState<LocalTask[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [delivering, setDelivering] = useState(false);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [deliveriesReady, setDeliveriesReady] = useState(false);
   const previews = usePreviews();
   const [setup, setSetup] = useState<{
     runId: number;
@@ -132,7 +143,6 @@ export function BoardPanel({
   const timers = useRef<{ flash?: number; notice?: number }>({});
 
   const { runs, starting } = runsState;
-  const groups = useMemo(() => groupByStatus(tasks), [tasks]);
   const working = useMemo(() => new Set(runs.filter(isActive).map((run) => run.taskId)), [runs]);
   const blocked = useMemo(() => blockedByTask(runs, tasks), [runs, tasks]);
   const testing = useMemo(() => {
@@ -144,6 +154,24 @@ export function BoardPanel({
     return ids;
   }, [tasks, runs, previews.infos]);
   const stages = useMemo(() => stagesByTask(tasks, runs, deliveries), [tasks, runs, deliveries]);
+  const attention = useMemo(
+    () => attentionOf(tasks, stages, blocked, working),
+    [tasks, stages, blocked, working],
+  );
+  const withAgentsCount = useMemo(
+    () => tasks.filter((task) => withAgents(task, stages, working)).length,
+    [tasks, stages, working],
+  );
+  const groups = useMemo(
+    () =>
+      groupByStatus(
+        filter === "all"
+          ? tasks
+          : tasks.filter((task) => matchesFilter(filter, task, attention, stages, working)),
+      ),
+    [tasks, filter, attention, stages, working],
+  );
+  const signals = useAttentionSignals(attention, !loading && deliveriesReady, workspaceId);
   const selected = tasks.find((task) => task.id === selectedId) ?? null;
 
   // O detalhe fica embaixo do quadro: ao escolher uma tarefa, leva a tela até ele.
@@ -273,6 +301,8 @@ export function BoardPanel({
   // Trocar de workspace zera a seleção; recarregar por `refreshKey` não.
   useEffect(() => {
     setLoading(workspaceId !== null || !workspacesReady);
+    setDeliveriesReady(false);
+    setFilter("all");
     setTasks([]);
     setSelectedId(null);
   }, [workspaceId, workspacesReady]);
@@ -296,8 +326,12 @@ export function BoardPanel({
     if (workspaceId === null) return;
     let alive = true;
     listDeliveries(workspaceId)
-      .then((rows) => alive && setDeliveries(rows))
-      .catch(() => undefined);
+      .then((rows) => {
+        if (!alive) return;
+        setDeliveries(rows);
+        setDeliveriesReady(true);
+      })
+      .catch(() => alive && setDeliveriesReady(true));
     return () => {
       alive = false;
     };
@@ -558,6 +592,11 @@ export function BoardPanel({
         previewSeen: selectedWork ? previews.infos[selectedWork.id] !== undefined : false,
       })
     : null;
+  const workId = selectedWork?.id;
+  const { ensureEvents } = runsState;
+  useEffect(() => {
+    if (workId !== undefined) ensureEvents(workId);
+  }, [workId, ensureEvents]);
   runNextRef.current = next ? () => quick(next.id) : null;
 
   return (
@@ -658,6 +697,76 @@ export function BoardPanel({
       {workspaces.length > 0 && (
         <div className={`board-layout${selected ? " has-detail" : ""}`}>
           <div className="board-main">
+            {!loading && tasks.length > 0 && (
+              <div className="attention-bar">
+                <fieldset className="attention-filters">
+                  <legend className="sr-only">Filtrar tarefas</legend>
+                  {(
+                    [
+                      ["all", "Todas", tasks.length],
+                      ["me", "Precisa de você", attention.size],
+                      ["agents", "Com os agentes", withAgentsCount],
+                    ] as const
+                  ).map(([id, label, count]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      className={`attention-filter${id === "me" && count > 0 ? " is-urgent" : ""}`}
+                      aria-pressed={filter === id}
+                      onClick={() => setFilter(id)}
+                    >
+                      {label} <span className="attention-count">{count}</span>
+                    </button>
+                  ))}
+                </fieldset>
+                <p className="attention-phrase" role="status">
+                  {countPhrase(attention.size)}
+                </p>
+              </div>
+            )}
+            {signals.digest.length > 0 && (
+              <section className="digest" aria-labelledby="digest-title">
+                <h3 id="digest-title">Enquanto você esteve fora</h3>
+                <ul>
+                  {byUrgency(signals.digest)
+                    .slice(0, 5)
+                    .map((item) => (
+                      <li key={item.taskId}>
+                        <button
+                          type="button"
+                          className="link-button"
+                          onClick={() => {
+                            setFilter("me");
+                            select(item.taskId);
+                            signals.dismissDigest();
+                          }}
+                        >
+                          #{item.taskId} {item.title}
+                        </button>{" "}
+                        · {item.reason}
+                      </li>
+                    ))}
+                </ul>
+                {signals.digest.length > 5 && (
+                  <p className="muted">e mais {signals.digest.length - 5}</p>
+                )}
+                <div className="digest-actions">
+                  <button
+                    type="button"
+                    className="button primary"
+                    onClick={() => {
+                      setFilter("me");
+                      signals.dismissDigest();
+                    }}
+                  >
+                    Ver o que precisa de mim
+                  </button>
+                  <button type="button" className="button" onClick={signals.dismissDigest}>
+                    Dispensar
+                  </button>
+                </div>
+              </section>
+            )}
             {loading ? (
               <KanbanSkeleton />
             ) : (

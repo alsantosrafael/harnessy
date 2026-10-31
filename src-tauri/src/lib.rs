@@ -20,8 +20,11 @@ mod workspace;
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             app::app_info,
+            app::attention::set_attention_count,
+            app::attention::notify_attention,
             workspace::commands::list_workspaces,
             workspace::commands::create_workspace,
             task::commands::list_tasks,

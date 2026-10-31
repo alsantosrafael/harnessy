@@ -1,5 +1,6 @@
 //! Ciclo de vida do aplicativo: metadados, estado gerenciado e janela.
 
+pub mod attention;
 pub mod tray;
 
 use serde::Serialize;
