@@ -6,7 +6,7 @@ use super::{Event, Guardrails, Modes, Overrides, Settings, View};
 use crate::{db::Database, error::Result};
 
 #[tauri::command]
-pub fn get_automation(
+pub async fn get_automation(
     store: State<'_, Database>,
     workspace_id: i64,
     task_id: Option<i64>,
@@ -15,7 +15,7 @@ pub fn get_automation(
 }
 
 #[tauri::command]
-pub fn save_automation(
+pub async fn save_automation(
     store: State<'_, Database>,
     workspace_id: i64,
     modes: Modes,
@@ -25,7 +25,7 @@ pub fn save_automation(
 }
 
 #[tauri::command]
-pub fn apply_automation_preset(
+pub async fn apply_automation_preset(
     store: State<'_, Database>,
     workspace_id: i64,
     preset: String,
@@ -34,7 +34,7 @@ pub fn apply_automation_preset(
 }
 
 #[tauri::command]
-pub fn set_automation_paused(
+pub async fn set_automation_paused(
     store: State<'_, Database>,
     workspace_id: i64,
     paused: bool,
@@ -43,7 +43,7 @@ pub fn set_automation_paused(
 }
 
 #[tauri::command]
-pub fn save_task_automation(
+pub async fn save_task_automation(
     store: State<'_, Database>,
     task_id: i64,
     overrides: Overrides,
@@ -52,7 +52,7 @@ pub fn save_task_automation(
 }
 
 #[tauri::command]
-pub fn list_automation_events(
+pub async fn list_automation_events(
     store: State<'_, Database>,
     workspace_id: i64,
     task_id: Option<i64>,

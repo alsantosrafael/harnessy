@@ -42,6 +42,17 @@ pub fn head_sha(git_bin: &Path, dirs: &[PathBuf], repo: &Path) -> Result<String,
     git(git_bin, dirs, repo, &["rev-parse", "HEAD"])
 }
 
+/// SHA completo de uma revisão (`HEAD`, branch ou SHA); `None` se o git não a conhece.
+pub fn resolve_rev(git_bin: &Path, dirs: &[PathBuf], repo: &Path, rev: &str) -> Option<String> {
+    git(
+        git_bin,
+        dirs,
+        repo,
+        &["rev-parse", "--verify", "--quiet", rev],
+    )
+    .ok()
+}
+
 /// SHA do último commit de uma branch local (`refs/heads/<branch>`).
 pub fn branch_sha(
     git_bin: &Path,
@@ -282,6 +293,11 @@ mod tests {
         git(&git_bin, &dirs, &repo, &["add", "-A"]).unwrap();
         git(&git_bin, &dirs, &repo, &["commit", "-q", "-m", "base"]).unwrap();
         let base = head_sha(&git_bin, &dirs, &repo).unwrap();
+        assert_eq!(
+            resolve_rev(&git_bin, &dirs, &repo, "HEAD"),
+            Some(base.clone())
+        );
+        assert_eq!(resolve_rev(&git_bin, &dirs, &repo, "nao-existe"), None);
 
         let wt = root.join("wt");
         create(&git_bin, &dirs, &repo, &wt, "harnessy/run-1-x", &base).unwrap();

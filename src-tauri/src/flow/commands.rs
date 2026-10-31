@@ -3,6 +3,7 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    sync::{Mutex, OnceLock},
 };
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -173,13 +174,39 @@ fn project_harness(folder: &str, rev: &str) -> String {
     let Some(git) = process::find_binary("git", &dirs) else {
         return String::new();
     };
-    let files = run::harness::load(&git, &dirs, Path::new(folder), rev);
-    run::harness::frame(rev, &files)
+    let repo = Path::new(folder);
+    // O texto só muda quando o commit muda: resolve a revisão e reaproveita o que já foi lido
+    // (são ~10 processos `git`, e a prévia do prompt pede isso a cada tarefa aberta).
+    let sha = worktree::resolve_rev(&git, &dirs, repo, rev).unwrap_or_else(|| rev.to_owned());
+    let key = (folder.to_owned(), sha.clone());
+    if let Some(hit) = harness_cache()
+        .lock()
+        .ok()
+        .and_then(|c| c.get(&key).cloned())
+    {
+        return hit;
+    }
+    let files = run::harness::load(&git, &dirs, repo, &sha);
+    let framed = run::harness::frame(&sha, &files);
+    if let Ok(mut cache) = harness_cache().lock() {
+        if cache.len() >= HARNESS_CACHE_MAX {
+            cache.clear();
+        }
+        cache.insert(key, framed.clone());
+    }
+    framed
+}
+
+const HARNESS_CACHE_MAX: usize = 16;
+
+fn harness_cache() -> &'static Mutex<HashMap<(String, String), String>> {
+    static CACHE: OnceLock<Mutex<HashMap<(String, String), String>>> = OnceLock::new();
+    CACHE.get_or_init(Mutex::default)
 }
 
 /// Texto exato que o agente receberá, para o usuário conferir antes de iniciar.
 #[tauri::command]
-pub fn preview_prompt(
+pub async fn preview_prompt(
     app: AppHandle,
     store: State<'_, Database>,
     workspace_id: i64,
@@ -206,7 +233,7 @@ pub fn preview_prompt(
 /// Ações para o menu da tarefa, com erro quando alguma está inválida. Com
 /// `workspace_id`, confere que o workspace existe.
 #[tauri::command]
-pub fn list_actions(
+pub async fn list_actions(
     app: AppHandle,
     store: State<'_, Database>,
     workspace_id: Option<i64>,
@@ -230,7 +257,7 @@ pub fn list_actions(
 /// Confirma o conteúdo atual de uma Ação do repositório (SPEC §15): só depois
 /// disso ela roda. Alterar o arquivo exige nova confirmação.
 #[tauri::command]
-pub fn approve_action(
+pub async fn approve_action(
     app: AppHandle,
     store: State<'_, Database>,
     workspace_id: i64,
@@ -255,7 +282,7 @@ pub fn approve_action(
 /// Cria uma Ação do usuário a partir do formulário: valida com o mesmo parser
 /// dos arquivos e grava em `<dados do app>/actions/<id>.toml`.
 #[tauri::command]
-pub fn create_action(app: AppHandle, input: action::Nova) -> Result<action::Resumo> {
+pub async fn create_action(app: AppHandle, input: action::Nova) -> Result<action::Resumo> {
     let (text, acao) = action::texto_da_nova(&input)?;
     if let Some(modelo) = acao.modelo.as_deref() {
         guard::model(modelo)?;
@@ -468,7 +495,7 @@ pub fn start_run(
 /// Ciclo extra numa run que falhou, com o próximo modelo da lista acima do
 /// último ciclo. A WebView só manda o id; modelo e prompt são decididos aqui.
 #[tauri::command]
-pub fn continue_run(
+pub async fn continue_run(
     app: AppHandle,
     store: State<'_, Database>,
     registry: State<'_, Registry>,
@@ -562,7 +589,7 @@ pub fn continue_run(
 /// (sempre roda, qualquer que seja o `quando` da Ação). A resposta chega pelos
 /// eventos `run-event` e `run-state`.
 #[tauri::command]
-pub fn review_run(
+pub async fn review_run(
     app: AppHandle,
     store: State<'_, Database>,
     registry: State<'_, Registry>,
@@ -646,7 +673,7 @@ pub fn review_run(
 
 /// Exclui uma tarefa (e as runs dela) a pedido do usuário.
 #[tauri::command]
-pub fn delete_task(
+pub async fn delete_task(
     store: State<'_, Database>,
     previews: State<'_, run::preview::Previews>,
     workspace_id: i64,
@@ -685,7 +712,7 @@ fn remove_leftover_worktrees(repo: &Path, worktrees: &[String]) {
 
 /// O usuário deu o bloqueio de uma run por resolvido (regras em [`sync::resolve`]).
 #[tauri::command]
-pub fn resolve_block(app: AppHandle, store: State<'_, Database>, run_id: i64) -> Result<()> {
+pub async fn resolve_block(app: AppHandle, store: State<'_, Database>, run_id: i64) -> Result<()> {
     let (run, change) = sync::resolve(&*store.connection()?, run_id)?;
     if let Some(change) = &change {
         emit_change(&app, change);
@@ -887,7 +914,7 @@ pub async fn merge_delivery(
 }
 
 #[tauri::command]
-pub fn list_deliveries(
+pub async fn list_deliveries(
     store: State<'_, Database>,
     workspace_id: i64,
 ) -> Result<Vec<crate::delivery::Delivery>> {
@@ -896,7 +923,7 @@ pub fn list_deliveries(
 
 /// Como subir o projeto: o perfil do workspace, se foi confirmado e o que sugerir.
 #[tauri::command]
-pub fn get_profile(
+pub async fn get_profile(
     store: State<'_, Database>,
     workspace_id: i64,
 ) -> Result<super::preview::ProfileView> {
@@ -905,7 +932,7 @@ pub fn get_profile(
 
 /// Grava `.harnessy/workspace.toml` com o comando escolhido e o confirma.
 #[tauri::command]
-pub fn save_profile(
+pub async fn save_profile(
     store: State<'_, Database>,
     workspace_id: i64,
     run: String,
@@ -916,7 +943,7 @@ pub fn save_profile(
 
 /// Confirma o comando que o repositório já traz no perfil.
 #[tauri::command]
-pub fn approve_profile(
+pub async fn approve_profile(
     store: State<'_, Database>,
     workspace_id: i64,
 ) -> Result<super::preview::ProfileView> {
@@ -939,7 +966,7 @@ fn emit_preview(app: &AppHandle, event: run::preview::Event) {
 
 /// Sobe o projeto da run no worktree dela, com o comando que o usuário confirmou.
 #[tauri::command]
-pub fn start_preview(
+pub async fn start_preview(
     app: AppHandle,
     store: State<'_, Database>,
     previews: State<'_, run::preview::Previews>,
@@ -954,20 +981,20 @@ pub fn start_preview(
 }
 
 #[tauri::command]
-pub fn stop_preview(previews: State<'_, run::preview::Previews>, run_id: i64) -> Result<()> {
+pub async fn stop_preview(previews: State<'_, run::preview::Previews>, run_id: i64) -> Result<()> {
     previews.stop(run_id);
     Ok(())
 }
 
 /// Abre no navegador o endereço local que o ambiente informou.
 #[tauri::command]
-pub fn open_preview(previews: State<'_, run::preview::Previews>, run_id: i64) -> Result<()> {
+pub async fn open_preview(previews: State<'_, run::preview::Previews>, run_id: i64) -> Result<()> {
     previews.open(run_id)
 }
 
 /// Estado e últimas linhas do log do ambiente de uma run (a tela chega depois dos eventos).
 #[tauri::command]
-pub fn preview_snapshot(
+pub async fn preview_snapshot(
     previews: State<'_, run::preview::Previews>,
     run_id: i64,
 ) -> Result<(Option<run::preview::Info>, Vec<String>)> {
@@ -976,7 +1003,7 @@ pub fn preview_snapshot(
 
 /// Ambientes de teste vivos, para o quadro marcar quais tarefas estão no ar.
 #[tauri::command]
-pub fn list_previews(
+pub async fn list_previews(
     previews: State<'_, run::preview::Previews>,
 ) -> Result<Vec<run::preview::Info>> {
     Ok(previews.active())

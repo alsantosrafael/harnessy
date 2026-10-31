@@ -11,17 +11,17 @@ pub fn emit_change(app: &AppHandle, change: &Change) {
 }
 
 #[tauri::command]
-pub fn list_tasks(store: State<'_, Database>, workspace_id: i64) -> Result<Vec<Task>> {
+pub async fn list_tasks(store: State<'_, Database>, workspace_id: i64) -> Result<Vec<Task>> {
     super::list(&*store.connection()?, workspace_id)
 }
 
 #[tauri::command]
-pub fn save_task(store: State<'_, Database>, input: TaskInput) -> Result<Task> {
+pub async fn save_task(store: State<'_, Database>, input: TaskInput) -> Result<Task> {
     super::save(&*store.connection()?, &input)
 }
 
 #[tauri::command]
-pub fn move_task(
+pub async fn move_task(
     app: AppHandle,
     store: State<'_, Database>,
     task_id: i64,
@@ -35,13 +35,13 @@ pub fn move_task(
 }
 
 #[tauri::command]
-pub fn task_history(store: State<'_, Database>, task_id: i64) -> Result<Vec<TaskEvent>> {
+pub async fn task_history(store: State<'_, Database>, task_id: i64) -> Result<Vec<TaskEvent>> {
     super::history(&*store.connection()?, task_id)
 }
 
 /// Cria os passos confirmados de "Dividir em passos" como Tarefas encadeadas.
 #[tauri::command]
-pub fn create_steps(
+pub async fn create_steps(
     store: State<'_, Database>,
     workspace_id: i64,
     parent_id: i64,

@@ -10,6 +10,21 @@ Rodar localmente para testar a mudança (fatia 2a):
 - Painel **Ambiente de teste** na tarefa: estado em texto (Subindo…, No ar, Parado, Caiu com o código), endereço, **Abrir no navegador**, **Parar** / **Rodar de novo** e o log ao vivo, rolável por teclado.
 - O card mostra **No ar** enquanto o ambiente da tarefa está rodando.
 
+## Front [0.28.1] — 2026-10-31
+
+Clicar numa tarefa responde na hora (verificado no navegador com os comandos lentos simulados: o card selecionado e o esqueleto do detalhe aparecem em cerca de 20 ms, e o detalhe completo em cerca de 70 ms):
+
+- O **detalhe monta em segundo plano**: o card destaca no mesmo instante do clique e um esqueleto ocupa o lugar do detalhe até ele ficar pronto. O histórico também mostra esqueleto enquanto carrega.
+- O **prompt do agente só é montado quando você abre a seção** "Prompt que o agente receberá" (antes, a cada tarefa aberta, com vários comandos `git`).
+- **Feedback de clique no card**: cursor de mão, escurece e ganha borda âmbar ao pressionar, e o card selecionado ganha barra de acento à esquerda, contorno e fundo próprios. Respeita "Reduzir movimento".
+- A **barra de ações do card** (editar, excluir, mover) deixou de cobrir o título e de ser cortada pela rolagem da raia: ela flutua acima da borda do card.
+- O **seletor de agente, modelo e esforço** virou uma grade alinhada, com a ajuda em linha própria e rótulos curtos (Proporcional, Automático), sem texto cortado nem legenda sobre a linha divisória.
+
+## Back [0.25.1] — 2026-10-31
+
+- **Os comandos de dados deixam de rodar na thread que desenha a janela.** Todos os comandos IPC de tarefas, runs, workspaces, entrega, perfil, automação e preferências passaram a `async` (no Tauri 2, um comando síncrono roda na thread principal e congela a interface enquanto trabalha). A prévia do prompt, que roda cerca de 10 processos `git`, era o pior caso.
+- **O harness do projeto é guardado em cache por commit** (até 16 entradas): a prévia do prompt e o início de runs deixam de refazer a leitura enquanto o commit não muda. Novo `worktree::resolve_rev`.
+
 ## Front [0.28.0] — 2026-10-31
 
 - O padrão de **Quando revisar** passa a ser **Proporcional (recomendado)**, no lugar de "Sempre". Os rótulos do revisor dizem o que "Automático" faz (modelo e esforço pelo tamanho da mudança) e há uma frase de ajuda sob cada opção. Uma escolha já gravada no banco (por exemplo, "Sempre") **não é alterada**.

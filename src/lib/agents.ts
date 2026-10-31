@@ -78,7 +78,7 @@ export const effortName = (runtime: Runtime, id: string) =>
 export type ReviewWhen = "auto" | "always" | "never";
 
 export const reviewWhens: readonly { id: ReviewWhen; label: string }[] = [
-  { id: "auto", label: "Proporcional (recomendado)" },
+  { id: "auto", label: "Proporcional" },
   { id: "always", label: "Sempre" },
   { id: "never", label: "Nunca" },
 ];

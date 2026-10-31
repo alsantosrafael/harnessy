@@ -33,21 +33,26 @@
 
 /* Cards: o botão abre; o de avançar fica ao lado (botão dentro de botão não existe em HTML). */
 .kanban-card { position: relative; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-raised); transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease; }
-.kanban-card:hover { border-color: var(--neutral-400); }
-.kanban-card.is-selected { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
+.kanban-card:hover { border-color: var(--neutral-400); background: var(--surface-muted); }
+/* Selecionado: barra de acento à esquerda, contorno e fundo, para não haver dúvida do que foi clicado. */
+.kanban-card.is-selected { border-color: var(--focus); background: var(--surface-selected); box-shadow: inset 3px 0 0 var(--accent-hover), 0 0 0 1px var(--focus); }
+/* Resposta imediata ao pressionar (80 a 150 ms), sem mudar o tamanho do card no layout. */
+.kanban-card:active:not(.is-selected) { background: var(--surface-selected); border-color: var(--accent-hover); transform: scale(0.992); }
+.kanban-card { transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease, background-color var(--duration-fast) ease, transform 90ms ease-out; }
 .kanban-card[draggable="true"] { cursor: grab; }
 .kanban-card::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--amber-100); opacity: 0; pointer-events: none; }
 .kanban-card.is-flash::after { animation: flash 600ms ease-out; }
 .tone-done .kanban-card { color: var(--text-secondary); }
-.card-open { display: grid; gap: var(--space-2); width: 100%; padding: var(--space-3) var(--space-3) var(--space-3) var(--space-3); text-align: left; border: 0; border-radius: inherit; background: none; color: var(--text); overflow-wrap: anywhere; }
+.card-open { cursor: pointer; display: grid; gap: var(--space-2); width: 100%; padding: var(--space-3) var(--space-3) var(--space-3) var(--space-3); text-align: left; border: 0; border-radius: inherit; background: none; color: var(--text); overflow-wrap: anywhere; }
 .tone-done .card-open { color: var(--text-secondary); }
 .card-open:focus-visible, .card-tool:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
-.card-tools { position: absolute; top: var(--space-2); right: var(--space-2); display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-sm); background: var(--surface-raised); opacity: 0; transition: opacity var(--duration-fast) ease; }
-.kanban-card:hover .card-tools, .kanban-card:focus-within .card-tools { opacity: 1; }
-.card-tool { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid transparent; border-radius: var(--radius-sm); background: none; color: var(--text-secondary); }
+/* Barra de ações: flutua sobre a borda de cima do card, na faixa do padding, para nunca cobrir o título. */
+.card-tools { position: absolute; top: -20px; right: var(--space-2); z-index: 2; display: flex; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-raised); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08); opacity: 0; pointer-events: none; transition: opacity var(--duration-fast) ease; }
+.kanban-card:hover .card-tools, .kanban-card:focus-within .card-tools, .kanban-card.is-selected .card-tools { opacity: 1; pointer-events: auto; }
+.card-tool { display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid transparent; border-radius: var(--radius-sm); background: none; color: var(--text-secondary); }
 .card-tool:hover { background: var(--surface-selected); border-color: var(--border); color: var(--text); }
 .card-tool.is-danger:hover { color: var(--critical); border-color: var(--critical); }
-@media (hover: none) { .card-tools { opacity: 1; position: static; justify-content: flex-end; } }
+@media (hover: none) { .card-tools { opacity: 1; pointer-events: auto; position: static; justify-content: flex-end; border: 0; box-shadow: none; } }
 .card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--text-secondary); }
 .chip { padding: 1px 6px; border-radius: 4px; background: var(--surface-muted); border: 1px solid var(--border); font-weight: 600; font-variant-numeric: tabular-nums; }
 .chip.is-blocked { display: inline-flex; align-items: center; gap: 4px; border-color: var(--critical); color: var(--critical); background: var(--surface-raised); }
@@ -170,3 +175,12 @@
 .digest ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); }
 .digest-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .preview-hint { margin: 0; padding: var(--space-2) var(--space-3); border: 1px solid var(--amber-500); border-left-width: 4px; border-radius: var(--radius-sm); background: var(--amber-100); color: var(--text); font-size: var(--text-sm); }
+
+/* Esqueletos: o clique responde antes de o conteúdo chegar. */
+.skeleton-line { height: 12px; width: 100%; }
+.skeleton-block { height: 88px; }
+.skeleton-stack { display: grid; gap: var(--space-2); margin-bottom: var(--space-3); }
+@media (prefers-reduced-motion: reduce) { .kanban-card:active:not(.is-selected) { transform: none; } }
+/* Folga no topo da lista: a barra de ações do primeiro card sai pela borda e não pode ser cortada
+   pela rolagem da raia (sem somar espaço: a margem negativa devolve o que o padding tomou). */
+.lane-cards { padding-top: 20px; margin-top: -17px; }

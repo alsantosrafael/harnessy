@@ -85,7 +85,7 @@ function AgentFields({ id, runtime, model, effort, auto, onChange, onEffort }: A
             value={model}
             onChange={(event) => onChange(runtime, event.target.value)}
           >
-            {auto && <option value="">Automático (pelo tamanho da mudança)</option>}
+            {auto && <option value="">Automático</option>}
             {agent?.models.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.label}
@@ -99,7 +99,6 @@ function AgentFields({ id, runtime, model, effort, auto, onChange, onEffort }: A
         <select
           id={`${id}-effort`}
           value={effort}
-          aria-describedby={`${id}-effort-help`}
           onChange={(event) => onEffort(event.target.value)}
         >
           <option value="">{auto ? "Automático" : "Padrão"}</option>
@@ -109,11 +108,6 @@ function AgentFields({ id, runtime, model, effort, auto, onChange, onEffort }: A
             </option>
           ))}
         </select>
-        <small id={`${id}-effort-help`} className="muted">
-          {auto
-            ? "Automático: baixo em mudanças pequenas, o padrão nas demais."
-            : "Mais esforço pensa mais, custa mais e demora mais."}
-        </small>
       </label>
     </>
   );
@@ -142,6 +136,7 @@ export function AgentPicker({ choice, onChange, compact, defaultOpen = false }: 
           }
           onEffort={(effort) => onChange({ ...choice, effort })}
         />
+        <p className="picker-help">Mais esforço pensa mais, custa mais e demora mais.</p>
       </fieldset>
       {!compact && (
         <fieldset>
@@ -161,13 +156,6 @@ export function AgentPicker({ choice, onChange, compact, defaultOpen = false }: 
                 </option>
               ))}
             </select>
-            <small className="muted">
-              {choice.reviewWhen === "auto"
-                ? "Pula mudança pequena e sem risco (como só documentação); usa modelo e esforço maiores só em mudança grande ou delicada."
-                : choice.reviewWhen === "always"
-                  ? "Revisa toda run, mesmo uma linha de texto."
-                  : "Não revisa sozinho; use Revisar agora quando quiser."}
-            </small>
           </label>
           {choice.reviewWhen !== "never" && (
             <AgentFields
@@ -187,6 +175,13 @@ export function AgentPicker({ choice, onChange, compact, defaultOpen = false }: 
               onEffort={(reviewerEffort) => onChange({ ...choice, reviewerEffort })}
             />
           )}
+          <p className="picker-help">
+            {choice.reviewWhen === "auto"
+              ? "Proporcional (recomendado): pula mudança pequena e sem risco, como só documentação. Em Automático, o modelo e o esforço seguem o tamanho da mudança: menores nas pequenas, maiores nas grandes ou delicadas."
+              : choice.reviewWhen === "always"
+                ? "Revisa toda run, mesmo uma linha de texto."
+                : "Não revisa sozinho; use Revisar agora quando quiser."}
+          </p>
         </fieldset>
       )}
     </details>

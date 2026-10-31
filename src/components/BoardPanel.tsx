@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import {
   type Attention,
@@ -51,7 +51,7 @@ import { ChangesPanel } from "./ChangesPanel";
 import { PreviewPanel } from "./PreviewPanel";
 import { PreviewSetup } from "./PreviewSetup";
 import { QuickActions } from "./QuickActions";
-import { TaskDetail } from "./TaskDetail";
+import { TaskDetail, TaskDetailSkeleton } from "./TaskDetail";
 import { WorkspaceForm } from "./WorkspaceForm";
 import "../styles/local-work.css";
 import "../styles/run-board.css";
@@ -176,6 +176,9 @@ export function BoardPanel({
     [tasks, filter, attention, stages, working],
   );
   const selected = tasks.find((task) => task.id === selectedId) ?? null;
+  // O card destaca no mesmo instante do clique; o detalhe (mais pesado) monta logo depois, atrás de um esqueleto.
+  const detailId = useDeferredValue(selectedId);
+  const detailPending = detailId !== selectedId;
 
   // O detalhe fica embaixo do quadro: ao escolher uma tarefa, leva a tela até ele.
   useEffect(() => {
@@ -904,33 +907,37 @@ export function BoardPanel({
                   />
                 ) : null;
               })()}
-              <TaskDetail
-                key={selected.id}
-                task={selected}
-                historyTick={historyTick}
-                block={blocked.get(selected.id)}
-                chainFrom={chainBase(selected, runs)}
-                previousTitle={
-                  tasks.find((item) => item.id === selected.afterId)?.title ?? "passo anterior"
-                }
-                choice={choice}
-                onChoice={onChoice}
-                canStart={startable}
-                starting={starting}
-                onMove={move}
-                onSaved={(saved) =>
-                  setTasks((current) =>
-                    current.map((item) => (item.id === saved.id ? saved : item)),
-                  )
-                }
-                onStart={start}
-                onResolve={resolve}
-                implementIsNext={!selectedWork || next?.id === "implement"}
-                onDirty={setDirty}
-                onClose={() => select(null)}
-                useChain={useChain}
-                onUseChain={setUseChain}
-              />
+              {detailPending ? (
+                <TaskDetailSkeleton />
+              ) : (
+                <TaskDetail
+                  key={selected.id}
+                  task={selected}
+                  historyTick={historyTick}
+                  block={blocked.get(selected.id)}
+                  chainFrom={chainBase(selected, runs)}
+                  previousTitle={
+                    tasks.find((item) => item.id === selected.afterId)?.title ?? "passo anterior"
+                  }
+                  choice={choice}
+                  onChoice={onChoice}
+                  canStart={startable}
+                  starting={starting}
+                  onMove={move}
+                  onSaved={(saved) =>
+                    setTasks((current) =>
+                      current.map((item) => (item.id === saved.id ? saved : item)),
+                    )
+                  }
+                  onStart={start}
+                  onResolve={resolve}
+                  implementIsNext={!selectedWork || next?.id === "implement"}
+                  onDirty={setDirty}
+                  onClose={() => select(null)}
+                  useChain={useChain}
+                  onUseChain={setUseChain}
+                />
+              )}
               {!startable && agentReady && (
                 <p className="muted">Já existe uma run ativa neste workspace.</p>
               )}

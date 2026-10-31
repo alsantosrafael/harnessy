@@ -6,12 +6,12 @@ use super::Workspace;
 use crate::{db::Database, error::Result};
 
 #[tauri::command]
-pub fn list_workspaces(store: State<'_, Database>) -> Result<Vec<Workspace>> {
+pub async fn list_workspaces(store: State<'_, Database>) -> Result<Vec<Workspace>> {
     super::list(&*store.connection()?)
 }
 
 #[tauri::command]
-pub fn create_workspace(
+pub async fn create_workspace(
     store: State<'_, Database>,
     name: String,
     folder: String,
