@@ -1,10 +1,12 @@
 import { mergeBlocker } from "./delivery";
-import type { Delivery, LocalTask, Run } from "./desktop";
+import type { Delivery, LocalTask, PreviewInfo, Run } from "./desktop";
+import { isLive } from "./preview";
 import { isActive, reviewable } from "./runs";
 
 export type QuickId =
   | "implement"
   | "review"
+  | "preview"
   | "publish"
   | "merge"
   | "conversation"
@@ -31,6 +33,8 @@ interface Input {
   /** Run que carrega o trabalho (a mais recente com branch) e o PR dela, se já existir. */
   workRun?: Run | null;
   delivery?: Delivery | null;
+  /** Ambiente de teste da run que carrega o trabalho, se já foi ligado. */
+  preview?: PreviewInfo | null;
 }
 
 /** Comandos rápidos da tarefa, com o motivo de cada indisponibilidade. */
@@ -42,6 +46,7 @@ export function quickStates({
   dirty,
   workRun = null,
   delivery = null,
+  preview = null,
 }: Input): QuickState[] {
   const busy = starting || (lastRun !== null && isActive(lastRun));
   const states: QuickState[] = [
@@ -66,6 +71,17 @@ export function quickStates({
           : canStart
             ? null
             : "Espere a run em andamento terminar.",
+    },
+    {
+      id: "preview",
+      label: isLive(preview) ? "Parar ambiente" : "Rodar localmente",
+      reason: !workRun
+        ? "Ainda não há run concluída com alterações."
+        : workRun.state !== "completed"
+          ? "A run não terminou com sucesso."
+          : busy
+            ? "Há uma run em andamento."
+            : null,
     },
     {
       id: "publish",

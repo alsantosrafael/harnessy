@@ -250,6 +250,39 @@ export const refreshDelivery = (runId: number) =>
 export const mergeDelivery = (runId: number) => localCall<Delivery>("merge_delivery", { runId });
 export const listDeliveries = (workspaceId: number) =>
   localCall<Delivery[]>("list_deliveries", { workspaceId });
+/** Como subir o projeto: o perfil do workspace e se o usuário já confirmou o comando. */
+export interface ProfileView {
+  exists: boolean;
+  run: string | null;
+  port: number | null;
+  approved: boolean;
+  /** Comando sugerido a partir do `package.json` quando não há perfil. */
+  suggestion: string | null;
+  error: string | null;
+}
+export const getProfile = (workspaceId: number) =>
+  localCall<ProfileView>("get_profile", { workspaceId });
+/** Grava `.harnessy/workspace.toml` com o comando escolhido e o confirma. */
+export const saveProfile = (workspaceId: number, run: string, port: number | null) =>
+  localCall<ProfileView>("save_profile", { workspaceId, run, port });
+/** Confirma o comando que o repositório já traz no perfil. */
+export const approveProfile = (workspaceId: number) =>
+  localCall<ProfileView>("approve_profile", { workspaceId });
+
+/** Ambiente de teste local de uma run. `url` é sempre `http://localhost:N`. */
+export interface PreviewInfo {
+  runId: number;
+  state: "starting" | "running" | "stopped" | "failed";
+  url: string | null;
+  exitCode: number | null;
+  startedAt: number;
+}
+export const startPreview = (runId: number) => localCall<PreviewInfo>("start_preview", { runId });
+export const stopPreview = (runId: number) => localCall<void>("stop_preview", { runId });
+export const openPreview = (runId: number) => localCall<void>("open_preview", { runId });
+export const previewSnapshot = (runId: number) =>
+  localCall<[PreviewInfo | null, string[]]>("preview_snapshot", { runId });
+export const listPreviews = () => localCall<PreviewInfo[]>("list_previews");
 export const cancelRun = (runId: number) => localCall<void>("cancel_run", { runId });
 /** Ciclo extra numa run que falhou, com o próximo modelo da lista (decidido pelo núcleo). */
 export const continueRun = (runId: number) => localCall<Run>("continue_run", { runId });
@@ -265,5 +298,9 @@ async function subscribe<T>(name: string, handler: (payload: T) => void): Promis
 export const onRunEvent = (handler: (event: RunEvent) => void) =>
   subscribe<RunEvent>("run-event", handler);
 export const onRunState = (handler: (run: Run) => void) => subscribe<Run>("run-state", handler);
+export const onPreviewState = (handler: (info: PreviewInfo) => void) =>
+  subscribe<PreviewInfo>("preview-state", handler);
+export const onPreviewLog = (handler: (log: { runId: number; line: string }) => void) =>
+  subscribe<{ runId: number; line: string }>("preview-log", handler);
 export const onTaskChanged = (handler: (change: TaskChange) => void) =>
   subscribe<TaskChange>("task-changed", handler);

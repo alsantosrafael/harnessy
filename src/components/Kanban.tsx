@@ -8,6 +8,7 @@ import {
   GitPullRequestDraft,
   HardDrive,
   LoaderCircle,
+  MonitorPlay,
   Pencil,
   Trash2,
   TriangleAlert,
@@ -51,6 +52,8 @@ interface Props {
   blocked: ReadonlyMap<number, Block>;
   /** Estágio de entrega (PR, checks, revisão) de cada tarefa que tem algo a mostrar. */
   stages: ReadonlyMap<number, Stage>;
+  /** Tarefas com o ambiente de teste no ar. */
+  testing: ReadonlySet<number>;
   /** Card recém-movido ou criado, destacado por um instante. */
   flashId: number | null;
   onSelect: (id: number) => void;
@@ -69,6 +72,7 @@ export function Kanban({
   working,
   blocked,
   stages,
+  testing,
   flashId,
   onSelect,
   onMove,
@@ -117,6 +121,7 @@ export function Kanban({
                 working={working.has(task.id)}
                 blocked={blocked.get(task.id)?.reason}
                 stage={stages.get(task.id)}
+                testing={testing.has(task.id)}
                 flash={flashId === task.id}
                 onSelect={onSelect}
                 onMove={onMove}
@@ -275,6 +280,7 @@ interface CardProps {
   working: boolean;
   blocked?: string;
   stage?: Stage;
+  testing: boolean;
   flash: boolean;
   onSelect: (id: number) => void;
   onMove: (id: number, to: TaskStatus) => void;
@@ -290,6 +296,7 @@ const KanbanCard = memo(function KanbanCard({
   working,
   blocked,
   stage,
+  testing,
   flash,
   onSelect,
   onMove,
@@ -335,6 +342,11 @@ const KanbanCard = memo(function KanbanCard({
             </span>
           )}
           {stage && <StageChip stage={stage} />}
+          {testing && (
+            <span className="chip stage-chip tone-success" title="O ambiente de teste está no ar.">
+              <MonitorPlay size={11} aria-hidden="true" /> No ar
+            </span>
+          )}
           {working && (
             <span className="card-working">
               <span className="pulse" aria-hidden="true" /> agente trabalhando

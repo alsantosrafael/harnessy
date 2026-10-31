@@ -3,6 +3,7 @@ import {
   Copy,
   GitMerge,
   GitPullRequest,
+  MonitorPlay,
   MessageSquare,
   Play,
   RotateCcw,
@@ -15,6 +16,7 @@ import type { QuickId, QuickState } from "../lib/quick";
 const icons: Record<QuickId, LucideIcon> = {
   implement: Play,
   review: SearchCheck,
+  preview: MonitorPlay,
   publish: GitPullRequest,
   merge: GitMerge,
   conversation: MessageSquare,

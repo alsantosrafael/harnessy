@@ -105,3 +105,26 @@ test("publishing needs a finished run with a branch; merging needs a safe PR", (
   });
   assert.match(String(by(failing).merge), /checks reprovados/);
 });
+
+test("running locally needs a finished run with changes and flips to stopping when live", () => {
+  const none = by(quickStates({ task: task("review"), lastRun: null, ...base }));
+  assert.match(String(none.preview), /Ainda não há run/);
+  const work = run({});
+  const off = quickStates({ task: task("review"), lastRun: work, workRun: work, ...base });
+  assert.equal(off.find((state) => state.id === "preview")?.label, "Rodar localmente");
+  assert.equal(by(off).preview, null);
+  const on = quickStates({
+    task: task("review"),
+    lastRun: work,
+    workRun: work,
+    preview: {
+      runId: 1,
+      state: "running",
+      url: "http://localhost:5173",
+      exitCode: null,
+      startedAt: 0,
+    },
+    ...base,
+  });
+  assert.equal(on.find((state) => state.id === "preview")?.label, "Parar ambiente");
+});

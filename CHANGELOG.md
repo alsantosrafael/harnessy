@@ -2,6 +2,14 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.21.0] — 2026-10-31
+
+Rodar localmente para testar a mudança (fatia 2a):
+
+- Novo comando rápido **Rodar localmente** (vira **Parar ambiente** quando está no ar). Sem `.harnessy/workspace.toml`, um diálogo pergunta o comando (já sugerido a partir do `package.json`) e a porta, grava o arquivo e sobe. Se o arquivo veio do repositório, mostra o comando e pede confirmação antes de rodar.
+- Painel **Ambiente de teste** na tarefa: estado em texto (Subindo…, No ar, Parado, Caiu com o código), endereço, **Abrir no navegador**, **Parar** / **Rodar de novo** e o log ao vivo, rolável por teclado.
+- O card mostra **No ar** enquanto o ambiente da tarefa está rodando.
+
 ## Back [0.19.0] — 2026-10-31
 
 Ambiente de teste local (fatia 2a):

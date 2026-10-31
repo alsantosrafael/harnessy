@@ -2,13 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { applyChange, applyMove, blockedByTask, groupByStatus, statusName } from "../lib/board";
 import {
+  approveProfile,
   deleteTask,
+  getProfile,
   listDeliveries,
   listTasks,
   mergeDelivery,
   moveTask,
+  openPreview,
   publishRun,
   refreshDelivery,
+  saveProfile,
+  startPreview,
+  stopPreview,
   type Delivery,
   resolveBlock,
   reviewRun,
@@ -20,11 +26,15 @@ import {
 } from "../lib/desktop";
 import type { AgentChoice } from "../lib/agents";
 import { deliveryOf, needsRefresh, stagesByTask, workRun } from "../lib/delivery";
+import { isLive } from "../lib/preview";
 import { canStartRun, chainBase, isActive } from "../lib/runs";
+import { usePreviews } from "../lib/usePreviews";
 import type { RunsState } from "../lib/useRuns";
 import { quickStates, type QuickId } from "../lib/quick";
 import { type Confirmation, ConfirmDialog } from "./ConfirmDialog";
 import { Kanban, KanbanSkeleton, type NewTaskDraft } from "./Kanban";
+import { PreviewPanel } from "./PreviewPanel";
+import { PreviewSetup } from "./PreviewSetup";
 import { QuickActions } from "./QuickActions";
 import { TaskDetail } from "./TaskDetail";
 import { WorkspaceForm } from "./WorkspaceForm";
@@ -82,6 +92,12 @@ export function BoardPanel({
   const [tasks, setTasks] = useState<LocalTask[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [delivering, setDelivering] = useState(false);
+  const previews = usePreviews();
+  const [setup, setSetup] = useState<{
+    runId: number;
+    suggestion: string;
+    error: string | null;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [flashId, setFlashId] = useState<number | null>(null);
@@ -109,6 +125,14 @@ export function BoardPanel({
   const groups = useMemo(() => groupByStatus(tasks), [tasks]);
   const working = useMemo(() => new Set(runs.filter(isActive).map((run) => run.taskId)), [runs]);
   const blocked = useMemo(() => blockedByTask(runs, tasks), [runs, tasks]);
+  const testing = useMemo(() => {
+    const ids = new Set<number>();
+    for (const task of tasks) {
+      const work = workRun(runs, task.id);
+      if (work && previews.infos[work.id]?.state === "running") ids.add(task.id);
+    }
+    return ids;
+  }, [tasks, runs, previews.infos]);
   const stages = useMemo(() => stagesByTask(tasks, runs, deliveries), [tasks, runs, deliveries]);
   const selected = tasks.find((task) => task.id === selectedId) ?? null;
 
@@ -367,6 +391,13 @@ export function BoardPanel({
       case "review":
         if (last) void review(last.id);
         break;
+      case "preview": {
+        const work = workRun(runs, selected.id);
+        if (!work) break;
+        if (isLive(previews.infos[work.id])) void stopPreview(work.id).catch(fail);
+        else void runPreview(work.id);
+        break;
+      }
       case "publish": {
         const work = workRun(runs, selected.id);
         if (work) void publish(work.id);
@@ -405,6 +436,46 @@ export function BoardPanel({
         move(selected.id, "todo");
         break;
     }
+  }
+
+  const fail = (cause: unknown) => setError(message(cause));
+
+  /** Rodar localmente: pede o comando se faltar, confirma o texto do repositório, e sobe. */
+  async function runPreview(runId: number) {
+    if (workspaceId === null) return;
+    try {
+      const profile = await getProfile(workspaceId);
+      if (!profile.exists) {
+        setSetup({ runId, suggestion: profile.suggestion ?? "", error: profile.error });
+        return;
+      }
+      if (!profile.approved) {
+        setConfirmation({
+          title: `Rodar “${profile.run}”?`,
+          body: "Este comando está em .harnessy/workspace.toml e vai rodar neste computador, na pasta da run. Confirme só se você o reconhece.",
+          confirmLabel: "Confirmar e rodar",
+          onConfirm: () =>
+            approveProfile(workspaceId)
+              .then(() => startPreview(runId))
+              .then(() => previews.load(runId))
+              .catch(fail),
+        });
+        return;
+      }
+      await startPreview(runId);
+      await previews.load(runId);
+    } catch (cause) {
+      fail(cause);
+    }
+  }
+
+  async function saveSetup(run: string, port: number | null) {
+    if (workspaceId === null || !setup) return;
+    const { runId } = setup;
+    await saveProfile(workspaceId, run, port);
+    setSetup(null);
+    await startPreview(runId).catch(fail);
+    await previews.load(runId).catch(fail);
   }
 
   /** Executa uma ação de entrega com feedback; o erro vem do núcleo, já em português. */
@@ -558,6 +629,7 @@ export function BoardPanel({
                 working={working}
                 blocked={blocked}
                 stages={stages}
+                testing={testing}
                 flashId={flashId}
                 onSelect={select}
                 onMove={move}
@@ -599,6 +671,7 @@ export function BoardPanel({
                 dirty,
                 workRun: workRun(runs, selected.id),
                 delivery: deliveryOf(deliveries, workRun(runs, selected.id)),
+                preview: previews.infos[workRun(runs, selected.id)?.id ?? -1] ?? null,
               })}
               onRun={quick}
               onDelete={() => remove(selected.id)}
@@ -610,6 +683,20 @@ export function BoardPanel({
               className="detail-panel"
               aria-label={`Detalhes da tarefa #${selected.id}`}
             >
+              {(() => {
+                const work = workRun(runs, selected.id);
+                const info = work ? previews.infos[work.id] : undefined;
+                return work && info ? (
+                  <PreviewPanel
+                    taskId={selected.id}
+                    info={info}
+                    log={previews.logs[work.id] ?? []}
+                    onOpen={() => void openPreview(work.id).catch(fail)}
+                    onStop={() => void stopPreview(work.id).catch(fail)}
+                    onRestart={() => void runPreview(work.id)}
+                  />
+                ) : null;
+              })()}
               <TaskDetail
                 key={selected.id}
                 task={selected}
@@ -643,6 +730,7 @@ export function BoardPanel({
           )}
         </div>
       )}
+      <PreviewSetup open={setup} onClose={() => setSetup(null)} onSave={saveSetup} />
       <ConfirmDialog ask={confirmation} onClose={() => setConfirmation(null)} />
     </section>
   );
