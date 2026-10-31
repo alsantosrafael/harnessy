@@ -95,3 +95,19 @@
   
   .kanban-card.is-flash::after { animation: none; }
 }
+
+/* Estágio de entrega: ícone e texto dizem o estado; a cor só reforça (borda e ícone, nunca o texto). */
+.stage-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--surface-raised); color: var(--text); --stage: var(--neutral-400); border-color: var(--stage); }
+.stage-chip svg { color: var(--stage); flex-shrink: 0; }
+.stage-chip.tone-info, .lane-summary .tone-info { --stage: var(--in-progress); }
+.stage-chip.tone-warn, .lane-summary .tone-warn { --stage: var(--amber-500); }
+.stage-chip.tone-critical, .lane-summary .tone-critical { --stage: var(--critical); }
+.stage-chip.tone-success, .lane-summary .tone-success { --stage: var(--positive); }
+.stage-chip.tone-critical { color: var(--critical); }
+.lane-summary { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); margin: 0; padding: 0 var(--space-1); list-style: none; font-size: var(--text-xs); color: var(--text-secondary); }
+.lane-summary li { --stage: var(--neutral-400); display: inline-flex; align-items: center; gap: 4px; }
+.lane-summary li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--stage); }
+.lane-summary strong { font-variant-numeric: tabular-nums; color: var(--text); }
+.is-spinning { animation: spin 1.1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .is-spinning { animation: none; } }

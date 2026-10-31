@@ -8,6 +8,7 @@ mod action;
 mod app;
 mod connections;
 mod db;
+mod delivery;
 mod error;
 mod flow;
 mod process;
@@ -35,6 +36,10 @@ pub fn run() {
             flow::commands::resolve_block,
             flow::commands::delete_task,
             flow::commands::review_run,
+            flow::commands::publish_run,
+            flow::commands::refresh_delivery,
+            flow::commands::merge_delivery,
+            flow::commands::list_deliveries,
             flow::commands::list_actions,
             run::commands::list_runs,
             run::commands::list_run_events,

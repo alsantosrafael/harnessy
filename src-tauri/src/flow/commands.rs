@@ -710,3 +710,108 @@ fn sync_task(app: &AppHandle, run: &Run) {
         emit_change(app, &change);
     }
 }
+
+/// Binários e pasta para falar com o GitHub em nome de uma run; falha com a frase certa.
+fn delivery_tools(
+    store: &Database,
+    run_id: i64,
+) -> Result<(PathBuf, PathBuf, Vec<PathBuf>, PathBuf)> {
+    let folder = {
+        let db = store.connection()?;
+        let run = run::get(&db, run_id)?;
+        workspace::get(&db, run.workspace_id)?.folder
+    };
+    process::wait_for_login_path();
+    let dirs = process::search_dirs();
+    let git = process::find_binary("git", &dirs)
+        .ok_or(AppError::Validation("git não encontrado neste computador."))?;
+    let gh = process::find_binary("gh", &dirs).ok_or(AppError::Validation(
+        "GitHub CLI (gh) não encontrado. Veja Conexões.",
+    ))?;
+    Ok((git, gh, dirs, PathBuf::from(folder)))
+}
+
+/// Registra na conversa da run o que o Harnessy fez no GitHub.
+fn note_delivery(app: &AppHandle, run_id: i64, text: &str) {
+    let store = app.state::<Database>();
+    let _ = store
+        .connection()
+        .and_then(|db| run::append_event(&db, run_id, "status", text));
+}
+
+/// Envia a branch da run e abre o PR em draft (ou adota o que já existe).
+#[tauri::command]
+pub async fn publish_run(
+    app: AppHandle,
+    store: State<'_, Database>,
+    run_id: i64,
+) -> Result<crate::delivery::Delivery> {
+    let (git, gh, dirs, repo) = delivery_tools(&store, run_id)?;
+    let tools = run::publish::Tools {
+        git: &git,
+        gh: &gh,
+        dirs: &dirs,
+        repo: &repo,
+    };
+    let result = super::delivery::publish(&store, &tools, &git, run_id)?;
+    note_delivery(
+        &app,
+        run_id,
+        &format!(
+            "PR #{} publicado como draft: {}",
+            result.pr_number, result.pr_url
+        ),
+    );
+    Ok(result)
+}
+
+/// Relê o PR no GitHub (checks, conflitos, merge feito por fora).
+#[tauri::command]
+pub async fn refresh_delivery(
+    app: AppHandle,
+    store: State<'_, Database>,
+    run_id: i64,
+) -> Result<crate::delivery::Delivery> {
+    let (git, gh, dirs, repo) = delivery_tools(&store, run_id)?;
+    let tools = run::publish::Tools {
+        git: &git,
+        gh: &gh,
+        dirs: &dirs,
+        repo: &repo,
+    };
+    let (result, change) = super::delivery::refresh(&store, &tools, run_id)?;
+    if let Some(change) = change {
+        emit_change(&app, &change);
+    }
+    Ok(result)
+}
+
+/// Merge (squash) do PR da run, só com o PR seguro; a tarefa vai para Concluído.
+#[tauri::command]
+pub async fn merge_delivery(
+    app: AppHandle,
+    store: State<'_, Database>,
+    run_id: i64,
+) -> Result<crate::delivery::Delivery> {
+    let (git, gh, dirs, repo) = delivery_tools(&store, run_id)?;
+    let tools = run::publish::Tools {
+        git: &git,
+        gh: &gh,
+        dirs: &dirs,
+        repo: &repo,
+    };
+    let (result, change) = super::delivery::merge(&store, &tools, run_id)?;
+    note_delivery(&app, run_id, &format!("PR #{} mergeado.", result.pr_number));
+    if let Some(change) = change {
+        emit_change(&app, &change);
+    }
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn list_deliveries(
+    store: State<'_, Database>,
+    workspace_id: i64,
+) -> Result<Vec<crate::delivery::Delivery>> {
+    super::delivery::list(&*store.connection()?, workspace_id)
+}

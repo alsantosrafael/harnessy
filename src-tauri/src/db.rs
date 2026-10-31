@@ -160,6 +160,21 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE runs ADD COLUMN reviewer_model TEXT;
     ALTER TABLE runs ADD COLUMN review_when TEXT CHECK (review_when IS NULL OR review_when IN ('auto', 'always', 'never'));
 ",
+    "
+    CREATE TABLE deliveries (
+        run_id INTEGER PRIMARY KEY REFERENCES runs(id),
+        pr_number INTEGER NOT NULL,
+        pr_url TEXT NOT NULL,
+        state TEXT NOT NULL CHECK (state IN ('open', 'merged', 'closed')),
+        draft INTEGER NOT NULL DEFAULT 1,
+        head_sha TEXT,
+        checks TEXT NOT NULL DEFAULT 'none' CHECK (checks IN ('none', 'pending', 'passing', 'failing')),
+        mergeable TEXT NOT NULL DEFAULT 'unknown' CHECK (mergeable IN ('unknown', 'mergeable', 'conflicting')),
+        reviewed_sha TEXT,
+        published_at INTEGER NOT NULL,
+        merged_at INTEGER
+    );
+",
 ];
 
 /// Segundos desde a época Unix; `0` se o relógio estiver antes dela.

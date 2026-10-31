@@ -1,7 +1,16 @@
-import type { LocalTask, Run } from "./desktop";
+import { mergeBlocker } from "./delivery";
+import type { Delivery, LocalTask, Run } from "./desktop";
 import { isActive, reviewable } from "./runs";
 
-export type QuickId = "implement" | "review" | "conversation" | "branch" | "finish" | "reopen";
+export type QuickId =
+  | "implement"
+  | "review"
+  | "publish"
+  | "merge"
+  | "conversation"
+  | "branch"
+  | "finish"
+  | "reopen";
 
 export interface QuickState {
   id: QuickId;
@@ -19,10 +28,21 @@ interface Input {
   starting: boolean;
   /** A tarefa tem edições não salvas: o agente leria o texto antigo. */
   dirty: boolean;
+  /** Run que carrega o trabalho (a mais recente com branch) e o PR dela, se já existir. */
+  workRun?: Run | null;
+  delivery?: Delivery | null;
 }
 
 /** Comandos rápidos da tarefa, com o motivo de cada indisponibilidade. */
-export function quickStates({ task, lastRun, canStart, starting, dirty }: Input): QuickState[] {
+export function quickStates({
+  task,
+  lastRun,
+  canStart,
+  starting,
+  dirty,
+  workRun = null,
+  delivery = null,
+}: Input): QuickState[] {
   const busy = starting || (lastRun !== null && isActive(lastRun));
   const states: QuickState[] = [
     {
@@ -46,6 +66,24 @@ export function quickStates({ task, lastRun, canStart, starting, dirty }: Input)
           : canStart
             ? null
             : "Espere a run em andamento terminar.",
+    },
+    {
+      id: "publish",
+      label: delivery ? "Atualizar PR" : "Publicar PR",
+      reason: !workRun
+        ? "Ainda não há run concluída com alterações."
+        : workRun.state !== "completed"
+          ? "A run não terminou com sucesso."
+          : busy
+            ? "Há uma run em andamento."
+            : delivery?.state === "merged"
+              ? "O PR já foi mesclado."
+              : null,
+    },
+    {
+      id: "merge",
+      label: "Fazer merge",
+      reason: busy ? "Há uma run em andamento." : mergeBlocker(workRun, delivery),
     },
     {
       id: "conversation",

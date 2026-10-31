@@ -2,6 +2,25 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.20.0] — 2026-10-31
+
+O quadro passa a mostrar a entrega de cada tarefa:
+
+- Cada card em **Revisão** ganha um selo de estágio, com ícone e texto: **Só local**, **PR em draft**, **PR aberto**, **Checks rodando**, **Checks falhando**, **Conflito**, **Mudanças pedidas**, **Pronto para merge**, **Mergeado** ou **PR fechado**. O tooltip e o leitor de tela dizem o que está acontecendo e qual é a próxima ação.
+- O cabeçalho de cada raia resume os estágios, com o que pede ação primeiro (por exemplo, "1 Checks falhando · 2 Pronto para merge").
+- Novos comandos rápidos **Publicar PR** (vira **Atualizar PR** depois) e **Fazer merge**, que pede confirmação e explica o motivo quando está indisponível.
+- Os PRs abertos são relidos no GitHub ao voltar para a janela e a cada 90 segundos. Uma mudança de estágio é anunciada para leitor de tela sem mover o foco. O ícone de "checks rodando" respeita `prefers-reduced-motion`.
+
+## Back [0.17.0] — 2026-10-31
+
+Entrega de uma run como PR (fatia 1; a interface vem na sequência):
+
+- Novo domínio `delivery` e tabela `deliveries` (migração nova): PR da run, estado, draft, checks, conflitos e o SHA que a revisão aprovou.
+- Comandos `publish_run`, `refresh_delivery`, `merge_delivery` e `list_deliveries`. Publicar verifica o diff (recusa diff vazio e arquivos que parecem segredos), faz `git push` sem force e sem hooks, abre o PR **em draft** com tarefa, critérios, contraprova e revisão no corpo, e não duplica se já existir um PR da branch.
+- O merge é squash, só se o PR estiver aberto, sem checks reprovados ou pendentes, sem conflito e sem revisão pedindo mudanças; usa `--match-head-commit`, então só mescla o commit que acabou de ser lido. Ao mesclar, a tarefa vai para Concluído.
+- Os comandos são assíncronos e não seguram o banco durante a chamada de rede.
+- Um novo commit no PR invalida a aprovação da revisão (`reviewed_sha` ≠ `head_sha`).
+
 ## Front [0.19.0] — 2026-10-31
 
 - A criação de tarefa na raia **A fazer** ganhou um formulário mais claro: o campo **Título** (com o botão **Criar**) e, embaixo, **+ Descrição e critérios** abre descrição e critérios de aceite opcionais no mesmo lugar. Uma linha diz que só o título basta e que o resto pode vir depois. Ctrl/⌘+Enter cria a partir da descrição ou dos critérios.

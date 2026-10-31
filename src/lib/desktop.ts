@@ -226,6 +226,30 @@ export const reviewRun = (runId: number, choice: AgentChoice) =>
     reviewer: choice.reviewer,
     reviewerModel: choice.reviewerModel,
   });
+/** PR de uma run, como o núcleo o conhece; `checks` e `mergeable` vêm do GitHub. */
+export interface Delivery {
+  runId: number;
+  prNumber: number;
+  prUrl: string;
+  state: "open" | "merged" | "closed";
+  draft: boolean;
+  headSha: string | null;
+  checks: "none" | "pending" | "passing" | "failing";
+  mergeable: "unknown" | "mergeable" | "conflicting";
+  /** SHA que a revisão aprovou; só vale se for igual a `headSha`. */
+  reviewedSha: string | null;
+  publishedAt: number;
+  mergedAt: number | null;
+}
+/** Envia a branch da run e abre o PR em draft (ou adota o que já existe). */
+export const publishRun = (runId: number) => localCall<Delivery>("publish_run", { runId });
+/** Relê o PR no GitHub: checks, conflitos e merge feito por fora. */
+export const refreshDelivery = (runId: number) =>
+  localCall<Delivery>("refresh_delivery", { runId });
+/** Squash merge do PR da run, só com o PR seguro; a tarefa vai para Concluído. */
+export const mergeDelivery = (runId: number) => localCall<Delivery>("merge_delivery", { runId });
+export const listDeliveries = (workspaceId: number) =>
+  localCall<Delivery[]>("list_deliveries", { workspaceId });
 export const cancelRun = (runId: number) => localCall<void>("cancel_run", { runId });
 /** Ciclo extra numa run que falhou, com o próximo modelo da lista (decidido pelo núcleo). */
 export const continueRun = (runId: number) => localCall<Run>("continue_run", { runId });

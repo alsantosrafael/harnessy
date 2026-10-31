@@ -3,8 +3,13 @@ import { Plus } from "lucide-react";
 import { applyChange, applyMove, blockedByTask, groupByStatus, statusName } from "../lib/board";
 import {
   deleteTask,
+  listDeliveries,
   listTasks,
+  mergeDelivery,
   moveTask,
+  publishRun,
+  refreshDelivery,
+  type Delivery,
   resolveBlock,
   reviewRun,
   onTaskChanged,
@@ -14,6 +19,7 @@ import {
   saveTask,
 } from "../lib/desktop";
 import type { AgentChoice } from "../lib/agents";
+import { deliveryOf, needsRefresh, stagesByTask, workRun } from "../lib/delivery";
 import { canStartRun, chainBase, isActive } from "../lib/runs";
 import type { RunsState } from "../lib/useRuns";
 import { quickStates, type QuickId } from "../lib/quick";
@@ -28,6 +34,8 @@ import "../styles/run-board.css";
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const FLASH_MS = 700;
 const UNDO_MS = 5_000;
+/** O GitHub muda por fora (checks, conflitos, merge): reler os PRs abertos de tempos em tempos. */
+const PR_POLL_MS = 90_000;
 
 interface Notice {
   text: string;
@@ -72,6 +80,8 @@ export function BoardPanel({
 }: Props) {
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [tasks, setTasks] = useState<LocalTask[]>([]);
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [delivering, setDelivering] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [flashId, setFlashId] = useState<number | null>(null);
@@ -86,6 +96,9 @@ export function BoardPanel({
 
   // Refs deixam `move`/`select` estáveis, para os cards memoizados não re-renderizarem.
   const tasksRef = useRef(tasks);
+  const deliveriesRef = useRef(deliveries);
+  deliveriesRef.current = deliveries;
+  const stagesRef = useRef<ReturnType<typeof stagesByTask>>(new Map());
   tasksRef.current = tasks;
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
@@ -96,6 +109,7 @@ export function BoardPanel({
   const groups = useMemo(() => groupByStatus(tasks), [tasks]);
   const working = useMemo(() => new Set(runs.filter(isActive).map((run) => run.taskId)), [runs]);
   const blocked = useMemo(() => blockedByTask(runs, tasks), [runs, tasks]);
+  const stages = useMemo(() => stagesByTask(tasks, runs, deliveries), [tasks, runs, deliveries]);
   const selected = tasks.find((task) => task.id === selectedId) ?? null;
 
   // O detalhe fica embaixo do quadro: ao escolher uma tarefa, leva a tela até ele.
@@ -242,6 +256,55 @@ export function BoardPanel({
     };
   }, [workspaceId, refreshKey]);
 
+  // Os PRs vêm do banco local e são relidos quando as runs mudam.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `runs` e `refreshKey` são gatilhos de recarga.
+  useEffect(() => {
+    if (workspaceId === null) return;
+    let alive = true;
+    listDeliveries(workspaceId)
+      .then((rows) => alive && setDeliveries(rows))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [workspaceId, runs, refreshKey]);
+
+  // Checks, conflitos e merge acontecem no GitHub: relê os PRs abertos ao voltar para a janela e a cada 90 s.
+  useEffect(() => {
+    if (hidden || workspaceId === null) return;
+    let busy = false;
+    const sync = async () => {
+      if (busy || document.visibilityState !== "visible") return;
+      const open = deliveriesRef.current.filter(needsRefresh);
+      if (open.length === 0) return;
+      busy = true;
+      // Sem `gh` ou sem rede o selo só fica como estava; o erro aparece nas ações manuais.
+      await Promise.allSettled(open.map((item) => refreshDelivery(item.runId)));
+      const rows = await listDeliveries(workspaceId).catch(() => null);
+      if (rows) setDeliveries(rows);
+      busy = false;
+    };
+    const timer = window.setInterval(sync, PR_POLL_MS);
+    window.addEventListener("focus", sync);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", sync);
+    };
+  }, [hidden, workspaceId]);
+
+  // Quem observa o quadro por leitor de tela ouve quando um estágio muda, sem perder o foco.
+  useEffect(() => {
+    const before = stagesRef.current;
+    for (const [taskId, stage] of stages) {
+      const was = before.get(taskId);
+      if (was && was.id !== stage.id) {
+        setLive(`Tarefa #${taskId}: ${stage.label}. ${stage.hint}`);
+        break;
+      }
+    }
+    stagesRef.current = stages;
+  }, [stages]);
+
   // `n` leva ao campo de nova tarefa, como em qualquer lista com atalhos.
   useEffect(() => {
     if (hidden) return;
@@ -304,6 +367,23 @@ export function BoardPanel({
       case "review":
         if (last) void review(last.id);
         break;
+      case "publish": {
+        const work = workRun(runs, selected.id);
+        if (work) void publish(work.id);
+        break;
+      }
+      case "merge": {
+        const work = workRun(runs, selected.id);
+        if (!work) break;
+        const pr = deliveryOf(deliveries, work);
+        setConfirmation({
+          title: `Fazer merge do PR #${pr?.prNumber ?? ""}?`,
+          body: `"${selected.title}" será mesclada na branch base com squash e a tarefa vai para Concluído. O Harnessy só mescla o commit que você está vendo agora.`,
+          confirmLabel: "Fazer merge",
+          onConfirm: () => void merge(work.id),
+        });
+        break;
+      }
       case "conversation":
         if (last) runsState.open(last.id);
         onOpenRun();
@@ -326,6 +406,37 @@ export function BoardPanel({
         break;
     }
   }
+
+  /** Executa uma ação de entrega com feedback; o erro vem do núcleo, já em português. */
+  async function deliver(action: () => Promise<Delivery>, done: (result: Delivery) => string) {
+    setDelivering(true);
+    try {
+      const result = await action();
+      setDeliveries((current) => [
+        ...current.filter((item) => item.runId !== result.runId),
+        result,
+      ]);
+      say({ text: done(result) });
+    } catch (cause) {
+      setError(message(cause));
+    } finally {
+      setDelivering(false);
+    }
+  }
+
+  const publish = (runId: number) =>
+    deliver(
+      () =>
+        deliveries.some((item) => item.runId === runId)
+          ? refreshDelivery(runId)
+          : publishRun(runId),
+      (result) => `PR #${result.prNumber} ${result.draft ? "em draft" : "aberto"}.`,
+    );
+  const merge = (runId: number) =>
+    deliver(
+      () => mergeDelivery(runId),
+      (result) => `PR #${result.prNumber} mergeado.`,
+    );
 
   async function review(runId: number) {
     try {
@@ -446,6 +557,7 @@ export function BoardPanel({
                 selectedId={selectedId}
                 working={working}
                 blocked={blocked}
+                stages={stages}
                 flashId={flashId}
                 onSelect={select}
                 onMove={move}
@@ -482,9 +594,11 @@ export function BoardPanel({
               states={quickStates({
                 task: selected,
                 lastRun: runs.find((run) => run.taskId === selected.id) ?? null,
-                canStart: startable,
+                canStart: startable && !delivering,
                 starting,
                 dirty,
+                workRun: workRun(runs, selected.id),
+                delivery: deliveryOf(deliveries, workRun(runs, selected.id)),
               })}
               onRun={quick}
               onDelete={() => remove(selected.id)}

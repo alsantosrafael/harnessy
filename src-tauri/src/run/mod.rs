@@ -11,6 +11,7 @@ pub mod codex;
 pub mod commands;
 pub mod guard;
 pub mod prompt;
+pub mod publish;
 pub mod redact;
 pub mod runtime;
 mod stream;

@@ -62,3 +62,46 @@ test("a finished task offers reopening instead of finishing; review says again",
   assert.ok(!states.some((state) => state.id === "finish"));
   assert.equal(states.find((state) => state.id === "review")?.label, "Revisar de novo");
 });
+
+test("publishing needs a finished run with a branch; merging needs a safe PR", () => {
+  const none = by(quickStates({ task: task("review"), lastRun: null, ...base }));
+  assert.match(String(none.publish), /Ainda não há run/);
+  assert.match(String(none.merge), /Publique o PR antes/);
+
+  const work = run({});
+  const published = {
+    runId: 1,
+    prNumber: 3,
+    prUrl: "u",
+    state: "open",
+    draft: true,
+    headSha: "a",
+    checks: "passing",
+    mergeable: "mergeable",
+    reviewedSha: null,
+    publishedAt: 0,
+    mergedAt: null,
+  } as const;
+  const before = quickStates({ task: task("review"), lastRun: work, workRun: work, ...base });
+  assert.equal(by(before).publish, null);
+  assert.equal(before.find((state) => state.id === "publish")?.label, "Publicar PR");
+
+  const after = quickStates({
+    task: task("review"),
+    lastRun: work,
+    workRun: work,
+    delivery: published,
+    ...base,
+  });
+  assert.equal(after.find((state) => state.id === "publish")?.label, "Atualizar PR");
+  assert.equal(by(after).merge, null);
+
+  const failing = quickStates({
+    task: task("review"),
+    lastRun: work,
+    workRun: work,
+    delivery: { ...published, checks: "failing" },
+    ...base,
+  });
+  assert.match(String(by(failing).merge), /checks reprovados/);
+});

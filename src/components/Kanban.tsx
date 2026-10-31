@@ -1,6 +1,21 @@
-import { ArrowRight, Pencil, Trash2, TriangleAlert } from "lucide-react";
+import {
+  ArrowRight,
+  CircleCheck,
+  CircleX,
+  GitMerge,
+  GitPullRequest,
+  GitPullRequestClosed,
+  GitPullRequestDraft,
+  HardDrive,
+  LoaderCircle,
+  Pencil,
+  Trash2,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 import { memo, useRef, useState } from "react";
 import { type Block, LANES, neighbor, shortcutTarget, statusName } from "../lib/board";
+import { type Stage, type StageId, summarize } from "../lib/delivery";
 import type { LocalTask, TaskStatus } from "../lib/desktop";
 import "../styles/kanban.css";
 
@@ -11,6 +26,20 @@ export interface NewTaskDraft {
   criteria: string;
 }
 
+/** Ícone por estágio: o estado nunca depende só da cor. */
+const STAGE_ICONS: Record<StageId, LucideIcon> = {
+  local: HardDrive,
+  draft: GitPullRequestDraft,
+  open: GitPullRequest,
+  "checks-running": LoaderCircle,
+  "checks-failing": CircleX,
+  conflict: TriangleAlert,
+  "changes-requested": TriangleAlert,
+  ready: CircleCheck,
+  merged: GitMerge,
+  closed: GitPullRequestClosed,
+};
+
 const EMPTY_DRAFT: NewTaskDraft = { title: "", description: "", criteria: "" };
 
 interface Props {
@@ -20,6 +49,8 @@ interface Props {
   working: ReadonlySet<number>;
   /** Tarefas cuja última run ficou presa, com o motivo. */
   blocked: ReadonlyMap<number, Block>;
+  /** Estágio de entrega (PR, checks, revisão) de cada tarefa que tem algo a mostrar. */
+  stages: ReadonlyMap<number, Stage>;
   /** Card recém-movido ou criado, destacado por um instante. */
   flashId: number | null;
   onSelect: (id: number) => void;
@@ -37,6 +68,7 @@ export function Kanban({
   selectedId,
   working,
   blocked,
+  stages,
   flashId,
   onSelect,
   onMove,
@@ -74,6 +106,7 @@ export function Kanban({
             {lane.name}
             <span className="lane-count">{groups[lane.status].length}</span>
           </h3>
+          <LaneSummary tasks={groups[lane.status]} stages={stages} />
           {lane.status === "todo" && <Composer onCreate={onCreate} />}
           <ul className="lane-cards">
             {groups[lane.status].map((task) => (
@@ -83,6 +116,7 @@ export function Kanban({
                 selected={selectedId === task.id}
                 working={working.has(task.id)}
                 blocked={blocked.get(task.id)?.reason}
+                stage={stages.get(task.id)}
                 flash={flashId === task.id}
                 onSelect={onSelect}
                 onMove={onMove}
@@ -198,11 +232,49 @@ function Composer({ onCreate }: { onCreate: (draft: NewTaskDraft) => Promise<boo
   );
 }
 
+/** Selo do estágio: ícone + texto, com a frase completa no tooltip e para leitor de tela. */
+function StageChip({ stage }: { stage: Stage }) {
+  const Icon = STAGE_ICONS[stage.id];
+  return (
+    <span className={`chip stage-chip tone-${stage.tone}`} title={stage.hint}>
+      <Icon
+        size={11}
+        aria-hidden="true"
+        className={stage.id === "checks-running" ? "is-spinning" : undefined}
+      />
+      {stage.label}
+      <span className="sr-only">. {stage.hint}</span>
+    </span>
+  );
+}
+
+/** Resumo da raia por estágio, com o que pede ação primeiro. Some quando não há nada. */
+function LaneSummary({
+  tasks,
+  stages,
+}: {
+  tasks: LocalTask[];
+  stages: ReadonlyMap<number, Stage>;
+}) {
+  const found = tasks.flatMap((task) => stages.get(task.id) ?? []);
+  if (found.length === 0) return null;
+  return (
+    <ul className="lane-summary" aria-label="Estágios de entrega">
+      {summarize(found).map((item) => (
+        <li key={item.id} className={`tone-${found.find((f) => f.id === item.id)?.tone}`}>
+          <strong>{item.count}</strong> {item.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 interface CardProps {
   task: LocalTask;
   selected: boolean;
   working: boolean;
   blocked?: string;
+  stage?: Stage;
   flash: boolean;
   onSelect: (id: number) => void;
   onMove: (id: number, to: TaskStatus) => void;
@@ -217,6 +289,7 @@ const KanbanCard = memo(function KanbanCard({
   selected,
   working,
   blocked,
+  stage,
   flash,
   onSelect,
   onMove,
@@ -261,6 +334,7 @@ const KanbanCard = memo(function KanbanCard({
               <TriangleAlert size={11} aria-hidden="true" /> Bloqueada
             </span>
           )}
+          {stage && <StageChip stage={stage} />}
           {working && (
             <span className="card-working">
               <span className="pulse" aria-hidden="true" /> agente trabalhando

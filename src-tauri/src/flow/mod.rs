@@ -8,6 +8,7 @@
 
 pub mod actions;
 pub mod commands;
+pub mod delivery;
 #[cfg(test)]
 mod economico;
 #[cfg(test)]
