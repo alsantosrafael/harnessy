@@ -373,13 +373,19 @@ impl Previews {
 }
 
 /// Alguém já escuta nesta porta (IPv4 ou IPv6 local).
+///
+/// Conectar numa porta da faixa efêmera pode "conectar a si mesmo" (o sistema escolhe a mesma
+/// porta como origem); essa conexão não prova que alguém escuta e é ignorada.
 pub fn port_in_use(port: u16) -> bool {
     [
         SocketAddr::from(([127, 0, 0, 1], port)),
         SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], port)),
     ]
     .iter()
-    .any(|addr| TcpStream::connect_timeout(addr, Duration::from_millis(200)).is_ok())
+    .any(|addr| {
+        TcpStream::connect_timeout(addr, Duration::from_millis(200))
+            .is_ok_and(|stream| stream.local_addr().ok() != stream.peer_addr().ok())
+    })
 }
 
 /// Uma porta livre: a preferida, se estiver livre, senão uma escolhida pelo sistema.

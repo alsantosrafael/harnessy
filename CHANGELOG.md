@@ -22,6 +22,7 @@ Clicar numa tarefa responde na hora (verificado no navegador com os comandos len
 
 ## Back [0.25.1] — 2026-10-31
 
+- **Corrigido um falso "porta ocupada".** A checagem de porta conectava nela, e numa porta da faixa efêmera o sistema pode escolher a mesma porta como origem (conexão consigo mesma), que parecia "alguém escuta". Essas conexões agora são ignoradas; o teste que revelou isso falhava só na suíte inteira.
 - **Os comandos de dados deixam de rodar na thread que desenha a janela.** Todos os comandos IPC de tarefas, runs, workspaces, entrega, perfil, automação e preferências passaram a `async` (no Tauri 2, um comando síncrono roda na thread principal e congela a interface enquanto trabalha). A prévia do prompt, que roda cerca de 10 processos `git`, era o pior caso.
 - **O harness do projeto é guardado em cache por commit** (até 16 entradas): a prévia do prompt e o início de runs deixam de refazer a leitura enquanto o commit não muda. Novo `worktree::resolve_rev`.
 
