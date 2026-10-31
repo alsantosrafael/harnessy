@@ -136,6 +136,9 @@ fn reviewer_for(
     } else {
         pick.model.clone()
     };
+    // O que ficou em Automático acompanha o tamanho do diff; escolha explícita não muda.
+    let auto_model = pick.model.is_empty() && acao.modelo.is_none();
+    let auto_effort = pick.effort.is_none() && acao.esforco.is_none();
     Some(Reviewer {
         model,
         runtime: Some(runtime),
@@ -144,6 +147,9 @@ fn reviewer_for(
         descricao: task.description.clone(),
         criterios: task.criteria.clone(),
         effort: pick.effort.map(str::to_owned),
+        auto_model,
+        auto_effort,
+        implementer_model: implementer_model.to_owned(),
         harness,
     })
 }

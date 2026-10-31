@@ -85,7 +85,7 @@ function AgentFields({ id, runtime, model, effort, auto, onChange, onEffort }: A
             value={model}
             onChange={(event) => onChange(runtime, event.target.value)}
           >
-            {auto && <option value="">Automático (um acima)</option>}
+            {auto && <option value="">Automático (pelo tamanho da mudança)</option>}
             {agent?.models.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.label}
@@ -102,7 +102,7 @@ function AgentFields({ id, runtime, model, effort, auto, onChange, onEffort }: A
           aria-describedby={`${id}-effort-help`}
           onChange={(event) => onEffort(event.target.value)}
         >
-          <option value="">Padrão</option>
+          <option value="">{auto ? "Automático" : "Padrão"}</option>
           {effortsOf(runtime).map((item) => (
             <option key={item.id} value={item.id}>
               {item.label}
@@ -110,7 +110,9 @@ function AgentFields({ id, runtime, model, effort, auto, onChange, onEffort }: A
           ))}
         </select>
         <small id={`${id}-effort-help`} className="muted">
-          Mais esforço pensa mais, custa mais e demora mais.
+          {auto
+            ? "Automático: baixo em mudanças pequenas, o padrão nas demais."
+            : "Mais esforço pensa mais, custa mais e demora mais."}
         </small>
       </label>
     </>
@@ -159,6 +161,13 @@ export function AgentPicker({ choice, onChange, compact, defaultOpen = false }: 
                 </option>
               ))}
             </select>
+            <small className="muted">
+              {choice.reviewWhen === "auto"
+                ? "Pula mudança pequena e sem risco (como só documentação); usa modelo e esforço maiores só em mudança grande ou delicada."
+                : choice.reviewWhen === "always"
+                  ? "Revisa toda run, mesmo uma linha de texto."
+                  : "Não revisa sozinho; use Revisar agora quando quiser."}
+            </small>
           </label>
           {choice.reviewWhen !== "never" && (
             <AgentFields

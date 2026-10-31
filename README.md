@@ -52,7 +52,7 @@ Não coloque credenciais no chat: o armazenamento de rascunhos não é um cofre.
 | Tarefas (quadro local com estados e histórico) | Disponível |
 | GitHub, Codex e Claude Code | Estado real das sessões das CLIs `gh`, `codex` e `claude`; autenticação pelo terminal |
 | Claude Code implementa em worktree próprio | Disponível: verificações rodadas pelo núcleo, falha estruturada, retomada de sessão, contraprova e ciclo com o próximo modelo |
-| Revisão independente | Revisor escolhido na interface (Claude Code ou Codex, com modelo e "quando revisar"); por padrão, o Claude um modelo acima revisa toda run, como um staff engineer |
+| Revisão independente | Revisor escolhido na interface (Claude Code ou Codex, com modelo e "quando revisar"); por padrão a revisão é proporcional ao tamanho e ao risco da mudança (pula só documentação pequena e usa modelo menor em mudança pequena), como um staff engineer |
 | Ações (Explicar, Dividir em passos, Nova Ação, Ações do repositório) | Disponível |
 | Workspaces e tarefas locais em SQLite | Disponível (aba Tarefas locais) |
 | Configuração `.harnessy/` versionada | Ações em `.harnessy/actions/` com confirmação por hash; perfil de verificações planejado |

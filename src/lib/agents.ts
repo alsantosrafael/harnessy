@@ -71,11 +71,14 @@ export const validEffort = (runtime: Runtime, raw: unknown): string =>
 export const effortName = (runtime: Runtime, id: string) =>
   effortsOf(runtime).find((item) => item.id === id)?.label ?? "Padrão";
 
-/** Quando o revisor roda: segundo a Ação (só com risco), sempre ou nunca. */
+/**
+ * Quando o revisor roda: `auto` é proporcional (pula mudança pequena e sem risco, como só
+ * documentação, e escolhe modelo e esforço pelo tamanho do diff), `always` revisa toda run.
+ */
 export type ReviewWhen = "auto" | "always" | "never";
 
 export const reviewWhens: readonly { id: ReviewWhen; label: string }[] = [
-  { id: "auto", label: "Só com risco" },
+  { id: "auto", label: "Proporcional (recomendado)" },
   { id: "always", label: "Sempre" },
   { id: "never", label: "Nunca" },
 ];
@@ -94,7 +97,7 @@ export interface AgentChoice {
   reviewWhen: ReviewWhen;
 }
 
-/** Padrão: Claude Code com Sonnet implementa; o próprio Claude Code revisa toda run. */
+/** Padrão: Claude Code com Sonnet implementa; o Claude Code revisa de forma proporcional ao diff. */
 export const defaultChoice = (): AgentChoice => ({
   runtime: "claude",
   model: "sonnet",
@@ -102,7 +105,7 @@ export const defaultChoice = (): AgentChoice => ({
   reviewer: "claude",
   reviewerModel: "",
   reviewerEffort: "",
-  reviewWhen: "always",
+  reviewWhen: "auto",
 });
 
 export const agentOf = (runtime: Runtime) => agents.find((agent) => agent.runtime === runtime);
@@ -152,14 +155,16 @@ function who(runtime: Runtime, model: string, effort = "") {
   if (runtime === "codex") {
     return (model && model !== "codex" ? `${label} · ${model}` : label) + level;
   }
-  return (model ? `${label} · ${modelName(runtime, model)}` : `${label}, um modelo acima`) + level;
+  return (
+    (model ? `${label} · ${modelName(runtime, model)}` : `${label}, modelo automático`) + level
+  );
 }
 
 /** Resumo de uma linha: quem implementa e quem revisa, e quando. */
 export function choiceSummary(choice: AgentChoice) {
   const impl = who(choice.runtime, choice.model, choice.effort);
   if (choice.reviewWhen === "never") return `${impl} · sem revisão`;
-  const when = choice.reviewWhen === "always" ? "sempre" : "com risco";
+  const when = choice.reviewWhen === "always" ? "sempre" : "proporcional";
   return `${impl} · revisa: ${who(choice.reviewer, choice.reviewerModel, choice.reviewerEffort)} (${when})`;
 }
 

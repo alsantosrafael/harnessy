@@ -25,7 +25,7 @@ const SENSITIVE: [&str; 6] = [
 const NOTE_MERGED: &str = "PR mergeado.";
 
 /// Arquivos do diff `base..branch`, a partir das linhas `diff --git a/x b/x`.
-fn changed_files(diff: &str) -> Vec<&str> {
+pub(super) fn changed_files(diff: &str) -> Vec<&str> {
     diff.lines()
         .filter_map(|line| line.strip_prefix("diff --git a/"))
         .filter_map(|rest| rest.split(" b/").next())

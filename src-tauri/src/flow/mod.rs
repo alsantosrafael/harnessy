@@ -508,8 +508,13 @@ fn review_cycle(
             return None;
         }
     };
-    if !review::is_due(reviewer.action.quando, proof.verdict, diffs.size) {
-        sink.event(id, "status", &review::skipped_message(proof.verdict));
+    let weight = review::weigh(&diffs.unified, &rails().sensitive);
+    if !review::is_due(reviewer.action.quando, proof.verdict, &weight) {
+        sink.event(
+            id,
+            "status",
+            &review::skipped_message(proof.verdict, &weight),
+        );
         return None;
     }
     let checks: String = job
@@ -545,23 +550,33 @@ fn review_diff(
     sink: &dyn Sink,
     runtime: &dyn Runtime,
 ) -> review::Outcome {
+    // O que o usuário deixou em Automático acompanha o tamanho da mudança (e o custo com ele).
+    let weight = review::weigh(&diffs.unified, &rails().sensitive);
+    let (model, effort) = reviewer.plan_for(&weight);
+    let how = match (weight.small(), reviewer.auto_model || reviewer.auto_effort) {
+        (true, true) => " · mudança pequena",
+        _ => "",
+    };
     sink.event(
         id,
         "status",
-        &format!("Revisão independente ({})…", reviewer.model),
+        &format!(
+            "Revisão independente ({model}{}{how})…",
+            effort
+                .as_deref()
+                .map(|level| format!(" · esforço {level}"))
+                .unwrap_or_default()
+        ),
     );
     let prompt = review::prompt_for(reviewer, &diffs.unified, checks, proof_message);
     let mut spec = AgentSpec::new(
         dir,
         &prompt,
-        &reviewer.model,
+        &model,
         actions::max_turns(&reviewer.action),
         Access::Read,
     );
-    spec.effort = reviewer
-        .effort
-        .as_deref()
-        .or(reviewer.action.esforco.as_deref());
+    spec.effort = effort.as_deref();
     spec.json_schema = Some(review::SCHEMA);
     let session = Session {
         run_id: id,
@@ -589,7 +604,7 @@ fn review_diff(
         id,
         &CycleRecord {
             cycle: number,
-            model: &reviewer.model,
+            model: &model,
             session_id: finish_event
                 .as_ref()
                 .and_then(|done| done.session_id.as_deref())
@@ -618,7 +633,7 @@ fn review_diff(
     );
     sink.review(id, outcome.verdict, outcome.discarded);
     sink.event(id, "status", &outcome.message());
-    sink.event(id, "review", &outcome.event_json(&reviewer.model));
+    sink.event(id, "review", &outcome.event_json(&model));
     outcome
 }
 
@@ -671,6 +686,11 @@ pub fn review_existing(
         }
     }
     registry.unregister(run_id);
+}
+
+/// Travas que decidem o que é "sensível" (dependências, migrações, CI); as mesmas da automação.
+fn rails() -> crate::automation::Guardrails {
+    crate::automation::Guardrails::default()
 }
 
 /// Um ciclo do agente: eventos para o log, negações e fim reportado.
@@ -1076,6 +1096,9 @@ mod tests {
             criterios: "ok.txt existe".into(),
             harness: String::new(),
             effort: None,
+            auto_model: false,
+            auto_effort: false,
+            implementer_model: String::new(),
             runtime: external,
         });
         let agent = ReviewedAgent {
@@ -1179,6 +1202,9 @@ mod tests {
             criterios: "ok.txt existe".into(),
             harness: String::new(),
             effort: None,
+            auto_model: false,
+            auto_effort: false,
+            implementer_model: String::new(),
             runtime: None,
         };
         let agent = ReviewedAgent {

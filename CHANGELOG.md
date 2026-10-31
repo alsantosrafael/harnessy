@@ -10,6 +10,18 @@ Rodar localmente para testar a mudança (fatia 2a):
 - Painel **Ambiente de teste** na tarefa: estado em texto (Subindo…, No ar, Parado, Caiu com o código), endereço, **Abrir no navegador**, **Parar** / **Rodar de novo** e o log ao vivo, rolável por teclado.
 - O card mostra **No ar** enquanto o ambiente da tarefa está rodando.
 
+## Front [0.28.0] — 2026-10-31
+
+- O padrão de **Quando revisar** passa a ser **Proporcional (recomendado)**, no lugar de "Sempre". Os rótulos do revisor dizem o que "Automático" faz (modelo e esforço pelo tamanho da mudança) e há uma frase de ajuda sob cada opção. Uma escolha já gravada no banco (por exemplo, "Sempre") **não é alterada**.
+
+## Back [0.25.0] — 2026-10-31
+
+Revisão proporcional: o custo da revisão acompanha o tamanho e o risco da mudança.
+
+- **"Sem testes" deixa de ser risco para documentação.** Uma mudança só de `.md`, `.mdx`, `.txt`, `.rst` ou `.adoc`, pequena, não passa mais pela revisão no modo proporcional (a conversa diz "só de documentação"). Mudança grande (mais de 300 linhas) ou em caminhos sensíveis (as mesmas travas da automação: dependências, migrações, CI, `.harnessy`) continua revisada.
+- **Modelo e esforço automáticos pelo diff.** O que o usuário deixou em Automático: mudança pequena revisa com o modelo de quem implementou (no mínimo Sonnet) e esforço baixo; as demais, um modelo acima e o esforço padrão. **Modelo ou esforço escolhidos pelo usuário (ou fixados pela Ação) nunca são alterados**, e vale também para a revisão sob demanda.
+- O status da revisão mostra o que foi usado ("Revisão independente (sonnet · esforço low · mudança pequena)…") e o ciclo grava o modelo realmente usado.
+
 ## Front [0.27.0] — 2026-10-31
 
 Rodar localmente mais simples e a escolha de agente à vista:

@@ -72,7 +72,7 @@ Se algo não ficou bom, abra o **Chat** da tarefa e descreva o ajuste. O agente 
 | Sintoma | O que fazer |
 |---|---|
 | "Alterações da run" mostra erro | A branch pode ter sido apagada no git. Veja se ela ainda existe |
-| Não aparecem comentários da revisão | A revisão pode não ter rodado (veja o seletor "Quando revisar") ou não ter achado nada |
+| Não aparecem comentários da revisão | A revisão pode ter sido **dispensada** por ser uma mudança pequena e sem risco (a conversa diz isso), ou não ter achado nada. Use **Revisar agora** para forçá-la |
 | A revisão "não devolveu o formato esperado" | Tente **Revisar de novo** ou escolha outro revisor |
 
 Próximo: [Testar localmente →](06-testar-localmente.md)

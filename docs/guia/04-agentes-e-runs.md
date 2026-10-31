@@ -30,13 +30,23 @@ No seletor de agente (a linha recolhida logo acima do botão de implementar) voc
 | **Agente** | **Claude Code** ou **Codex**. Os dois podem implementar e revisar |
 | **Modelo** | O "tamanho do cérebro": modelos maiores resolvem coisas mais difíceis, custam mais e demoram mais. O padrão de quem implementa é **Sonnet**; o revisor pode ficar em **Automático** (um acima) |
 | **Esforço** | Quanto o agente **pensa antes de agir**: **Baixo**, **Médio**, **Alto**, **Muito alto** e **Máximo** no Claude Code (o Codex tem Baixo, Médio e Alto). **Padrão** deixa a decisão com a Ação ou a ferramenta. Mais esforço custa mais e demora mais |
-| **Quando revisar** | **Sempre** (padrão), **Só com risco** ou **Nunca** |
+| **Quando revisar** | **Proporcional (recomendado, padrão)**, **Sempre** ou **Nunca** |
 
 O resumo do seletor mostra o que está valendo, por exemplo: `Claude Code · Sonnet · esforço médio · revisa: Codex (sempre)`.
 
 A escolha fica guardada **no banco local do Harnessy**, então vale para qualquer janela do app (instalada ou em desenvolvimento) e para todas as tarefas. A revisão sob demanda (**Revisar agora**) usa o revisor, o modelo e o esforço que estiverem escolhidos naquele momento.
 
-> **Dica de custo:** o esforço e o modelo do **revisor** pesam muito. Uma revisão com um modelo maior pode custar mais do que a própria implementação. Para mudanças pequenas, escolha **Só com risco** ou um revisor mais leve.
+### A revisão proporcional
+
+Revisar custa. Em uma run real, a revisão com um modelo grande custou **três vezes mais que a implementação** de uma única linha de documentação. Por isso o padrão é **Proporcional**: o Harnessy compara a revisão ao tamanho e ao risco da mudança.
+
+| A mudança é… | O que acontece |
+|---|---|
+| **Só documentação** (`.md`, `.txt`…) e pequena | **Não revisa.** A conversa diz por quê |
+| Pequena, sem caminhos sensíveis | Revisa com o **modelo de quem implementou** (no mínimo Sonnet) e **esforço baixo** |
+| **Grande** (mais de 300 linhas), em **caminhos sensíveis** (dependências, migrações, CI, `.harnessy`), ou **código sem prova** de que os testes pegam a mudança | Revisa com um **modelo acima** e o esforço padrão |
+
+**O que você escolheu vale sempre.** Se você fixar um modelo ou um esforço para o revisor, ele é usado como está, em qualquer tamanho de mudança. **Sempre** revisa toda run, e **Revisar agora** revisa quando você pedir. A proporção só age no que ficou em **Automático**.
 
 > Quando uma run **falha** ou o resultado não convence, o botão **Tentar com** o próximo modelo repete o trabalho com um modelo maior, sem perder o que já foi feito.
 
