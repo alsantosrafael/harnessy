@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CircleHelp, Columns3, MessageSquare, Plug, SquarePen, X } from "lucide-react";
+import {
+  ChevronRight,
+  CircleHelp,
+  Columns3,
+  Folder,
+  MessageSquare,
+  Plug,
+  SquarePen,
+  X,
+} from "lucide-react";
 import { type AgentChoice, loadChoice, saveChoice } from "./lib/agents";
 import { getAppInfo, listWorkspaces, type AppInfo, type Workspace } from "./lib/desktop";
 import { createDraftSession } from "./lib/drafts";
@@ -22,6 +31,7 @@ export function App() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspacesReady, setWorkspacesReady] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [loadError, setLoadError] = useState("");
   const [boardTick, setBoardTick] = useState(0);
   const [runError, setRunError] = useState("");
@@ -93,6 +103,20 @@ export function App() {
   }, [help]);
 
   const connect = () => setView("connections");
+  function toggleWorkspace(id: number) {
+    // O workspace atual fica sempre aberto; clicar nele só o torna ativo.
+    if (id !== workspaceId) {
+      setWorkspaceId(id);
+      setExpanded((set) => new Set(set).add(id));
+      return;
+    }
+    setExpanded((set) => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   const working = runs.runs.filter(isActive).length;
   const runtimeLabel = runtimeError ? "Núcleo indisponível" : info ? "Local" : "Prévia";
   const workspace = workspaces.find((item) => item.id === workspaceId);
@@ -114,37 +138,87 @@ export function App() {
           <SquarePen size={14} aria-hidden="true" />
           Nova tarefa
         </button>
-        <nav>
-          <button
-            className={`nav-item ${view === "board" ? "selected" : ""}`}
-            aria-current={view === "board" ? "page" : undefined}
-            onClick={() => show("board")}
-          >
-            <Columns3 size={16} aria-hidden="true" />
-            Tarefas<span className="shortcut">⌘1</span>
-          </button>
-          <button
-            className={`nav-item ${view === "chat" ? "selected" : ""}`}
-            aria-current={view === "chat" ? "page" : undefined}
-            onClick={() => show("chat")}
-          >
-            <MessageSquare size={16} aria-hidden="true" />
-            Chat
-            {working > 0 && (
-              <span className="nav-badge" title={`${working} run(s) em andamento`}>
-                {working}
-              </span>
-            )}
-            <span className="shortcut">⌘2</span>
-          </button>
-          <button
-            className={`nav-item ${view === "connections" ? "selected" : ""}`}
-            aria-current={view === "connections" ? "page" : undefined}
-            onClick={connect}
-          >
-            <Plug size={16} aria-hidden="true" />
-            Conexões<span className="shortcut">⌘3</span>
-          </button>
+        <nav className="workspace-tree" aria-label="Workspaces">
+          {workspaces.length === 0 && (
+            <>
+              <button
+                className={`nav-item ${view === "board" ? "selected" : ""}`}
+                aria-current={view === "board" ? "page" : undefined}
+                onClick={() => show("board")}
+              >
+                <Columns3 size={16} aria-hidden="true" />
+                Tarefas<span className="shortcut">⌘1</span>
+              </button>
+              <button
+                className={`nav-item ${view === "connections" ? "selected" : ""}`}
+                aria-current={view === "connections" ? "page" : undefined}
+                onClick={connect}
+              >
+                <Plug size={16} aria-hidden="true" />
+                Conexões<span className="shortcut">⌘3</span>
+              </button>
+            </>
+          )}
+          {workspaces.map((item) => {
+            const current = item.id === workspaceId;
+            const open = current || expanded.has(item.id);
+            const go = (next: View) => {
+              setWorkspaceId(item.id);
+              show(next);
+            };
+            const here = (target: View) => current && view === target;
+            return (
+              <div className="ws-group" key={item.id}>
+                <button
+                  className={`nav-item ws-header ${current ? "current" : ""}`}
+                  aria-expanded={open}
+                  title={item.folder}
+                  onClick={() => toggleWorkspace(item.id)}
+                >
+                  <ChevronRight size={14} className="ws-chevron" aria-hidden="true" />
+                  <Folder size={16} aria-hidden="true" />
+                  <span className="ws-name">{item.name}</span>
+                  {current && working > 0 && (
+                    <span className="nav-badge" title={`${working} run(s) em andamento`}>
+                      {working}
+                    </span>
+                  )}
+                </button>
+                {open && (
+                  <div className="ws-items">
+                    <button
+                      className={`nav-item ${here("board") ? "selected" : ""}`}
+                      aria-current={here("board") ? "page" : undefined}
+                      onClick={() => go("board")}
+                    >
+                      <Columns3 size={15} aria-hidden="true" />
+                      Tarefas{current && <span className="shortcut">⌘1</span>}
+                    </button>
+                    <button
+                      className={`nav-item ${here("chat") ? "selected" : ""}`}
+                      aria-current={here("chat") ? "page" : undefined}
+                      onClick={() => go("chat")}
+                    >
+                      <MessageSquare size={15} aria-hidden="true" />
+                      Chat{current && <span className="shortcut">⌘2</span>}
+                    </button>
+                    <button
+                      className={`nav-item ${here("connections") ? "selected" : ""}`}
+                      aria-current={here("connections") ? "page" : undefined}
+                      onClick={() => go("connections")}
+                    >
+                      <Plug size={15} aria-hidden="true" />
+                      Conexões{current && <span className="shortcut">⌘3</span>}
+                    </button>
+                    <button className="nav-item" onClick={() => go("chat")}>
+                      <SquarePen size={15} aria-hidden="true" />
+                      Nova tarefa
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
         <div className="sidebar-bottom">
           <button ref={helpButton} className="nav-item" onClick={() => setHelp(true)}>

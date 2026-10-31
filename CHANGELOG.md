@@ -2,6 +2,13 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.18.0] — 2026-10-31
+
+Barra lateral organizada por workspace:
+
+- Cada workspace é um grupo expansível com **Tarefas**, **Chat**, **Conexões** e **Nova tarefa**; clicar numa ação já troca de workspace e de tela.
+- O workspace atual fica sempre aberto e mostra o contador de runs em andamento. Sem workspaces, a barra mantém Tarefas e Conexões.
+
 ## Front [0.17.1] — 2026-10-30
 
 Correções do QA de regras de negócio:
