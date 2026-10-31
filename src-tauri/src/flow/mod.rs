@@ -1070,6 +1070,7 @@ mod tests {
             tarefa: "Criar arquivo".into(),
             descricao: String::new(),
             criterios: "ok.txt existe".into(),
+            harness: String::new(),
             runtime: external,
         });
         let agent = ReviewedAgent {
@@ -1171,6 +1172,7 @@ mod tests {
             tarefa: "Criar arquivo".into(),
             descricao: String::new(),
             criterios: "ok.txt existe".into(),
+            harness: String::new(),
             runtime: None,
         };
         let agent = ReviewedAgent {

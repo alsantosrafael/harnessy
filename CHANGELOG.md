@@ -2,6 +2,15 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Back [0.18.0] — 2026-10-31
+
+Duas camadas de harness ([ADR 0004](docs/adr/0004-duas-camadas-de-harness.md)):
+
+- O harness do projeto (`AGENTS.md`, `CLAUDE.md`, `.claude/rules/*.md`, `docs/adr/*.md`) é lido **pelo Rust** do commit base, com limite de tamanho e redação de credenciais, e entra no prompt do implementador e do revisor como um bloco de **dados** delimitado, depois das regras do núcleo. Ele informa as convenções, mas não muda papel, formato da resposta, veredito, permissões nem ferramentas; em conflito, valem as regras do Harnessy. O texto de um arquivo não consegue fechar o bloco.
+- Uma mudança que reescreve o AGENTS.md não altera as regras pelas quais é julgada, porque a leitura é do commit base.
+- O início do prompt deixou de mandar o agente "seguir o AGENTS.md" por conta própria. A Ação `revisar` também não manda mais ler arquivos do repositório; ela usa o bloco do Harnessy.
+- A prévia do prompt mostra o bloco, então você vê exatamente o que o agente recebe.
+
 ## Back [0.17.1] — 2026-10-31
 
 - A Ação embutida `revisar` agora é um **staff engineer**: avalia simplicidade e complexidade proporcional à tarefa, fundamentos, aderência às regras e à arquitetura do projeto (lê `AGENTS.md`, `.claude/rules` e `docs/adr`), testabilidade, manutenção e o impacto no usuário. Bugs e casos de borda deixam de ser o foco dela: são do QA, papel separado que entra com o ambiente de teste. O filtro do núcleo continua descartando achados fora das linhas alteradas.

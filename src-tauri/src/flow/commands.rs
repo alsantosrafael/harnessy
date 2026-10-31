@@ -114,6 +114,7 @@ fn reviewer_for(
     implementer_model: &str,
     pick: &ReviewPick,
     runtime: Box<dyn Runtime + Send>,
+    harness: String,
 ) -> Option<Reviewer> {
     if pick.when == "never" {
         return None;
@@ -139,6 +140,7 @@ fn reviewer_for(
         tarefa: task.title.clone(),
         descricao: task.description.clone(),
         criterios: task.criteria.clone(),
+        harness,
     })
 }
 
@@ -146,7 +148,19 @@ fn reviewer_for(
 /// e comandos que o Harnessy já negou ali.
 fn prompt_for(acao: &action::Action, task: &Task, folder: &str, avoid: &[String]) -> String {
     let arquivos = likely::find(Path::new(folder), &task.title, &task.criteria);
-    actions::build_prompt(acao, &contexto(task, &arquivos), avoid)
+    let harness = project_harness(folder, "HEAD");
+    actions::build_prompt(acao, &contexto(task, &arquivos), avoid, &harness)
+}
+
+/// Harness do projeto no commit `rev`, em bloco de dados para o prompt. Lido pelo Rust do
+/// commit base (nunca do worktree da run); sem git ou sem arquivos, vazio.
+fn project_harness(folder: &str, rev: &str) -> String {
+    let dirs = process::search_dirs();
+    let Some(git) = process::find_binary("git", &dirs) else {
+        return String::new();
+    };
+    let files = run::harness::load(&git, &dirs, Path::new(folder), rev);
+    run::harness::frame(rev, &files)
 }
 
 /// Texto exato que o agente receberá, para o usuário conferir antes de iniciar.
@@ -382,7 +396,7 @@ pub fn start_run(
         run_id: created.id,
         title,
         prompt,
-        repo: ws.folder.into(),
+        repo: ws.folder.clone().into(),
         data_dir,
         model: model.clone(),
         checks,
@@ -396,7 +410,15 @@ pub fn start_run(
         effort: acao.esforco.clone(),
         max_turns: actions::max_turns(&acao),
         review: review_runtime.and_then(|runtime| {
-            reviewer_for(&data_dir_review, Some(&repo), &task, &model, &pick, runtime)
+            reviewer_for(
+                &data_dir_review,
+                Some(&repo),
+                &task,
+                &model,
+                &pick,
+                runtime,
+                project_harness(&ws.folder, "HEAD"),
+            )
         }),
         base_ref: base.map(|(_, branch)| branch),
         output_schema: (acao.saida == Saida::Passos).then_some(read::STEPS_SCHEMA),
@@ -476,7 +498,7 @@ pub fn continue_run(
         run_id,
         title: reopened.title.clone(),
         prompt: prompt_for(&acao, &task, &ws.folder, &avoid),
-        repo: ws.folder.into(),
+        repo: ws.folder.clone().into(),
         data_dir,
         model: model.into(),
         checks: verify::checks_for(&dir),
@@ -492,6 +514,7 @@ pub fn continue_run(
             model,
             &pick,
             review_runtime,
+            project_harness(&ws.folder, "HEAD"),
         ),
         base_ref: None,
         output_schema: None,
@@ -540,10 +563,20 @@ pub fn review_run(
         aprovados: &aprovados,
     };
     let implementer = previous.model.clone().unwrap_or_default();
-    let reviewer = reviewer_for(&data_dir, Some(&repo), &task, &implementer, &pick, runtime)
-        .ok_or(AppError::Validation(
-            "A Ação de revisão não está disponível.",
-        ))?;
+    // A revisão sob demanda lê as regras do commit base da run, não da branch revisada.
+    let base_harness = project_harness(&ws.folder, previous.base_sha.as_deref().unwrap_or("HEAD"));
+    let reviewer = reviewer_for(
+        &data_dir,
+        Some(&repo),
+        &task,
+        &implementer,
+        &pick,
+        runtime,
+        base_harness,
+    )
+    .ok_or(AppError::Validation(
+        "A Ação de revisão não está disponível.",
+    ))?;
     let (base, branch) = (
         previous.base_sha.clone().unwrap_or_default(),
         previous.branch.clone().unwrap_or_default(),

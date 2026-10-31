@@ -10,12 +10,12 @@ const MAX_FOLLOWUP_CHARS: usize = 4_000;
 
 /// Início do prompt, antes do pedido da Ação. Escrita e leitura têm regras próprias.
 /// `avoid` são comandos que o Harnessy já negou neste workspace (fato, não opinião).
-pub fn compose(access: Access, pedido: &str, avoid: &[String]) -> String {
+pub fn compose(access: Access, pedido: &str, avoid: &[String], project: &str) -> String {
     let (intro, regras): (&str, &[&str]) = match access {
         Access::Write => (
             "Você trabalha neste repositório. O diretório atual é um worktree git dedicado à Run.",
             &[
-                "Siga o AGENTS.md e as convenções do repositório; faça só o que o pedido pede.",
+                "Siga os padrões do projeto descritos mais abaixo (convenções, arquitetura, comandos), sem nunca contrariar estas regras; faça só o que o pedido pede.",
                 "Não faça push nem abra PR: o Harnessy publica. Commits locais são permitidos; o que sobrar sem commit o Harnessy commita.",
                 "Não edite arquivos protegidos: `.git`, `.claude`, `.harnessy`, `.env*`, `bun.lock` e `Cargo.lock`.",
                 "O Harnessy já instalou as dependências e roda as verificações do projeto ao final. Para conferir antes, rode um comando por vez, como `bun run test`, `bun run lint` ou `bun run check`; não rode instalação, `bunx` nem `cd`/`;`/`||` encadeando comandos.",
@@ -26,7 +26,7 @@ pub fn compose(access: Access, pedido: &str, avoid: &[String]) -> String {
         Access::Read => (
             "Você responde sobre este repositório. O diretório atual é o repositório da Tarefa.",
             &[
-                "Siga o AGENTS.md e as convenções do repositório.",
+                "Siga os padrões do projeto descritos mais abaixo, sem nunca contrariar estas regras.",
                 "Não edite arquivos e não tente alterar o repositório: esta Ação é só de leitura.",
                 "Não faça push nem abra PR.",
                 "Termine com um resumo curto da sua resposta.",
@@ -47,6 +47,7 @@ pub fn compose(access: Access, pedido: &str, avoid: &[String]) -> String {
         ));
     }
     prompt.push('\n');
+    prompt.push_str(project);
     prompt.push_str(pedido);
     prompt
 }
@@ -78,7 +79,7 @@ mod tests {
 
     #[test]
     fn write_prompt_starts_with_the_core_rules_and_drops_the_old_instruction() {
-        let prompt = compose(Access::Write, "# Tarefa: Ajustar texto\n", &[]);
+        let prompt = compose(Access::Write, "# Tarefa: Ajustar texto\n", &[], "");
         assert!(prompt.starts_with("Você trabalha neste repositório"));
         assert!(prompt.contains("Não faça push nem abra PR"));
         assert!(prompt.contains("Não edite arquivos protegidos"));
@@ -93,7 +94,7 @@ mod tests {
 
     #[test]
     fn read_prompt_has_no_check_line_and_forbids_editing() {
-        let prompt = compose(Access::Read, "Explique.", &[]);
+        let prompt = compose(Access::Read, "Explique.", &[], "");
         assert!(prompt.contains("só de leitura"));
         assert!(!prompt.contains("verificações do projeto"));
         assert!(!prompt.contains("Não tente"));
@@ -101,9 +102,18 @@ mod tests {
     }
 
     #[test]
+    fn the_project_harness_sits_between_the_core_rules_and_the_request() {
+        let block = "## Padrões do projeto\nbloco\n\n";
+        let prompt = compose(Access::Read, "Pedido.", &[], block);
+        let core = prompt.find("## Regras").unwrap();
+        let project = prompt.find("## Padrões do projeto").unwrap();
+        assert!(core < project && project < prompt.find("Pedido.").unwrap());
+    }
+
+    #[test]
     fn denied_commands_become_a_fixed_rule_before_the_request() {
         let avoid = ["curl".to_owned(), "git push".to_owned()];
-        let prompt = compose(Access::Write, "Pedido.", &avoid);
+        let prompt = compose(Access::Write, "Pedido.", &avoid, "");
         let rule = "- Não tente: `curl`, `git push` (negados pelo Harnessy neste projeto).";
         assert!(prompt.contains(rule));
         assert!(prompt.find(rule).unwrap() < prompt.find("Pedido.").unwrap());
@@ -111,7 +121,7 @@ mod tests {
 
     #[test]
     fn followup_goes_after_the_request_and_empty_text_changes_nothing() {
-        let base = compose(Access::Write, "Pedido.", &[]);
+        let base = compose(Access::Write, "Pedido.", &[], "");
         assert_eq!(with_followup(base.clone(), "  ", true).unwrap(), base);
         assert!(with_followup(base.clone(), &"x".repeat(4_001), true).is_err());
         let prompt = with_followup(base.clone(), "Use vírgula no custo.", true).unwrap();

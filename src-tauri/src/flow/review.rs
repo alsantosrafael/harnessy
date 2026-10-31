@@ -42,6 +42,8 @@ pub struct Reviewer {
     pub tarefa: String,
     pub descricao: String,
     pub criterios: String,
+    /// Bloco do harness do projeto (já lido do commit base); vazio se o projeto não tem.
+    pub harness: String,
     /// Runtime próprio do revisor (o Codex); `None` usa o do implementador.
     pub runtime: Option<Box<dyn Runtime + Send>>,
 }
@@ -291,7 +293,12 @@ pub(super) fn prompt_for(reviewer: &Reviewer, diff: &str, checks: &str, proof: &
         contraprova: proof,
         ..Default::default()
     };
-    prompt::compose(Access::Read, &reviewer.action.render(&ctx), &[])
+    prompt::compose(
+        Access::Read,
+        &reviewer.action.render(&ctx),
+        &[],
+        &reviewer.harness,
+    )
 }
 
 #[cfg(test)]
