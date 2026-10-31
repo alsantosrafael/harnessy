@@ -613,9 +613,21 @@ pub fn review_run(
 
 /// Exclui uma tarefa (e as runs dela) a pedido do usuário.
 #[tauri::command]
-pub fn delete_task(store: State<'_, Database>, workspace_id: i64, task_id: i64) -> Result<()> {
+pub fn delete_task(
+    store: State<'_, Database>,
+    previews: State<'_, run::preview::Previews>,
+    workspace_id: i64,
+    task_id: i64,
+) -> Result<()> {
     let (folder, worktrees) = {
         let db = store.connection()?;
+        // Um ambiente de teste rodando num worktree que vai sumir seria um servidor órfão.
+        for run in run::list(&db, workspace_id)?
+            .iter()
+            .filter(|run| run.task_id == task_id)
+        {
+            previews.stop(run.id);
+        }
         (
             workspace::get(&db, workspace_id)?.folder,
             run::worktrees_of_task(&db, task_id)?,
@@ -847,4 +859,92 @@ pub fn list_deliveries(
     workspace_id: i64,
 ) -> Result<Vec<crate::delivery::Delivery>> {
     super::delivery::list(&*store.connection()?, workspace_id)
+}
+
+/// Como subir o projeto: o perfil do workspace, se foi confirmado e o que sugerir.
+#[tauri::command]
+pub fn get_profile(
+    store: State<'_, Database>,
+    workspace_id: i64,
+) -> Result<super::preview::ProfileView> {
+    super::preview::profile_view(&*store.connection()?, workspace_id)
+}
+
+/// Grava `.harnessy/workspace.toml` com o comando escolhido e o confirma.
+#[tauri::command]
+pub fn save_profile(
+    store: State<'_, Database>,
+    workspace_id: i64,
+    run: String,
+    port: Option<u16>,
+) -> Result<super::preview::ProfileView> {
+    super::preview::save_profile(&*store.connection()?, workspace_id, &run, port)
+}
+
+/// Confirma o comando que o repositório já traz no perfil.
+#[tauri::command]
+pub fn approve_profile(
+    store: State<'_, Database>,
+    workspace_id: i64,
+) -> Result<super::preview::ProfileView> {
+    super::preview::approve_profile(&*store.connection()?, workspace_id)
+}
+
+fn emit_preview(app: &AppHandle, event: run::preview::Event) {
+    match event {
+        run::preview::Event::State(info) => {
+            let _ = app.emit("preview-state", info);
+        }
+        run::preview::Event::Log { run_id, line } => {
+            let _ = app.emit(
+                "preview-log",
+                serde_json::json!({ "runId": run_id, "line": line }),
+            );
+        }
+    }
+}
+
+/// Sobe o projeto da run no worktree dela, com o comando que o usuário confirmou.
+#[tauri::command]
+pub fn start_preview(
+    app: AppHandle,
+    store: State<'_, Database>,
+    previews: State<'_, run::preview::Previews>,
+    run_id: i64,
+) -> Result<run::preview::Info> {
+    process::wait_for_login_path();
+    let dirs = process::search_dirs();
+    let target = app_data(&app)?.join("cargo-target");
+    let spec = super::preview::spec_for(&*store.connection()?, run_id, &dirs, &target)?;
+    let handle = app.clone();
+    previews.start(spec, move |event| emit_preview(&handle, event))
+}
+
+#[tauri::command]
+pub fn stop_preview(previews: State<'_, run::preview::Previews>, run_id: i64) -> Result<()> {
+    previews.stop(run_id);
+    Ok(())
+}
+
+/// Abre no navegador o endereço local que o ambiente informou.
+#[tauri::command]
+pub fn open_preview(previews: State<'_, run::preview::Previews>, run_id: i64) -> Result<()> {
+    previews.open(run_id)
+}
+
+/// Estado e últimas linhas do log do ambiente de uma run (a tela chega depois dos eventos).
+#[tauri::command]
+pub fn preview_snapshot(
+    previews: State<'_, run::preview::Previews>,
+    run_id: i64,
+) -> Result<(Option<run::preview::Info>, Vec<String>)> {
+    Ok((previews.info(run_id), previews.log(run_id)))
+}
+
+/// Ambientes de teste vivos, para o quadro marcar quais tarefas estão no ar.
+#[tauri::command]
+pub fn list_previews(
+    previews: State<'_, run::preview::Previews>,
+) -> Result<Vec<run::preview::Info>> {
+    Ok(previews.active())
 }

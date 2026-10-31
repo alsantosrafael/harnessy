@@ -11,6 +11,7 @@ pub mod codex;
 pub mod commands;
 pub mod guard;
 pub mod harness;
+pub mod preview;
 pub mod prompt;
 pub mod publish;
 pub mod redact;

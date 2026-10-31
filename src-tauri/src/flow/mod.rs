@@ -15,6 +15,7 @@ mod economico;
 mod experiment;
 mod failure;
 mod likely;
+pub mod preview;
 mod proof;
 mod read;
 pub mod review;

@@ -175,6 +175,13 @@ const MIGRATIONS: &[&str] = &[
         merged_at INTEGER
     );
 ",
+    "
+    CREATE TABLE profile_approvals (
+        workspace_id INTEGER PRIMARY KEY REFERENCES workspaces(id),
+        sha256 TEXT NOT NULL,
+        approved_at INTEGER NOT NULL
+    );
+",
 ];
 
 /// Segundos desde a época Unix; `0` se o relógio estiver antes dela.

@@ -47,6 +47,7 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     flow::sync::recover(&*database.connection()?, &read_only)?;
     app.manage(database);
     app.manage(Registry::default());
+    app.manage(crate::run::preview::Previews::default());
     tray::install(app)?;
     Ok(())
 }

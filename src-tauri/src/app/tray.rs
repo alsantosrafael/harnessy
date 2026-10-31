@@ -3,7 +3,7 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    App, AppHandle, RunEvent, Window, WindowEvent,
+    App, AppHandle, Manager, RunEvent, Window, WindowEvent,
 };
 
 use super::show_main_window;
@@ -38,7 +38,10 @@ pub fn on_window_event(window: &Window, event: &WindowEvent) {
 }
 
 pub fn on_run_event(app: &AppHandle, event: RunEvent) {
-    if let RunEvent::Reopen { .. } = event {
-        show_main_window(app);
+    match event {
+        RunEvent::Reopen { .. } => show_main_window(app),
+        // Não deixa servidor de desenvolvimento órfão ocupando a porta depois de fechar o app.
+        RunEvent::Exit => app.state::<crate::run::preview::Previews>().stop_all(),
+        _ => {}
     }
 }

@@ -2,6 +2,15 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Back [0.19.0] — 2026-10-31
+
+Ambiente de teste local (fatia 2a):
+
+- Novo domínio `profile`: `.harnessy/workspace.toml` (`[preview] run`, `port`, `ready`) descreve como subir o projeto. O comando só roda depois de o usuário confirmar o texto exato (aprovação por sha256; editar o arquivo pede nova confirmação). Sem o arquivo, o núcleo sugere `bun run dev`/`npm run dev` a partir do `package.json`. Nova tabela `profile_approvals` (migração).
+- Novo `run::preview`: sobe o comando no worktree da run, com o ambiente fixo do núcleo (sem `GH_TOKEN`), em grupo de processos próprio. Detecta o endereço local pela saída (Vite e afins, sem cores ANSI) ou pela porta do perfil, guarda as últimas 500 linhas do log (com credenciais redigidas) e informa `starting`, `running`, `stopped` ou `failed`. Só um ambiente fica vivo por vez; parar mata tudo o que ele abriu.
+- O ambiente é encerrado ao fechar o app e ao excluir a tarefa, para não deixar servidor órfão na porta.
+- Comandos: `get_profile`, `save_profile`, `approve_profile`, `start_preview`, `stop_preview`, `open_preview` (só abre `http://localhost:N` anunciado pelo próprio ambiente), `preview_snapshot` e `list_previews`; eventos `preview-state` e `preview-log`.
+
 ## Back [0.18.0] — 2026-10-31
 
 Duas camadas de harness ([ADR 0004](docs/adr/0004-duas-camadas-de-harness.md)):

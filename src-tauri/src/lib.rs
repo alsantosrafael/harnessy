@@ -12,6 +12,7 @@ mod delivery;
 mod error;
 mod flow;
 mod process;
+mod profile;
 mod run;
 mod task;
 mod workspace;
@@ -40,6 +41,14 @@ pub fn run() {
             flow::commands::refresh_delivery,
             flow::commands::merge_delivery,
             flow::commands::list_deliveries,
+            flow::commands::get_profile,
+            flow::commands::save_profile,
+            flow::commands::approve_profile,
+            flow::commands::start_preview,
+            flow::commands::stop_preview,
+            flow::commands::open_preview,
+            flow::commands::preview_snapshot,
+            flow::commands::list_previews,
             flow::commands::list_actions,
             run::commands::list_runs,
             run::commands::list_run_events,
