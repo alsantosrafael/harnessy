@@ -84,12 +84,24 @@ pub(super) fn exit_of(end: &End, finish: Option<&Finish>) -> Exit {
     }
     match finish {
         Some(done) if done.ok && end.status == Some(0) => Exit::Success(done.summary.clone()),
-        Some(done) if done.summary.is_empty() => Exit::Failed("O agente terminou com erro.".into()),
+        Some(done) if done.summary.is_empty() => Exit::Failed(failure_text(&done.subtype)),
         Some(done) => Exit::Failed(done.summary.clone()),
         None => Exit::Failed(format!(
             "O agente terminou sem resultado (código {}).",
             end.status.map_or("?".into(), |c| c.to_string())
         )),
+    }
+}
+
+/// Motivo legível quando o agente falha sem texto de resultado.
+fn failure_text(subtype: &str) -> String {
+    match subtype {
+        "error_max_turns" => format!(
+            "O agente usou todos os {} turnos antes de terminar. O que ele fez fica na branch da run: use Continuar para seguir de onde parou, ou divida a tarefa em passos menores.",
+            guard::MAX_TURNS
+        ),
+        "error_during_execution" => "O agente foi interrompido por um erro durante a execução.".into(),
+        _ => "O agente terminou com erro.".into(),
     }
 }
 
@@ -186,6 +198,12 @@ mod tests {
             exit_of(&end(Some(0)), Some(&finish(false, ""))),
             Exit::Failed("O agente terminou com erro.".into())
         );
+        let mut turns = finish(false, "");
+        turns.subtype = "error_max_turns".into();
+        let Exit::Failed(text) = exit_of(&end(Some(1)), Some(&turns)) else {
+            panic!("deveria falhar");
+        };
+        assert!(text.contains("todos os 25 turnos"));
     }
 
     #[test]
