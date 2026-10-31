@@ -90,6 +90,7 @@ export function TaskDetail({
   // Recarrega o catálogo depois de criar ou confirmar uma Ação.
   const [actionsTick, setActionsTick] = useState(0);
   const primary = actions.find((action) => action.id === IMPLEMENT_ACTION);
+  const done = task.status === "done";
   const primaryReason = primary ? unavailableReason(primary) : null;
   const dirty =
     form.title !== task.title ||
@@ -279,7 +280,7 @@ export function TaskDetail({
           <button
             type="button"
             className={implementIsNext ? "button primary" : "button"}
-            disabled={!canStart || starting || dirty || primaryReason !== null}
+            disabled={!canStart || starting || dirty || done || primaryReason !== null}
             onClick={() => onStart(task.id, undefined, continueFrom)}
           >
             {starting
@@ -292,6 +293,7 @@ export function TaskDetail({
               zero é só se você quiser descartar o caminho atual.
             </p>
           )}
+          {done && <p className="muted">Tarefa concluída. Reabra para implementar de novo.</p>}
           {dirty && <p className="muted">Salve a tarefa antes de implementar.</p>}
           {primaryReason && <p className="local-error">{primaryReason}</p>}
         </section>

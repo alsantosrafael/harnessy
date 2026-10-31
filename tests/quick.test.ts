@@ -63,6 +63,16 @@ test("a finished task offers reopening instead of finishing; review says again",
   assert.equal(states.find((state) => state.id === "review")?.label, "Revisar de novo");
 });
 
+test("a finished task locks the actions that change the work", () => {
+  const states = by(
+    quickStates({ task: task("done"), lastRun: run({ review: "approve" }), ...base }),
+  );
+  for (const id of ["implement", "review", "preview", "publish", "merge"] as const) {
+    assert.match(String(states[id]), /Tarefa concluída/);
+  }
+  assert.equal(states.reopen, null);
+});
+
 test("publishing needs a finished run with a branch; merging needs a safe PR", () => {
   const none = by(quickStates({ task: task("review"), lastRun: null, ...base }));
   assert.match(String(none.publish), /Ainda não há run/);

@@ -2,6 +2,10 @@
 
 O produto segue SemVer. Durante 0.x, incompatibilidades exigem uma versão minor e migração explícita.
 
+## Front [0.29.2] — 2026-10-31
+
+- **Tarefa concluída trava as ações que mexem no trabalho.** Implementar, Revisar, Rodar localmente, Publicar PR e Fazer merge ficam indisponíveis com o motivo "Tarefa concluída. Reabra para continuar."; o botão de implementar do detalhe também. Reabrir tarefa, Abrir conversa e Copiar branch continuam disponíveis.
+
 ## Front [0.21.0] — 2026-10-31
 
 Rodar localmente para testar a mudança (fatia 2a):

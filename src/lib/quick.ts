@@ -37,6 +37,15 @@ interface Input {
   preview?: PreviewInfo | null;
 }
 
+const DONE_REASON = "Tarefa concluída. Reabra para continuar.";
+const LOCKED_WHEN_DONE: ReadonlySet<QuickId> = new Set([
+  "implement",
+  "review",
+  "preview",
+  "publish",
+  "merge",
+]);
+
 /** Comandos rápidos da tarefa, com o motivo de cada indisponibilidade. */
 export function quickStates({
   task,
@@ -117,6 +126,12 @@ export function quickStates({
       ? { id: "reopen", label: "Reabrir tarefa", reason: null }
       : { id: "finish", label: "Concluir tarefa", reason: null },
   );
+  // Tarefa concluída é só leitura: o que muda o trabalho fica travado até reabrir.
+  if (task.status === "done") {
+    return states.map((state) =>
+      LOCKED_WHEN_DONE.has(state.id) ? { ...state, reason: DONE_REASON } : state,
+    );
+  }
   return states;
 }
 
